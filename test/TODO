@@ -1,0 +1,19 @@
+file
+link
+directory
+delete
+  Basic operation (done for file and link)
+  Owner/group/perms (done for file and link)
+  Original backup
+
+config.xml:
+  Various forms of filtering
+    negating checks for list of attributes:  <exec group="!foo">
+  Etch aborts when given contradictory instructions
+
+Command-line options:
+  --damp-run
+  --interactive
+  --full-file
+  --filename-only
+

@@ -1,0 +1,4 @@
+To execute all tests run alltests.rb
+
+You can also run the individual .rb test files to test specific areas.
+
