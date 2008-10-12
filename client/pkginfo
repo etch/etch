@@ -1,0 +1,8 @@
+PKG="OSSetch"
+NAME="Etch client"
+ARCH="sparc,i386"
+VERSION="1.1"
+CATEGORY="application"
+CLASSES="none"
+PSTAMP="none"
+

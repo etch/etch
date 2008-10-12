@@ -1,0 +1,10 @@
+# Run the etch client every hour
+# If you want to disable etch updates do NOT comment out this cron job.
+# Out next client update will just put it back anyway.
+# Instead create /var/etch/disable_etch and add a comment as to
+# why this box shouldn't be getting updates.  Etch will notice
+# that file and abort.  disable_etch files with no comment will be
+# removed by the System Administration team without warning.
+MAILTO=""
+0 * * * * root /usr/sbin/etch_cron_wrapper 
+

@@ -1,0 +1,10 @@
+#!/bin/sh
+
+crontab -l | /usr/xpg4/bin/grep -qs etch
+if [ $? = 0 ]
+then
+	crontab -l | grep -v etch > /tmp/root_crontab || exit 1
+	crontab /tmp/root_crontab
+	rm /tmp/root_crontab
+fi
+
