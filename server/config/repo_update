@@ -1,0 +1,35 @@
+#!/usr/bin/ruby -w
+
+Dir.chdir('/etc/etchserver')
+system('svn update')
+
+# Create hourly tag
+currenttag = Time.now.strftime('etchautotag-%Y%m%d-%H00')
+tagdir = File.join('tags', currenttag)
+if !File.directory?(tagdir)
+  #system('svn up trunk')
+  #system("svn copy trunk #{tagdir}")
+  #system("svn ci -m 'Creating current autotag' --non-interactive #{tagdir}")
+  system("cp -a trunk #{tagdir}")
+end
+
+def convert_tagtime_to_unixtime(tagdate, tagtime)
+  year, month, day = tagdate.unpack('A4A2A2')
+  hour, minute = tagtime.unpack('A2A2')
+  unixtime = Time.local(year, month, day, hour, minute, 0, 0)
+  unixtime
+end
+
+# Remove old hourly tags
+Dir.chdir('tags')
+timelimit = Time.at(Time.now - 60 * 60 * 24 * 3)  # 3 days
+Dir.foreach('.') do |entry|
+  next unless entry =~ /^etchautotag-(\d{8})-(\d{4})$/
+  tagunixtime = convert_tagtime_to_unixtime($1, $2)
+  if tagunixtime < timelimit
+    #system("svn delete #{entry}")
+    #system("svn ci -m 'Removing old autotag' --non-interactive #{entry}")
+    system("rm -rf #{entry}")
+  end
+end
+
