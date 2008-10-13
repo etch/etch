@@ -1,7 +1,7 @@
 #!/usr/bin/ruby -w
 
 Dir.chdir('/etc/etchserver')
-system('svn update')
+system('svn update --quiet')
 
 # Create hourly tag
 currenttag = Time.now.strftime('etchautotag-%Y%m%d-%H00')
