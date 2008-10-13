@@ -4,6 +4,7 @@ require 'digest/sha1' # hexdigest
 require 'base64'      # decode64, encode64
 require 'fileutils'   # mkdir_p
 require 'rexml/document'
+require 'erb'
 require 'versiontype' # Version
 
 module Etch
@@ -429,6 +430,15 @@ class Etch::Server
         plain_file = config_xml.root.elements['/config/file/source/plain'].text
         newcontents = IO::read(plain_file)
         
+      elsif config_xml.root.elements['/config/file/source/template']
+        template_elements = config_xml.root.elements.to_a('/config/file/source/template')
+        if check_for_inconsistency(template_elements)
+          raise "Inconsistent 'template' entries for #{file}"
+        end
+        
+        # Run the template through ERB to generate the file contents
+        erb = ERB.new(IO.read(config_xml.root.elements['/config/file/source/template'].text), nil, '-')
+        newcontents = erb.result
       elsif config_xml.root.elements['/config/file/source/script']
         script_elements = config_xml.root.elements.to_a('/config/file/source/script')
         if check_for_inconsistency(script_elements)

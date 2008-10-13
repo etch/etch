@@ -65,6 +65,43 @@ class EtchFileTests < Test::Unit::TestCase
     assert_equal(correctcontents, get_file_contents(@targetfile), 'file')
 
     #
+    # Test with a template
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <source>
+              <template>source.template</template>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    templatecontents = "This is a test\n<%= 2+2 %>\n"
+    sourcecontents = "This is a test\n4\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source.template", 'w') do |file|
+      file.write(templatecontents)
+    end
+
+    # Run etch
+    #puts "Running initial file test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file was created properly
+    correctcontents = ''
+    IO.foreach(File.join(@repodir, 'warning.txt')) do |line|
+      correctcontents << '# ' + line
+    end
+    correctcontents << "\n"
+    correctcontents << sourcecontents
+
+    assert_equal(correctcontents, get_file_contents(@targetfile), 'template')
+
+    #
     # Test using a different warning file
     #
 
