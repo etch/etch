@@ -18,6 +18,7 @@ $dryrun = nil
 $interactive = nil
 $fullfile = nil
 $filenameonly = nil
+$disableforce = nil
 $lockforce = nil
 $debug = nil
 $server = nil
@@ -48,6 +49,9 @@ opts.on('--full-file', 'Normally etch will print a diff to show what changes it 
 end
 opts.on('--filename-only', 'Similar to the previous option, but in the opposite direction.   Etch will only display the name of file to be changed.') do |opt|
   $filenameonly = opt
+end
+opts.on('--disable-force', 'Ignore the disable_etch file.  Use with caution.') do |opt|
+  $disableforce = opt
 end
 opts.on('--lock-force', 'Force the removal of any existing lockfiles.  Normally only lockfile over 2 hours old are removed.') do |opt|
   $lockforce = opt
@@ -83,5 +87,5 @@ end
 #
 
 etchclient = Etch::Client.new($server, $tag, $varbase, $debug, $dryrun, $interactive, $filenameonly, $fullfile)
-etchclient.process_until_done(files_to_generate, $lockforce)
+etchclient.process_until_done(files_to_generate, $disableforce, $lockforce)
 

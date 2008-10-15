@@ -71,8 +71,8 @@ class Etch::Client
     @exec_once_per_run = {}
   end
   
-  def process_until_done(files_to_generate, lockforce)
-    check_for_disable_etch_file
+  def process_until_done(files_to_generate, disableforce, lockforce)
+    check_for_disable_etch_file(disableforce)
     remove_stale_lock_files(lockforce)
 
     # Assemble the initial request
@@ -178,12 +178,16 @@ class Etch::Client
     # FIXME
   end
 
-  def check_for_disable_etch_file
+  def check_for_disable_etch_file(disableforce)
     disable_etch = File.join(@varbase, 'disable_etch')
     if File.exist?(disable_etch)
-      puts "Etch disabled:"
-      $stdout.write(IO.read(disable_etch))
-      exit(200)
+      if !disableforce
+        puts "Etch disabled:"
+        $stdout.write(IO.read(disable_etch))
+        exit(200)
+      else
+        puts "Ignoring disable_etch file"
+      end
     end
   end
   
