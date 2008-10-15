@@ -62,6 +62,9 @@ class Etch::Server
           @tag = tmptag.chomp
         end
       end
+      if !$?.success?
+        raise "External node tagger exited with error #{$?.exitstatus}"
+      end
       RAILS_DEFAULT_LOGGER.info "Tag for node #{@fqdn} from external node tagger: '#{@tag}'" if (@debug)
     end
 
