@@ -306,25 +306,36 @@ class Etch::Client
       uid = lookup_uid(owner)
       gid = lookup_gid(group)
 
-      compare_file_contents = false
+      set_file_contents = false
       if newcontents
-        compare_file_contents = compare_file_contents(file, newcontents)
+        set_file_contents = compare_file_contents(file, newcontents)
       end
-      compare_permissions = compare_permissions(file, perms)
-      compare_ownership = compare_ownership(file, uid, gid)
+      set_permissions = nil
+      set_ownership = nil
+      # If the file is currently something other than a plain file then
+      # always set the flags to set the permissions and ownership.
+      # Checking the permissions/ownership of whatever is there currently
+      # is useless.
+      if set_file_contents && (!File.file?(file) || File.symlink?(file))
+        set_permissions = true
+        set_ownership = true
+      else
+        set_permissions = compare_permissions(file, perms)
+        set_ownership = compare_ownership(file, uid, gid)
+      end
 
       # Proceed if:
       # - The new contents are different from the current file
       # - The permissions or ownership requested don't match the
       #   current permissions or ownership
-      if !compare_file_contents &&
-         !compare_permissions &&
-         !compare_ownership
+      if !set_file_contents &&
+         !set_permissions &&
+         !set_ownership
         puts "No change to #{file} necessary" if (@debug)
         done = true
       else
         # Tell the user what we're going to do
-        if compare_file_contents
+        if set_file_contents
           # If the new contents are different from the current file
           # show that to the user in the format they've requested.
           # If the requested permissions are not world-readable then
@@ -371,10 +382,10 @@ class Etch::Client
             tempfile.delete
           end
         end
-        if compare_permissions
+        if set_permissions
           puts "Will set permissions on #{file} to #{permstring}"
         end
-        if compare_ownership
+        if set_ownership
           puts "Will set ownership of #{file} to #{uid}:#{gid}"
         end
 
@@ -439,7 +450,7 @@ class Etch::Client
 
         # If the new contents are different from the current file,
         # replace the file.
-        if compare_file_contents
+        if set_file_contents
           if !@dryrun
             # Write out the new contents into a temporary file
             filebase = File.basename(file)
@@ -469,16 +480,21 @@ class Etch::Client
 
             # Move the new file into place
             File.rename(newfile.path, file)
+            
+            # Check the permissions and ownership now to ensure they
+            # end up set properly
+            set_permissions = compare_permissions(file, perms)
+            set_ownership = compare_ownership(file, uid, gid)
           end
         end
 
         # Ensure the permissions are set properly
-        if compare_permissions
+        if set_permissions
           File.chmod(perms, file) if (!@dryrun)
         end
 
         # Ensure the ownership is set properly
-        if compare_ownership
+        if set_ownership
           begin
             File.chown(uid, gid, file) if (!@dryrun)
           rescue Errno::EPERM
@@ -539,7 +555,7 @@ class Etch::Client
         process_setup(file, config)
       end
 
-      compare_link_destination = compare_link_destination(file, dest)
+      set_link_destination = compare_link_destination(file, dest)
       absdest = File.expand_path(dest, File.dirname(file))
 
       permstring = config.elements['/config/link/perms'].text
@@ -588,22 +604,34 @@ class Etch::Client
         @lchmod_supported = true        
       end
       
-      compare_permissions = false
+      set_permissions = false
       if @lchmod_supported
-        compare_permissions = compare_permissions(file, perms)
+        # If the file is currently something other than a link then
+        # always set the flags to set the permissions and ownership.
+        # Checking the permissions/ownership of whatever is there currently
+        # is useless.
+        if set_link_destination && !File.symlink?(file)
+          set_permissions = true
+        else
+          set_permissions = compare_permissions(file, perms)
+        end
       end
-      compare_ownership = false
-      if @lchmod_supported
-        compare_ownership = compare_ownership(file, uid, gid)
+      set_ownership = false
+      if @lchown_supported
+        if set_link_destination && !File.symlink?(file)
+          set_ownership = true
+        else
+          set_ownership = compare_ownership(file, uid, gid)
+        end
       end
 
       # Proceed if:
       # - The new link destination differs from the current one
       # - The permissions or ownership requested don't match the
       #   current permissions or ownership
-      if !compare_link_destination &&
-         !compare_permissions &&
-         !compare_ownership
+      if !set_link_destination &&
+         !set_permissions &&
+         !set_ownership
         puts "No change to #{file} necessary" if (@debug)
         done = true
       # Check that the link destination exists, and refuse to create
@@ -622,13 +650,13 @@ class Etch::Client
         done = true
       else
         # Tell the user what we're going to do
-        if compare_link_destination
+        if set_link_destination
           puts "Linking #{file} -> #{dest}"
         end
-        if compare_permissions
+        if set_permissions
           puts "Will set permissions on #{file} to #{permstring}"
         end
-        if compare_ownership
+        if set_ownership
           puts "Will set ownership of #{file} to #{uid}:#{gid}"
         end
 
@@ -692,19 +720,28 @@ class Etch::Client
         end
 
         # Create the link
-        if compare_link_destination
+        if set_link_destination
           remove_file(file) if (!@dryrun)
           File.symlink(dest, file) if (!@dryrun)
+
+          # Check the permissions and ownership now to ensure they
+          # end up set properly
+          if @lchmod_supported
+            set_permissions = compare_permissions(file, perms)
+          end
+          if @lchown_supported
+            set_ownership = compare_ownership(file, uid, gid)
+          end
         end
 
         # Ensure the permissions are set properly
-        if compare_permissions
+        if set_permissions
           # Note: lchmod
           File.lchmod(perms, file) if (!@dryrun)
         end
 
         # Ensure the ownership is set properly
-        if compare_ownership
+        if set_ownership
           begin
             # Note: lchown
             File.lchown(uid, gid, file) if (!@dryrun)
@@ -775,27 +812,39 @@ class Etch::Client
       uid = lookup_uid(owner)
       gid = lookup_gid(group)
 
-      compare_permissions = compare_permissions(file, perms)
-      compare_ownership = compare_ownership(file, uid, gid)
+      set_directory = !File.directory?(file) || File.symlink?(file)
+      set_permissions = nil
+      set_ownership = nil
+      # If the file is currently something other than a directory then
+      # always set the flags to set the permissions and ownership.
+      # Checking the permissions/ownership of whatever is there currently
+      # is useless.
+      if set_directory
+        set_permissions = true
+        set_ownership = true
+      else
+        set_permissions = compare_permissions(file, perms)
+        set_ownership = compare_ownership(file, uid, gid)
+      end
 
       # Proceed if:
       # - The current file is not a directory
       # - The permissions or ownership requested don't match the
       #   current permissions or ownership
-      if (File.directory?(file) && !File.symlink?(file)) &&
-         !compare_permissions &&
-         !compare_ownership
+      if !set_directory &&
+         !set_permissions &&
+         !set_ownership
         puts "No change to #{file} necessary" if (@debug)
         done = true
       else
         # Tell the user what we're going to do
-        if !File.directory?(file) || File.symlink?(file)
+        if set_directory
           puts "Making directory #{file}"
         end
-        if compare_permissions
+        if set_permissions
           puts "Will set permissions on #{file} to #{permstring}"
         end
-        if compare_ownership
+        if set_ownership
           puts "Will set ownership of #{file} to #{uid}:#{gid}"
         end
 
@@ -846,18 +895,23 @@ class Etch::Client
         end
 
         # Create the directory
-        if !File.directory?(file) || File.symlink?(file)
+        if set_directory
           remove_file(file) if (!@dryrun)
           Dir.mkdir(file) if (!@dryrun)
+
+          # Check the permissions and ownership now to ensure they
+          # end up set properly
+          set_permissions = compare_permissions(file, perms)
+          set_ownership = compare_ownership(file, uid, gid)
         end
 
         # Ensure the permissions are set properly
-        if compare_permissions
+        if set_permissions
           File.chmod(perms, file) if (!@dryrun)
         end
 
         # Ensure the ownership is set properly
-        if compare_ownership
+        if set_ownership
           begin
             File.chown(uid, gid, file) if (!@dryrun)
           rescue Errno::EPERM
