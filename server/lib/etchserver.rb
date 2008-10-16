@@ -375,11 +375,11 @@ class Etch::Server
     # Perform any server setup commands
     if config_xml.root.elements['/config/server_setup'] && !done
       RAILS_DEFAULT_LOGGER.info "Processing server setup commands" if (@debug)
-      config_xml.root.elements.each('/config/server_setup') do |cmd|
-        RAILS_DEFAULT_LOGGER.info "  Executing #{cmd}" if (@debug)
-        success = system(cmd)
+      config_xml.root.elements.each('/config/server_setup/exec') do |cmd|
+        RAILS_DEFAULT_LOGGER.info "  Executing #{cmd.text}" if (@debug)
+        success = system(cmd.text)
         if !success
-          raise "Server setup command #{cmd} for file #{file} exited with non-zero value"
+          raise "Server setup command #{cmd.text} for file #{file} exited with non-zero value"
         end
       end
     end

@@ -33,13 +33,17 @@ class EtchActionTests < Test::Unit::TestCase
   def test_actions
 
     #
-    # Basic tests to ensure that actions are performed under normal circumstances
+    # Basic tests to ensure that actions are performed under normal
+    # circumstances
     #
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
+          <server_setup>
+            <exec>echo server_setup >> #{@repodir}/server_setup</exec>
+          </server_setup>
           <setup>
             <exec>echo setup >> #{@repodir}/setup</exec>
           </setup>
@@ -78,6 +82,10 @@ class EtchActionTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     # Verify that the actions were executed
+    #  The server_setup action will get run several times as we loop
+    #  back and forth with the server sending original sums and
+    #  contents.  So just verify that it was run at least once.
+    assert(get_file_contents("#{@repodir}/server_setup").include?("server_setup\n"), 'server_setup')
     assert_equal("setup\n", get_file_contents("#{@repodir}/setup"), 'setup')
     assert_equal("pre\n", get_file_contents("#{@repodir}/pre"), 'pre')
     assert_equal(
@@ -100,9 +108,99 @@ class EtchActionTests < Test::Unit::TestCase
     assert_equal("exec_once\n", get_file_contents("#{@repodir}/exec_once"), 'exec_once_2nd_check')
 
     #
+    # Test a failed setup command to ensure etch aborts
+    #
+
+    # Put some text into the original file so that we can make sure it
+    # is not touched.
+    origcontents = "This is the original text\n"
+    File.delete(@targetfile)
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <setup>
+            <exec>false</exec>
+          </setup>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running initial action test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file was not touched
+    assert_equal(origcontents, get_file_contents(@targetfile), 'failed setup')
+
+    #
+    # Test a failed pre command to ensure etch aborts
+    #
+
+    # Put some text into the original file so that we can make sure it
+    # is not touched.
+    origcontents = "This is the original text\n"
+    File.delete(@targetfile)
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <pre>
+            <exec>false</exec>
+          </pre>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running initial action test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file was not touched
+    assert_equal(origcontents, get_file_contents(@targetfile), 'failed pre')
+
+    #
     # Run a test where the test action fails, ensure that the original
     # target file is restored and any post actions re-run afterwards
     #
+
+    # Put some text into the original file so that we can make sure it
+    # is restored.
+    origcontents = "This is the original text\n"
+    File.delete(@targetfile)
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -139,7 +237,7 @@ class EtchActionTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     # Verify that the original was restored, and that post was run twice
-    assert_equal(sourcecontents, get_file_contents(@targetfile), 'failed test target')
+    assert_equal(origcontents, get_file_contents(@targetfile), 'failed test target')
     assert_equal("post\npost\n", get_file_contents("#{@repodir}/post"), 'failed test post')
 
     #
