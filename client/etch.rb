@@ -69,6 +69,9 @@ class Etch::Client
     @already_processed = {}
     @exec_already_processed = {}
     @exec_once_per_run = {}
+    
+    @lchown_supported = nil
+    @lchmod_supported = nil
   end
   
   def process_until_done(files_to_generate, disableforce, lockforce)
@@ -448,11 +451,11 @@ class Etch::Client
             newfile.chmod(perms)
             begin
               newfile.chown(uid, gid)
-            rescue
+            rescue Errno::EPERM
               raise if Process.euid == 0
             end
 
-            puts "Writing new contents of #{file} to #{newfile}" if (@debug)
+            puts "Writing new contents of #{file} to #{newfile.path}" if (@debug)
             newfile.write(newcontents)
             newfile.close
 
@@ -478,7 +481,7 @@ class Etch::Client
         if compare_ownership
           begin
             File.chown(uid, gid, file) if (!@dryrun)
-          rescue
+          rescue Errno::EPERM
             raise if Process.euid == 0
           end
         end
@@ -545,9 +548,54 @@ class Etch::Client
       group = config.elements['/config/link/group'].text
       uid = lookup_uid(owner)
       gid = lookup_gid(group)
-
-      compare_permissions = compare_permissions(file, perms)
-      compare_ownership = compare_ownership(file, uid, gid)
+      
+      # lchown and lchmod are not supported on many platforms.  The server
+      # always includes ownership and permissions settings with any link
+      # (pulling them from defaults.xml if the user didn't specify them in
+      # the config.xml file.)  As such link management would always fail
+      # on systems which don't support lchown/lchmod, which seems like bad
+      # behavior.  So instead we check to see if they are implemented, and
+      # if not just ignore ownership/permissions settings.  I suppose the
+      # ideal would be for the server to tell the client whether the
+      # ownership/permissions were specifically requested (in config.xml)
+      # rather than just defaults, and then for the client to always try to
+      # manage ownership/permissions if the settings are not defaults (and
+      # fail in the event that they aren't implemented.)
+      if @lchown_supported.nil?
+        lchowntestlink = Tempfile.new('etchlchowntest').path
+        lchowntestfile = Tempfile.new('etchlchowntest').path
+        File.delete(lchowntestlink)
+        File.symlink(lchowntestfile, lchowntestlink)
+        begin
+          File.lchown(0, 0, lchowntestfile)
+        rescue NotImplementedError
+          @lchown_supported = false
+        rescue Errno::EPERM
+          raise if Process.euid == 0
+        end
+        @lchown_supported = true
+      end
+      if @lchmod_supported.nil?
+        lchmodtestlink = Tempfile.new('etchlchmodtest').path
+        lchmodtestfile = Tempfile.new('etchlchmodtest').path
+        File.delete(lchmodtestlink)
+        File.symlink(lchmodtestfile, lchmodtestlink)
+        begin
+          File.lchmod(0644, lchmodtestfile)
+        rescue NotImplementedError
+          @lchmod_supported = false
+        end
+        @lchmod_supported = true        
+      end
+      
+      compare_permissions = false
+      if @lchmod_supported
+        compare_permissions = compare_permissions(file, perms)
+      end
+      compare_ownership = false
+      if @lchmod_supported
+        compare_ownership = compare_ownership(file, uid, gid)
+      end
 
       # Proceed if:
       # - The new link destination differs from the current one
@@ -660,7 +708,7 @@ class Etch::Client
           begin
             # Note: lchown
             File.lchown(uid, gid, file) if (!@dryrun)
-          rescue
+          rescue Errno::EPERM
             raise if Process.euid == 0
           end
         end
@@ -812,7 +860,7 @@ class Etch::Client
         if compare_ownership
           begin
             File.chown(uid, gid, file) if (!@dryrun)
-          rescue
+          rescue Errno::EPERM
             raise if Process.euid == 0
           end
         end
@@ -984,7 +1032,7 @@ class Etch::Client
 
     # If the file currently exists and is a regular file, check to see
     # if the new contents are different.
-    if File.file?(file)
+    if File.file?(file) && !File.symlink?(file)
       contents = IO.read(file)
       if newcontents != contents
         r = true
@@ -1095,7 +1143,7 @@ class Etch::Client
           Dir.mkdir(origpath, st.mode) if (!@dryrun)
           begin
             File.chown(st.uid, st.gid, origpath) if (!@dryrun)
-          rescue
+          rescue Errno::EPERM
             raise if Process.euid == 0
           end
         end

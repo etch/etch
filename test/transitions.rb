@@ -127,6 +127,45 @@ class EtchTransitionTests < Test::Unit::TestCase
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link to file')
 
     #
+    # Link to file transition where the link points to a file with
+    # identical contents to the file contents we should be writing out
+    # (to test that the comparison method doesn't follow symlinks)
+    #
+
+    # Reset target
+    FileUtils.rm_rf(@targetfile)
+    File.symlink(@destfile, @targetfile)
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    File.open(@destfile, 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running link w/ same contents to file test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file was created properly
+    assert_equal(sourcecontents, get_file_contents(@targetfile), 'link w/ same contents to file')
+
+    #
     # Link to directory transition
     #
 

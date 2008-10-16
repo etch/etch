@@ -75,12 +75,15 @@ module EtchTests
   end
 
   def get_file_contents(file)
-    # Trap exceptions (like non-existent file) so that tests can
-    # properly report back whether the file contents match or not.
-    begin
-      IO.read(file)
-    rescue
-      nil
+    # Don't follow symlinks
+    if File.file?(file) && !File.symlink?(file)
+      # Trap exceptions (like non-existent file) so that tests can
+      # properly report back whether the file contents match or not.
+      begin
+        IO.read(file)
+      rescue
+        nil
+      end
     end
   end
 end
