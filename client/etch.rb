@@ -340,8 +340,8 @@ class Etch::Client
           # show that to the user in the format they've requested.
           # If the requested permissions are not world-readable then
           # use the filenameonly format so that we don't disclose
-          # non-public data.
-          if @filenameonly || permstring.to_i(8) & 0004 == 0
+          # non-public data, unless we're in interactive mode
+          if @filenameonly || (permstring.to_i(8) & 0004 == 0 && !@interactive)
             puts "Will write out new #{file}"
           elsif @fullfile
             # Grab the first 8k of the contents
