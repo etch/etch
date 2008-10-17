@@ -584,12 +584,12 @@ class Etch::Client
         File.symlink(lchowntestfile, lchowntestlink)
         begin
           File.lchown(0, 0, lchowntestfile)
+          @lchown_supported = true
         rescue NotImplementedError
           @lchown_supported = false
         rescue Errno::EPERM
           raise if Process.euid == 0
         end
-        @lchown_supported = true
       end
       if @lchmod_supported.nil?
         lchmodtestlink = Tempfile.new('etchlchmodtest').path
@@ -598,10 +598,10 @@ class Etch::Client
         File.symlink(lchmodtestfile, lchmodtestlink)
         begin
           File.lchmod(0644, lchmodtestfile)
+          @lchmod_supported = true        
         rescue NotImplementedError
           @lchmod_supported = false
         end
-        @lchmod_supported = true        
       end
       
       set_permissions = false
