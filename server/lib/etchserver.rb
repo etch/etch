@@ -962,7 +962,7 @@ class EtchExternalSource
   # This method processes an ERB template (as specified via a <template>
   # entry in a config.xml file) and returns the results.
   def process_template(template)
-    RAILS_DEFAULT_LOGGER.info "Processing template #{template} for file #{file}" if (@debug)
+    RAILS_DEFAULT_LOGGER.info "Processing template #{template} for file #{@file}" if (@debug)
     erb = ERB.new(IO.read(template), nil, '-')
     erb.result
   end
@@ -971,7 +971,7 @@ class EtchExternalSource
   # in a config.xml file) and returns any output that the script puts in
   # the @contents variable.
   def run_script(script)
-    RAILS_DEFAULT_LOGGER.info "Processing script #{script} for file #{file}" if (@debug)
+    RAILS_DEFAULT_LOGGER.info "Processing script #{script} for file #{@file}" if (@debug)
     @contents = ''
     eval(IO.read(script))
     @contents
