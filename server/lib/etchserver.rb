@@ -964,7 +964,7 @@ class EtchExternalSource
   def process_template(template)
     RAILS_DEFAULT_LOGGER.info "Processing template #{template} for file #{@file}" if (@debug)
     erb = ERB.new(IO.read(template), nil, '-')
-    erb.result
+    erb.result(binding)
   end
 
   # This method runs a etch script (as specified via a <script> entry
