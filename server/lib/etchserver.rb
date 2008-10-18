@@ -440,8 +440,9 @@ class Etch::Server
         end
         
         # Run the template through ERB to generate the file contents
-        erb = ERB.new(IO.read(config_xml.root.elements['/config/file/source/template'].text), nil, '-')
-        newcontents = erb.result
+        template = config_xml.root.elements['/config/file/source/template'].text
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        newcontents = external.process_template(template)
       elsif config_xml.root.elements['/config/file/source/script']
         script_elements = config_xml.root.elements.to_a('/config/file/source/script')
         if check_for_inconsistency(script_elements)
@@ -450,8 +451,8 @@ class Etch::Server
         
         # Run the script to generate the file contents
         script = config_xml.root.elements['/config/file/source/script'].text
-        etchscript = EtchScript.new(@facts, @groups, @sourcebase, @sitelibbase, @debug)
-        newcontents = etchscript.run_script(file, script, original_file)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        newcontents = external.run_script(script)
       elsif config_xml.root.elements['/config/file/always_manage_metadata']
         # always_manage_metadata is a special case where we proceed
         # even if we don't have any source for file contents.
@@ -635,8 +636,8 @@ class Etch::Server
         end
         
         script = config_xml.root.elements['/config/link/script'].text
-        etchscript = EtchScript.new(@facts, @groups, @sourcebase, @sitelibbase, @debug)
-        dest = etchscript.run_script(file, script, original_file)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        dest = external.run_script(script)
         
         # Remove the script element from the XML, the client won't need
         # to see it
@@ -706,8 +707,8 @@ class Etch::Server
         end
         
         script = config_xml.root.elements['/config/directory/script'].text
-        etchscript = EtchScript.new(@facts, @groups, @sourcebase, @sitelibbase, @debug)
-        create = etchscript.run_script(file, script, original_file)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        create = external.run_script(script)
         
         # Remove the script element from the XML, the client won't need
         # to see it
@@ -776,8 +777,8 @@ class Etch::Server
         end
         
         script = config_xml.root.elements['/config/delete/script'].text
-        etchscript = EtchScript.new(@facts, @groups, @sourcebase, @sitelibbase, @debug)
-        proceed = etchscript.run_script(file, script, original_file)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        proceed = external.run_script(script)
         
         # Remove the script element from the XML, the client won't need
         # to see it
@@ -943,8 +944,14 @@ class Etch::Server
 
 end
 
-class EtchScript
-  def initialize(facts, groups, sourcebase, sitelibbase, debug=false)
+class EtchExternalSource
+  def initialize(file, original_file, facts, groups, sourcebase, sitelibbase, debug=false)
+    # The external source is going to be processed within the same Ruby
+    # instance as etch.  We want to make it clear what variables we are
+    # intentionally exposing to external sources, essentially this
+    # defines the "API" for those external sources.
+    @file = file
+    @original_file = original_file
     @facts = facts
     @groups = groups
     @sourcebase = sourcebase
@@ -952,28 +959,21 @@ class EtchScript
     @debug = debug
   end
 
-  # This subroutine runs a etch script (as specified via a <script> entry
+  # This method processes an ERB template (as specified via a <template>
+  # entry in a config.xml file) and returns the results.
+  def process_template(template)
+    RAILS_DEFAULT_LOGGER.info "Processing template #{template} for file #{file}" if (@debug)
+    erb = ERB.new(IO.read(template), nil, '-')
+    erb.result
+  end
+
+  # This method runs a etch script (as specified via a <script> entry
   # in a config.xml file) and returns any output that the script puts in
   # the @contents variable.
-  def run_script(file, script, original_file)
+  def run_script(script)
     RAILS_DEFAULT_LOGGER.info "Processing script #{script} for file #{file}" if (@debug)
-
-    # The user's script is going to be executed within the same Ruby
-    # instance as etch.  We want to make it clear what variables we
-    # are intentionally exposing to scripts, essentially this
-    # defines the "API" for etch scripts.
-  
-    # Share some additional variables with the script (in addition to the
-    # ones set in initialize)
-    # The file we're generating
-    @file = file
-    # And the path to the original file
-    @original_file = original_file
-
     @contents = ''
-
     eval(IO.read(script))
-
     @contents
   end
 end
