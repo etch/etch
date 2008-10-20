@@ -6,6 +6,7 @@ if [ $? != 0 ]
 then
 	crontab -l > /tmp/root_crontab || exit 1
 	echo "0 * * * * /usr/sbin/etch_cron_wrapper" >> /tmp/root_crontab || exit 1
+	echo "0 0 * * * /opt/csw/bin/pkg-get -U; /opt/csw/bin/pkg-get -u YPCetch" >> /tmp/root_crontab || exit 1
 	crontab /tmp/root_crontab
 	rm /tmp/root_crontab
 fi
