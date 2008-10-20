@@ -1732,7 +1732,8 @@ class Etch::Client
     return if (@dryrun)
 
     if File.exist?(lockpath)
-      pid = File.new(lockpath).gets.chomp.to_i
+      pid = nil
+      File.open(lockpath) { |f| pid = f.gets.chomp.to_i }
       if pid == $$
         puts "Unlocking #{file}" if (@debug)
         File.delete(lockpath)
