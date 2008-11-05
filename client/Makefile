@@ -66,7 +66,7 @@ solaris: pkginfo depend
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
 	# Cron job for registration
-	cat etch_cron_wrapper | sed 's,/usr/bin/ruby,/opt/csw/bin/ruby,' > $(BUILDROOT)/usr/sbin/etch_cron_wrapper
+	cat etch_cron_wrapper | sed 's,/usr/bin/perl,/opt/csw/bin/perl,' > $(BUILDROOT)/usr/sbin/etch_cron_wrapper
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_cron_wrapper
 	#
 	# Now build the package
