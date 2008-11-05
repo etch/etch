@@ -15,11 +15,12 @@ class FilesController < ApplicationController
       response = etchserver.generate(params[:files])
       render :text => response
     rescue Exception => e
-      #logger.error e.message
-      #response = e.message
-      #logger.info e.backtrace.join("\n") if params[:debug]
-      #render :text => response, :status => :internal_server_error
-      raise
+      logger.error e.message
+      logger.info e.backtrace.join("\n") if params[:debug]
+      response = e.message
+      response << e.backtrace.join("\n") if params[:debug]
+      render :text => response, :status => :internal_server_error
+      #raise
     end
   end
   

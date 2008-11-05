@@ -216,9 +216,8 @@ class Etch::Server
     @already_generated = {}
     @generation_status = {}
     @configs = {}
-    # FIXME: Make these hashes so they de-dup
-    @need_sum = []
-    @need_orig = []
+    @need_sum = {}
+    @need_orig = {}
 
     filelist.each do |file|
       RAILS_DEFAULT_LOGGER.info "Generating #{file}" if @debug
@@ -241,7 +240,7 @@ class Etch::Server
     response_xml.root.add_element configs_xml
     # Add the files for which we need sums
     need_sums_xml = REXML::Element.new 'need_sums'
-    @need_sum.each do |need|
+    @need_sum.each_key do |need|
       need_xml = REXML::Element.new 'need_sum'
       need_xml.text = need
       need_sums_xml.add_element need_xml
@@ -249,7 +248,7 @@ class Etch::Server
     response_xml.root.add_element need_sums_xml
     # Add the files for which we need originals
     need_origs_xml = REXML::Element.new 'need_origs'
-    @need_orig.each do |need|
+    @need_orig.each_key do |need|
       need_xml = REXML::Element.new 'need_orig'
       need_xml.text = need
       need_origs_xml.add_element need_xml
@@ -347,12 +346,12 @@ class Etch::Server
         # contents for this file then stick it into the orig sum request
         # list so that the client knows it needs to ask for this file
         # again next time.
-        if !@need_sum.include?(depend) && !@need_orig.include?(depend)
-          @need_sum << depend
+        if !@need_sum.has_key?(depend) && !@need_orig.has_key?(depend)
+          @need_sum[depend] = true
         end
       end
       # Lastly make sure that this file gets sent back appropriately
-      @need_sum << file
+      @need_sum[file] = true
       filter_xml_completely!(config_xml, ['depend', 'setup'])
       generation_status = false
       done = true
@@ -387,7 +386,7 @@ class Etch::Server
     # Make sure we have the original contents for this file
     original_file = nil
     if !files[file] || !files[file]['sha1sum']
-      @need_sum << file
+      @need_sum[file] = true
       # If there are setup commands defined for this file we need to
       # pass those back along with our request for the original file,
       # as the setup commands may be needed to create the original
@@ -400,7 +399,7 @@ class Etch::Server
     else
       original_file = "#{@origbase}/#{file}.ORIG/#{files[file]['sha1sum']}"
       if !File.exist?(original_file) && !done
-        @need_orig << file
+        @need_orig[file] = true
         # If there are setup commands defined for this file we need to
         # pass those back along with our request for the original file,
         # as the setup commands may be needed to create the original
@@ -870,17 +869,17 @@ class Etch::Server
     elsif @facts[name]
       comparables = [@facts[name]]
     end
-
+    
     result = false
     negate = false
-
+    
     # Negation
     # i.e. <plain os="!SunOS"></plain>
     if value =~ /^\!/
       negate = true
-      value.gsub /^\!/, ''  # Strip off the bang
+      value.sub!(/^\!/, '')  # Strip off the bang
     end
-
+    
     comparables.each do |comp|
       # Numerical comparisons
       # i.e. <plain os="SunOS" osversion=">=5.8"></plain>
@@ -909,14 +908,14 @@ class Etch::Server
         end
       end
     end
-
+    
     if negate
       return !result
     else
       return result
     end
   end
-
+  
   # We let users specify a source multiple times in a config.xml.  This is
   # necessary if multiple groups require the same file, for example.
   # However, the user needs to be consistent.  So this is valid on a
@@ -963,7 +962,13 @@ class EtchExternalSource
   # entry in a config.xml file) and returns the results.
   def process_template(template)
     RAILS_DEFAULT_LOGGER.info "Processing template #{template} for file #{@file}" if (@debug)
+    # The '-' arg allows folks to use <% -%> or <%- -%> to instruct ERB to
+    # not insert a newline for that line, which helps avoid a bunch of blank
+    # lines in the processed file where there was code in the template.
     erb = ERB.new(IO.read(template), nil, '-')
+    # The binding arg ties the template's namespace to this point in the
+    # code, thus ensuring that all of the variables above (@file, etc.)
+    # are visible to the template code.
     erb.result(binding)
   end
 
@@ -973,7 +978,13 @@ class EtchExternalSource
   def run_script(script)
     RAILS_DEFAULT_LOGGER.info "Processing script #{script} for file #{@file}" if (@debug)
     @contents = ''
-    eval(IO.read(script))
+    begin
+      eval(IO.read(script))
+    rescue Exception => e
+      # Help the user figure out where the exception occurred, otherwise they
+      # just get told it happened here in eval, which isn't very helpful.
+      raise e.exception("Exception while processing script #{script} for file #{@file}:\n" + e.message)
+    end
     @contents
   end
 end
