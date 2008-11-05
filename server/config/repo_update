@@ -1,5 +1,6 @@
 #!/usr/bin/ruby -w
 
+Dir.mkdir('/etc/etchserver') if !File.directory?('/etc/etchserver')
 Dir.chdir('/etc/etchserver')
 system('svn update --quiet')
 
