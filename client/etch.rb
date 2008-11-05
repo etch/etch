@@ -131,9 +131,9 @@ class Etch::Client
           break
         end
       else
-        response.error!
         puts response.body
-        abort
+        # error! raises an exception
+        response.error!
       end
 
       #
@@ -1523,13 +1523,11 @@ class Etch::Client
         # running at that same lower priority.  sshd is particularly
         # nefarious, because further commands started by users via
         # that low priority sshd will also run at low priority.
-        # FIXME: Need to figure out how get/setpriority express
-        # failure in Ruby
-        etch_priority = Process.getpriority(Process::PRIO_USER, 0)
+        etch_priority = Process.getpriority(Process::PRIO_PROCESS, 0)
         if etch_priority != 0
           puts "  Etch is running at priority #{etch_priority}, " +
                "temporarily adjusting priority to 0 to run post command" if (@debug)
-          Process.setpriority(Process::PRIO_USER, 0, 0)
+          Process.setpriority(Process::PRIO_PROCESS, 0, 0)
         end
       end
 
