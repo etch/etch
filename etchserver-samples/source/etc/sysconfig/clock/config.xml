@@ -1,0 +1,9 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="RedHat">clock.script</script>
+			<script operatingsystem="CentOS">clock.script</script>
+		</source>
+	</file>
+</config>
+

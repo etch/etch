@@ -1,0 +1,16 @@
+#!/usr/bin/ruby
+
+# On Red Hat /etc/localtime is a copy of the relevant timezone file from
+# /usr/share/zoneinfo.  If Red Hat releases updated timezone data (via a
+# new tzdata RPM) the files in /usr/share/zoneinfo get updated, but
+# /etc/localtime does not.  So we have etch manage /etc/localtime, this
+# script feeding the /u/s/z file to etch.
+
+# FIXME: This is reading /u/s/z on the server, which kinda defeats the purpose
+
+if @groups.include?('uspacific')
+	@contents << IO.read('/usr/share/zoneinfo/US/Pacific')
+else
+	@contents << IO.read('/usr/share/zoneinfo/UTC')
+end
+

@@ -1,0 +1,23 @@
+#!/usr/bin/ruby
+
+# FIXME: This is reading /u/s/z on the server, which kinda defeats the
+# purpose
+
+if @groups.include?('uspacific')
+	if File.exist?('/usr/share/zoneinfo/US/Pacific')
+		@contents << '/usr/share/zoneinfo/US/Pacific'
+	elsif File.exist?('/usr/share/zoneinfo/America/Los_Angeles')
+		@contents << '/usr/share/zoneinfo/America/Los_Angeles'
+	else
+		abort "No US/Pacific zoneinfo file found"
+	end
+else
+	if File.exist?('/usr/share/zoneinfo/UTC')
+		@contents << '/usr/share/zoneinfo/UTC'
+	elsif File.exist?('/usr/share/zoneinfo/Etc/UTC')
+		@contents << '/usr/share/zoneinfo/Etc/UTC'
+	else
+		abort "No UTC zoneinfo file found"
+	end
+end
+

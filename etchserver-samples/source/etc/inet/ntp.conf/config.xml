@@ -1,0 +1,16 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="Solaris">ntp.conf.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec operatingsystem="Solaris" operatingsystemversion="&lt;5.9">/etc/init.d/xntpd stop</exec>
+		<exec operatingsystem="Solaris" operatingsystemversion="&lt;5.9">/etc/init.d/xntpd start</exec>
+
+		<exec operatingsystem="Solaris" operatingsystemversion=">=5.10">svcadm enable ntp</exec>
+		<exec operatingsystem="Solaris" operatingsystemversion=">=5.10">svcadm restart ntp</exec>
+	</post>
+</config>
+

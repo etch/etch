@@ -1,0 +1,35 @@
+#!/bin/sh
+
+if [ -x /usr/bin/wget ]
+then
+	wget=/usr/bin/wget
+elif [ -x /usr/sfw/bin/wget ]
+then
+	wget=/usr/sfw/bin/wget
+elif [ -x /usr/local/bin/wget ]
+then
+	wget=/usr/local/bin/wget
+fi
+
+if [ -n "$wget" ]
+then
+	cd /var/tmp || exit 1
+	rm -f pkg_get.pkg
+	$wget http://server.example.com/solaris/bootstrap/pkg_get.pkg || exit 1
+	pkgadd -a noask -n -d /var/tmp/pkg_get.pkg CSWpkgget
+else
+	# If we can't find a copy of wget fall back to NFS
+
+	mkdir /mnt/solaris
+	mount server.example.com:/export/solaris /mnt/solaris
+
+	cd /mnt/solaris/bootstrap || exit 1
+	pkgadd -a noask -n -d pkg_get.pkg CSWpkgget
+	cp -p wget-sparc.bin /usr/local/bin/wget
+	chmod 755 /usr/local/bin/wget
+
+	cd /
+	umount /mnt/solaris
+	rmdir /mnt/solaris
+fi
+

@@ -1,0 +1,20 @@
+#!/usr/bin/ruby
+
+# We don't use NTP on VMware virtualized hosts per VMware's
+# recommendation
+
+if @facts['manufacturer'] !~ /^VMware/
+  if @groups.include?('ntp-server')
+    @contents = IO.read('ntp.conf.server')
+  else
+    @contents = IO.read('ntp.conf.client')
+  end
+
+  # Add OS-specific bits
+  if @facts['operatingsystem'] =~ /RedHat|CentOS/
+    @contents << IO.read('ntp.conf.redhat')
+  else
+    abort "Unsupported OS #{@facts['operatingsystem']}"
+  end
+end
+

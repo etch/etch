@@ -1,0 +1,10 @@
+<config>
+	<file>
+		<!-- Having the warning message in motd looks funny -->
+		<warning_file></warning_file>
+		<source>
+			<plain>motd</plain>
+		</source>
+	</file>
+</config>
+

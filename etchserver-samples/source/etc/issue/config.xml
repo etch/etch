@@ -1,0 +1,10 @@
+<config>
+	<file>
+		<!-- Having the warning message in issue looks funny -->
+		<warning_file></warning_file>
+		<source>
+			<plain>issue</plain>
+		</source>
+	</file>
+</config>
+

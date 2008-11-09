@@ -1,0 +1,12 @@
+<config>
+  <file>
+    <comment_line>; </comment_line>
+    <source>
+      <plain>resolv.conf</plain>
+    </source>
+  </file>
+  <test>
+    <exec kernel="Linux">host etch | grep 'has address'</exec>
+    <exec operatingsystem="Solaris">nslookup etch | grep etch</exec>
+  </test>
+</config>

@@ -1,0 +1,22 @@
+<config>
+  <file>
+    <owner>0</owner>
+    <group>0</group>
+    <perms>444</perms>
+    <warning_file>warning.txt</warning_file>
+    <comment_open></comment_open>
+    <comment_line># </comment_line>
+    <comment_close></comment_close>
+  </file>
+  <link>
+    <owner>0</owner>
+    <group>0</group>
+    <perms>555</perms>
+  </link>
+  <directory>
+    <owner>0</owner>
+    <group>0</group>
+    <perms>755</perms>
+  </directory>
+</config>
+

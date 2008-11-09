@@ -1,0 +1,8 @@
+# UTC is the default timezone setting for etch-managed systems, but this
+# node is a member of the 'uspacific' node group in nVentory and is
+# therefore set to US/Pacific instead.
+
+ZONE="US/Pacific"
+UTC=false
+ARC=false
+

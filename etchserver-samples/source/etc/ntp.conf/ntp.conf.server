@@ -1,0 +1,10 @@
+# Default to ignoring modifications and traps.  This still allows
+# others to query us for info about our setup and to peer with us.
+restrict default nomodify notrap
+# Permit all access from localhost
+restrict 127.0.0.1
+
+server 0.pool.ntp.org iburst
+server 1.pool.ntp.org iburst
+server 2.pool.ntp.org iburst
+

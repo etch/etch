@@ -1,0 +1,12 @@
+<config>
+	<pre>
+		<exec operatingsystem="/RedHat|CentOS/">rpm --quiet -q ntp || yum -y install ntp</exec>
+	</pre>
+
+	<file>
+		<source>
+			<script operatingsystem="/RedHat|CentOS/">step-tickers.script</script>
+		</source>
+	</file>
+</config>
+

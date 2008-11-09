@@ -1,0 +1,6 @@
+<config>
+	<link>
+		<dest operatingsystem="Solaris">/var/pkg-get/admin-fullauto</dest>
+	</link>
+</config>
+

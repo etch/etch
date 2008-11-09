@@ -1,0 +1,10 @@
+/var/log/auth -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/cron -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/daemon -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/kern -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/lpr -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/maillog -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/user -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/log/local -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+/var/adm/messages -p 1w -C 4 -a 'kill -HUP `cat /var/run/syslog.pid`'
+

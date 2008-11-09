@@ -1,0 +1,13 @@
+#!/usr/bin/ruby
+
+IO.foreach(@original_file) do |line|
+	if line =~ %r{^/var/log/syslog} || line =~ %r{^/var/adm/messages}
+		# Remove by not adding to @contents
+		# Appropriate replacements will be added in our addition file
+	else
+		@contents << line
+	end
+end
+
+@contents << IO.read('logadm.conf.addition')
+

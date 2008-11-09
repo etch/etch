@@ -1,0 +1,11 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">inetd.conf.script</script>
+		</source>
+	</file>
+	<post>
+		<exec>/usr/bin/pkill -HUP inetd</exec>
+	</post>
+</config>
+

@@ -1,0 +1,12 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="/RedHat|CentOS/">config.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec>setenforce 0</exec>
+	</post>
+</config>
+

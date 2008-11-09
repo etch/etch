@@ -1,0 +1,3 @@
+# Don't route if this machine has multiple interfaces.
+# See /etc/init.d/inetinit
+

@@ -1,0 +1,13 @@
+#!/usr/bin/ruby
+
+# We don't use NTP on VMware virtualized hosts per VMware's
+# recommendation
+
+if @facts['manufacturer'] !~ /^VMware/
+  if @groups.include?('ntp-server')
+    @contents = IO.read('step-tickers.server')
+  else
+    @contents = IO.read('step-tickers.client')
+  end
+end
+

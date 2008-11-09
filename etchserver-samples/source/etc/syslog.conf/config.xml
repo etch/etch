@@ -1,0 +1,25 @@
+<config>
+	<file>
+		<source>
+			<plain operatingsystem="/RedHat|CentOS/">syslog.conf</plain>
+			<plain operatingsystem="Solaris">syslog.conf.solaris</plain>
+		</source>
+	</file>
+
+	<post>
+		<!--
+			Make sure all of the files referenced in
+			syslog.conf exist, some versions of syslogd
+			won't create files.
+		  -->
+		<exec>touch -a /var/log/auth /var/log/cron /var/log/daemon /var/log/kern /var/log/lpr /var/log/maillog /var/log/user /var/log/local</exec>
+
+		<exec operatingsystem="/RedHat|CentOS/">service syslog restart</exec>
+
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/syslog stop</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/syslog start</exec>
+
+		<exec operatingsystem="Solaris" operatingsystemrelease=">=5.10">svcadm restart system-log</exec>
+	</post>
+</config>
+

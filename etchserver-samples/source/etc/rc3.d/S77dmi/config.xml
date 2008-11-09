@@ -1,0 +1,11 @@
+<!-- This is a service on Solaris that we don't want to run -->
+<config>
+	<pre>
+		<exec>/etc/rc3.d/S77dmi stop</exec>
+	</pre>
+
+	<delete>
+		<proceed operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9"/>
+	</delete>
+</config>
+

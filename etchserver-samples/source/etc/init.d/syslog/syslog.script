@@ -1,0 +1,11 @@
+#!/usr/bin/ruby
+
+# Add -t flag to syslogd to stop syslog from listening on the
+# network for messages.  This is no longer necessary starting with
+# Solaris 9, see /etc/default/syslogd instead.
+IO.foreach(@original_file) do |line|
+	line.gsub!(/(^\t\t/usr/sbin/syslogd)/, '\1 -t')
+
+	contents << line
+end
+

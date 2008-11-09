@@ -1,0 +1,16 @@
+# For the folks who like separate log files
+auth.debug					/var/log/auth
+cron.debug					/var/log/cron
+daemon.debug					/var/log/daemon
+kern.debug					/var/log/kern
+lpr.debug					/var/log/lpr
+mail.debug					/var/log/maillog
+user.debug					/var/log/user
+local0,local1,local2,local3,local4,local5,local6,local7.debug	/var/log/local
+
+# And for the folks who like a combined file
+*.debug;mail.none				/var/adm/messages
+
+# And ship a copy of interesting stuff to the site log server
+auth.debug;daemon.debug;kern.debug		@syslog
+

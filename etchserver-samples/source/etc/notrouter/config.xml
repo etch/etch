@@ -1,0 +1,8 @@
+<config>
+	<file>
+		<source>
+			<plain operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">notrouter</plain>
+		</source>
+	</file>
+</config>
+

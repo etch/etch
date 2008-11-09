@@ -1,0 +1,10 @@
+# Same rotation settings as the default Red Hat configuration, but with
+# our set of log files.
+/var/log/auth /var/log/cron /var/log/daemon /var/log/kern /var/log/lpr /var/log/maillog /var/log/user /var/log/local /var/log/messages {
+    create 644
+    sharedscripts
+    postrotate
+	/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+    endscript
+}
+

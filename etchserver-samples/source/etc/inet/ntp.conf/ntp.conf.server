@@ -1,0 +1,14 @@
+# Default to ignoring modifications and traps.  This still allows
+# others to query us for info about our setup and to peer with us.
+restrict default nomodify notrap
+# Permit all access from localhost
+restrict 127.0.0.1
+
+server time.caltech.edu
+server time.apple.com
+server clock.isc.org
+server tick.ucla.edu
+server timekeeper.isi.edu
+server nist1-dc.witime.net
+server nist1-ny.witime.net
+

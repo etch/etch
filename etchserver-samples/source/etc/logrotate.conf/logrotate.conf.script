@@ -1,0 +1,26 @@
+#!/usr/bin/ruby
+
+#
+# Red Hat rotates wtmp monthly by default, which causes the loss of
+# login history unnecessarily, as most servers are logged into very
+# infrequently and wtmp grows very slowly.  So we change the rotation to
+# be based on the size of wtmp, which results in retention of 1-2 years
+# of login history in most cases.
+#
+
+in_wtmp_stanza = false
+IO.foreach(@original_file) do |line|
+	if line =~ %r|^\s*/var/log/wtmp|
+		in_wtmp_stanza = true
+	elsif line =~ %r|^\s*}|
+		in_wtmp_stanza = false
+	elsif in_wtmp_stanza && line =~ %r|^\s*monthly|
+		# Comment out the monthly setting
+		line.insert(0, '#')
+		# And insert a size setting
+		line << "    size 100k\n"
+	end
+
+	@contents << line
+end
+

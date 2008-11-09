@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+
+IO.foreach(@original_file) do |line|
+	if line =~ /^\s*#/
+		# Pass comments untouched
+	else
+		# Everything else gets commented out
+		line.insert(0, '#')
+	end
+
+	@contents << line
+end
+

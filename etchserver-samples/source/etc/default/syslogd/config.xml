@@ -1,0 +1,20 @@
+<config>
+	<!--
+		The Solaris 10 and later equivalent of the configuration done in
+		this file on Solaris 9 (turning off acceptance of syslog
+		messages from the network).  This isn't really the best place
+		for this, but will live here until we have a dedicated area in
+		etch for configuration via commands instead of files.
+	  -->
+	<setup>
+		<exec operatingsystem="Solaris" operatingsystemrelease=">=5.10">svccfg -s svc:/system/system-log setprop config/log_from_remote = false</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease=">=5.10">svcadm refresh svc:/system/system-log</exec>
+	</setup>
+
+	<file>
+		<source>
+			<script operatingsystem="Solaris" operatingsystemrelease="5.9">syslogd.script</script>
+		</source>
+	</file>
+</config>
+

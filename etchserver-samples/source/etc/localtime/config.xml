@@ -1,0 +1,27 @@
+<config>
+	<file>
+		<!-- Binary file so don't insert warning -->
+		<warning_file></warning_file>
+		<source>
+			<script operatingsystem="/RedHat|CentOS/">localtime-redhat.script</script>
+		</source>
+	</file>
+	<link>
+		<script operatingsystem="FreeBSD">localtime-freebsd.script</script>
+	</link>
+
+	<post>
+		<exec operatingsystem="/RedHat|CentOS/">service syslog restart</exec>
+		<exec operatingsystem="/RedHat|CentOS/">service crond restart</exec>
+		<exec operatingsystem="/RedHat|CentOS/">service atd restart</exec>
+		<exec operatingsystem="/RedHat|CentOS/">service sudoscriptd restart</exec>
+
+		<exec operatingsystem="FreeBSD">killall syslogd</exec>
+		<exec operatingsystem="FreeBSD">/usr/sbin/syslogd -svv</exec>
+		<exec operatingsystem="FreeBSD">killall cron</exec>
+		<exec operatingsystem="FreeBSD">/usr/sbin/cron -s</exec>
+		<exec operatingsystem="FreeBSD">kill `cat /var/run/sudoscriptd.pid`</exec>
+		<exec operatingsystem="FreeBSD">/usr/local/etc/rc.d/sudoscriptd.sh</exec>
+	</post>
+</config>
+

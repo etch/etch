@@ -1,0 +1,8 @@
+#!/usr/bin/ruby
+
+if @groups.include?('uspacific')
+	@contents << IO.read('uspacific')
+else
+	@contents << IO.read('utc')
+end
+

@@ -1,0 +1,14 @@
+#!/usr/bin/ruby
+
+IO.foreach(@original_file) do |line|
+	if /^TZ=/
+		if @groups.include?('uspacific')
+			line = "TZ=US/Pacific\n"
+		else
+			line = "TZ=UTC\n"
+		end
+	end
+
+	@contents << line
+end
+

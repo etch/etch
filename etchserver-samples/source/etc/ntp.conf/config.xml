@@ -1,0 +1,20 @@
+<config>
+	<depend group="ntp-server">/etc/virtifs</depend>
+	<depend operatingsystem="/RedHat|CentOS/">/etc/ntp/step-tickers</depend>
+
+	<pre>
+		<exec operatingsystem="/RedHat|CentOS/">rpm --quiet -q ntp || yum -y install ntp</exec>
+	</pre>
+
+	<file>
+		<source>
+			<script operatingsystem="/RedHat|CentOS/">ntp.conf.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec operatingsystem="/RedHat|CentOS/">chkconfig ntpd on</exec>
+		<exec operatingsystem="/RedHat|CentOS/">service ntpd restart</exec>
+	</post>
+</config>
+

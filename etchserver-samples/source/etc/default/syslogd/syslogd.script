@@ -1,0 +1,13 @@
+#!/usr/bin/ruby
+
+# Configure syslog to not listen on the network.  This only works on
+# Solaris 9.  For earlier versions see /etc/init.d/syslog.  For later
+# versions see the config.xml in this directory.
+IO.foreach(@original_file) do |line|
+	if /LOG_FROM_REMOTE=/
+		line = "LOG_FROM_REMOTE=NO\n"
+	end
+
+	@contents << line
+end
+

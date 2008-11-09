@@ -1,0 +1,8 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="/RedHat|CentOS/">logrotate.conf.script</script>
+		</source>
+	</file>
+</config>
+

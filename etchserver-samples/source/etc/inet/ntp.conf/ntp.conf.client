@@ -1,0 +1,10 @@
+# Default to ignoring all queries and modifications.  This still allows
+# peering with anyone.
+restrict default nomodify notrap noquery
+# Permit all access from localhost
+restrict 127.0.0.1
+
+server ntp1
+server ntp2
+server ntp3
+

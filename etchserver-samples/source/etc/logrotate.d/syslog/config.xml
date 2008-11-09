@@ -1,0 +1,8 @@
+<config>
+	<file>
+		<source>
+			<plain operatingsystem="/RedHat|CentOS/">syslog</plain>
+		</source>
+	</file>
+</config>
+

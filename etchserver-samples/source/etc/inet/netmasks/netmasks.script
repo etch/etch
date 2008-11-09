@@ -1,0 +1,16 @@
+#!/usr/bin/ruby
+
+require 'nventory'
+
+nvclient = NVentory::Client.new
+subnet_results = nvclient.get_objects('subnets', {}, {})
+if subnet_results.nil? || subnet_results.empty?
+	abort "Failed to get subnet data from nVentory"
+end
+
+subnet_results.each_value do |subnet|
+	if subnet['network'] && subnet['netmask']
+		@contents << "#{subnet['network']}\t#{subnet['netmask']}" << "\n"
+	end
+end
+

@@ -1,0 +1,13 @@
+<config>
+	<depend>/var/sadm/install/admin/noask</depend>
+	<pre>
+		<exec>pkginfo -q CSWpkgget || sh ./install_pkgget</exec>
+	</pre>
+
+	<file>
+		<source>
+			<plain operatingsystem="Solaris">pkg-get.conf</plain>
+		</source>
+	</file>
+</config>
+

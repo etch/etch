@@ -1,0 +1,20 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="Solaris">init.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/syslog stop</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/syslog start</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/cron stop</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/cron start</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease="&lt;=5.9">/etc/init.d/sudoscriptd restart</exec>
+
+		<exec operatingsystem="Solaris" operatingsystemrelease=">=5.10">svcadm restart system-log</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease=">=5.10">svcadm restart cron</exec>
+		<exec operatingsystem="Solaris" operatingsystemrelease=">=5.10">/etc/init.d/sudoscriptd restart</exec>
+	</post>
+</config>
+

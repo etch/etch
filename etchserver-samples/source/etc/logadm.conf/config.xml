@@ -1,0 +1,9 @@
+<config>
+	<file>
+		<source>
+			<!-- logadm not used in older versions of Solaris -->
+			<script operatingsystem="Solaris" operatingsystemrelease=">=5.9">logadm.conf.script</script>
+		</source>
+	</file>
+</config>
+

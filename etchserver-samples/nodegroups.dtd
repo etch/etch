@@ -1,0 +1,7 @@
+<!ELEMENT nodegroups (nodegroup*)>
+
+<!ELEMENT nodegroup (child*)>
+<!ATTLIST nodegroup name CDATA #REQUIRED>
+
+<!ELEMENT child (#PCDATA)>
+

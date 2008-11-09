@@ -1,0 +1,8 @@
+<config>
+	<file>
+		<source>
+			<script operatingsystem="Solaris">netmasks.script</script>
+		</source>
+	</file>
+</config>
+

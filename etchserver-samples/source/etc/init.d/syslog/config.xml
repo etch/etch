@@ -1,0 +1,15 @@
+<config>
+	<file>
+		<perms>544</perms>
+		<!-- Shell script so insert warning below shebang line -->
+		<warning_on_second_line/>
+		<source>
+			<script operatingsystem="Solaris" operatingsystemrelease="&lt;=5.8">syslog.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec>for i in /etc/rc?.d/*syslog; do rm -f $i; ln /etc/init.d/syslog $i; done</exec>
+	</post>
+</config>
+
