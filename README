@@ -1,0 +1,34 @@
+etch - Unix System Configuration Management
+http://etch.sourceforge.net
+
+------------------------------------------------------------------------------
+Setup
+------------------------------------------------------------------------------
+
+See the GettingStarted page on http://etch.wiki.sourceforge.net/
+
+------------------------------------------------------------------------------
+Help
+------------------------------------------------------------------------------
+
+If you run into any problems or have any questions you'll find us on the
+etch-users mailing list:
+
+https://lists.sourceforge.net/lists/listinfo/etch-users
+
+------------------------------------------------------------------------------
+License
+------------------------------------------------------------------------------
+
+License: MIT (http://www.opensource.org/licenses/mit-license.php)
+
+------------------------------------------------------------------------------
+Credits
+------------------------------------------------------------------------------
+
+etch 1.x copyright Jason Heiss, 2003
+
+etch 3.x is a derivative work of etch 1.x and is 
+copyright 2008, YELLOWPAGES.COM LLC
+Development by Jason Heiss, YELLOWPAGES.COM
+
