@@ -314,7 +314,13 @@ class Etch::Server
     @filestack[file] = true
 
     # Load the config.xml file
-    config_xml = REXML::Document.new(File.open("#{@sourcebase}/#{file}/config.xml"))
+    begin
+      config_xml = REXML::Document.new(File.open("#{@sourcebase}/#{file}/config.xml"))
+    rescue => e
+      # Help the user figure out where the exception occurred, REXML doesn't
+      # include the filename when it throws a parse exception.
+      raise e.exception("Exception while processing config.xml for file #{file}:\n" + e.message)
+    end
 
     # Filter the config.xml file by looking for attributes
     configfilter!(config_xml.root)
