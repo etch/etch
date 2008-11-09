@@ -1,0 +1,9 @@
+<config>
+	<link>
+		<!--
+			This will create a symlink to /tmp/otherfile on all systems.
+		  -->
+		<dest>/tmp/otherfile</dest>
+	</link>
+</config>
+

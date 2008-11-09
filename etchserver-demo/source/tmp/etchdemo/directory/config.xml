@@ -1,0 +1,12 @@
+<config>
+	<directory>
+		<!--
+			This directory will be created on any variant of Linux, and
+			FreeBSD and Solaris.
+		  -->
+		<create kernel="Linux"/>
+		<create operatingsystem="FreeBSD"/>
+		<create operatingsystem="Solaris"/>
+	</directory>
+</config>
+

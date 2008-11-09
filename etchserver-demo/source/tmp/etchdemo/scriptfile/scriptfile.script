@@ -1,0 +1,12 @@
+#!/usr/bin/ruby
+
+# See the etch manual for more info about how etch scripts work.
+
+@contents << IO.read('main')
+
+@contents << "Line between the main part of the file and the addition\n"
+
+if @facts['kernel'] == 'Linux' && @groups.include?('testgroup')
+	@contents << IO.read('addition')
+end
+

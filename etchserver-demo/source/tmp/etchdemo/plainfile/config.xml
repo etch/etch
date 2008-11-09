@@ -1,0 +1,17 @@
+<config>
+	<file>
+		<!--
+			By default files will be owned by root,
+			but you can change that.  If this user or
+			group doesn't exist UID 0 and GID 0 will
+			be used as a faillback.
+		  -->
+		<owner>nobody</owner>
+		<group>wheel</group>
+		<source>
+			<plain operatingsystem="!FreeBSD">plainfile</plain>
+			<plain operatingsystem="FreeBSD">plainfile2</plain>
+		</source>
+	</file>
+</config>
+
