@@ -1,0 +1,23 @@
+#!/usr/bin/ruby -w
+##############################################################################
+# This is a node grouping script for etch which gets groups from nVentory
+# http://etch.wiki.sourceforge.net/NodeGroups
+##############################################################################
+
+require 'nventory'
+
+name = ARGV[0] or abort "No hostname passed"
+
+#
+# Grab classes from nVentory
+#
+
+nvclient = NVentory::Client.new
+results = nvclient.get_objects('nodes', {}, { 'name' => name }, ['node_groups'])
+
+if results.include?(name) && results[name].include?('node_groups')
+  results[name]['node_groups'].each do |ng|
+    puts ng['name']
+  end
+end
+

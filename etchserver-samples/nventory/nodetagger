@@ -1,0 +1,126 @@
+#!/usr/bin/ruby -w
+##############################################################################
+# This is a node tagging script for etch which gets tags from nVentory
+# http://etch.wiki.sourceforge.net/ControlledDeployment
+##############################################################################
+
+require 'nventory'
+
+name = ARGV[0] or abort "No hostname passed"
+
+#
+# Load the tag state data
+#
+# This allows users to mark tags as good or bad.  Here's a scenario to
+# explain why you want to be able to mark tags as bad.  Imagine you check
+# in a bad change at 0800.  Around 1000 you notice that your dev and qa
+# environments are broken and commit a fix.  That fix ends up in the 1100
+# tag.  However, staging and production are still going to get the 0800,
+# 0900 and 1000 tags before they get to your 1100 tag with the fix.  You
+# need a way to tell the system to skip over those bad tags.  If you mark
+# 0800, 0900 and 1000 as bad then dev and qa will revert to 0700 (the last
+# non-bad tag), and staging and production will hold at 0700.  Then the
+# 1100 tag will work its way through the environments as usual.  Disaster
+# averted.
+#
+# Marking tags as good doesn't currently do anything, but could be used to
+# implement a human review or change management process where only known-good
+# tags are allowed to propagate to production.
+#
+@tagstate = {}
+tagstatefile = File.join(File.dirname(__FILE__), 'tagstate')
+if File.exist?(tagstatefile)
+  IO.foreach(tagstatefile) do |line|
+    next if line =~ /^\s*$/  # Skip blank lines
+    next if line =~ /^\s*#/  # Skip comments
+    tag, state = line.split
+    if state == 'good' || state == 'bad'
+      @tagstate[tag] = state
+    else
+      warn "Ignoring state #{state} for tag #{tag}, it's not 'good' or 'bad'"
+    end
+  end
+end
+
+# This finds an autotag that is at least 'hoursago' old, isn't marked as bad,
+# and is marked as good if 'needgoodtag' is true
+def findautotag(hoursago, needgoodtag=false)
+  tag = nil
+  hourcounter = hoursago
+  # Check back up to three days for an acceptable tag.  The three day
+  # limit is arbitrary, but we need something so that we avoid going
+  # into an infinite loop if there simply isn't an acceptable tag.
+  while tag.nil? && hourcounter < 24*3
+    proposedtag = Time.at(Time.now - hourcounter * 60 * 60).strftime('etchautotag-%Y%m%d-%H00')
+    # If we need a 'good' tag then check that the proposed tag is
+    # marked as 'good'.
+    if needgoodtag &&
+       !@tagstate[proposedtag].nil? &&
+       @tagstate[proposedtag] == 'good'
+      tag = proposedtag
+    end
+    # If we don't need a 'good' tag then check that either the
+    # proposed tag has no state (unknown, and presumed good in this
+    # case), or has a state that isn't 'bad'.
+    if !needgoodtag &&
+       (@tagstate[proposedtag].nil? || @tagstate[proposedtag] != 'bad')
+      tag = proposedtag
+    end
+    hourcounter += 1
+  end
+  
+  if tag.nil?
+    abort "No acceptable tag found for hoursago:#{hoursago} and " +
+          "needgoodtag:#{needgoodtag}"
+  end
+  
+  tag
+end
+
+#
+# Grab tag from nVentory
+#
+
+nvclient = NVentory::Client.new
+results = nvclient.get_objects('nodes', {}, { 'name' => name }, ['node_groups'])
+
+tag = ''
+DEFAULT_HOURS = 4
+hours = DEFAULT_HOURS
+if !results.empty? && !results[name].nil?
+  if !results[name]['config_management_tag'].nil? &&
+     !results[name]['config_management_tag'].empty?
+    tag = results[name]['config_management_tag']
+  else
+    if !results[name]['node_groups'].nil?
+      node_group_names = results[name]['node_groups'].collect { |ng| ng['name'] }
+      case
+      when node_group_names.include?('dev') || node_group_names.include?('int')
+        hours = 0
+      when node_group_names.include?('qa')
+        hours = 1
+      when node_group_names.include?('stg')
+        hours = 2
+      end
+    end
+
+    # For production nodes we want to divide them based on our
+    # failover/BCP strategy so that we deploy changes in such a way that
+    # a bad change doesn't take out all failover groups at once.  With
+    # multiple data centers and global load balancing this could mean
+    # deploying to one data center and then the other.  Or you could base
+    # it on other node groups.  In other words this section should set about
+    # half your machines to hours = 3, and then the remaining systems will
+    # get the default number of hours below.
+    if hours == DEFAULT_HOURS
+		# nVentory query for DC goes here
+    end
+  end
+end
+
+if tag.nil? || tag.empty?
+  tag = findautotag(hours)
+end
+
+puts File.join('tags', tag)
+
