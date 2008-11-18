@@ -1,2 +1,6 @@
 #!/bin/sh
 
+# The nodegrouper script can be used to query an external data source
+# for node group assignments.
+# http://etch.wiki.sourceforge.net/NodeGroups
+
