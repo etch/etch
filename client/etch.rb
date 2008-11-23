@@ -11,7 +11,7 @@ require 'net/https'
 require 'rexml/document'
 require 'fileutils'   # copy, mkpath, rmtree
 require 'fcntl'       # Fcntl::O_*
-require 'etc'         # getpwnam, getgrname
+require 'etc'         # getpwnam, getgrnam
 require 'tempfile'    # Tempfile
 
 # clean up "using default DH parameters" warning for https
@@ -1592,10 +1592,10 @@ class Etch::Client
     else
       # Otherwise attempt to look up the username to get a UID.
       # Default to UID 0 if the username can't be found.
-      pw = Etc.getpwnam(user)
-      if pw
+      begin
+        pw = Etc.getpwnam(user)
         uid = pw.uid
-      else
+      rescue ArgumentError
         puts "config.xml requests user #{user}, but that user can't be found.  Using UID 0."
         uid = 0
       end
@@ -1612,10 +1612,10 @@ class Etch::Client
     else
       # Otherwise attempt to look up the group to get a GID.  Default
       # to GID 0 if the group can't be found.
-      gr = Etc.getgrnam(group)
-      if gr
+      begin
+        gr = Etc.getgrnam(group)
         gid = gr.gid
-      else
+      rescue ArgumentError
         puts "config.xml requests group #{group}, but that group can't be found.  Using GID 0."
         gid = 0
       end

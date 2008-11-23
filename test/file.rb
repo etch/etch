@@ -363,6 +363,39 @@ class EtchFileTests < Test::Unit::TestCase
     assert_equal(0660, perms, 'file perms')
 
     #
+    # Test ownership w/ bogus owner/group names
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <owner>bogusbogusbogus</owner>
+          <group>bogusbogusbogus</group>
+          <source>
+            <plain>source</plain>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    # Run etch
+    #puts "Running file ownership w/ bogus owner/group names"
+    run_etch(@port, @testbase)
+
+    # Verify that the ownership defaulted to UID/GID 0
+    #  Most systems don't support give-away chown, so this test won't work
+    #  if not run as root
+    if Process.euid == 0
+      assert_equal(0, File.lstat(@targetfile).uid, 'file uid w/ bogus owner')
+      assert_equal(0, File.lstat(@targetfile).gid, 'file gid w/ bogus group')
+    else
+      warn "Not running as root, skipping bogus ownership test"
+    end
+
+    #
     # Run a test of always_manage_metadata
     #
 
