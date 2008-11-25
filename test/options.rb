@@ -28,6 +28,54 @@ class EtchOptionTests < Test::Unit::TestCase
   
   def test_dryrun
     #
+    # Test killswitch (not really a command-line option, but seems to
+    # fit best in this file)
+    #
+
+    # Put some text into the original file so that we can make sure it is
+    # not touched.
+    origcontents = "This is the original text\n"
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    File.open("#{@repodir}/killswitch", 'w') do |file|
+      file.write('killswitch test')
+    end
+    
+    # Run etch
+    #puts "Running killswitch test"
+    sleep 3
+    puts "#"
+    puts "# Errors expected here"
+    puts "#"
+    sleep 3
+    run_etch(@port, @testbase)
+
+    assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
+    
+    File.delete("#{@repodir}/killswitch")
+    
+    #
     # Test --dry-run
     #
 

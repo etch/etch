@@ -44,7 +44,14 @@ class Etch::Server
     if !File.directory?(@configbase)
       raise "Config base #{@configbase} doesn't exist"
     end
-
+    
+    # Check for killswitch
+    killswitch = File.join(@configbase, 'killswitch')
+    if File.exist?(killswitch)
+      contents = IO.read(killswitch)
+      raise "killswitch activated: #{contents}"
+    end
+    
     # Run the external node tagger
     # A client-supplied tag overrides the server-side node tagger
     if !@tag.nil? && !@tag.empty?
