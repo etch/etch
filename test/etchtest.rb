@@ -23,7 +23,7 @@ module EtchTests
     # Put the basic files into that directory needed for a basic etch tree
     FileUtils.cp_r(Dir.glob('testrepo/*'), repodir)
 
-    hostname = `hostname`.chomp
+    hostname = `facter fqdn`.chomp
     nodegroups_string = ''
     nodegroups.each { |ng| nodegroups_string << "<group>#{ng}</group>\n" }
     File.open(File.join(repodir, 'nodes.xml'), 'w') do |file|

@@ -101,7 +101,7 @@ class EtchAttributeTests < Test::Unit::TestCase
     #
     # Put the node in one group for the next series of tests
     #
-    hostname = `hostname`.chomp
+    hostname = `facter fqdn`.chomp
     File.open(File.join(@repodir, 'nodes.xml'), 'w') do |file|
       file.puts <<-EOF
         <nodes>
@@ -216,7 +216,7 @@ class EtchAttributeTests < Test::Unit::TestCase
     #
     # Put the node in two groups for the next series of tests
     #
-    hostname = `hostname`.chomp
+    hostname = `facter fqdn`.chomp
     File.open(File.join(@repodir, 'nodes.xml'), 'w') do |file|
       file.puts <<-EOF
         <nodes>
