@@ -412,6 +412,7 @@ class EtchFileTests < Test::Unit::TestCase
     end
 
     testcontents = "This is a test\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
     File.open(@targetfile, 'w') do |file|
       file.write(testcontents)
     end
