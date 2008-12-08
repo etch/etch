@@ -333,7 +333,9 @@ class EtchAttributeTests < Test::Unit::TestCase
   def test_fact_attributes
     Facter.loadfacts
     os = Facter['operatingsystem'].value
-    osrel = Facter['operatingsystemrelease'].value
+    # Facter frequently leaves extraneous whitespace on this fact, thus
+    # the strip
+    osrel = Facter['operatingsystemrelease'].value.strip
     
     #
     # Simple fact comparison
