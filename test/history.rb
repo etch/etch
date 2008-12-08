@@ -137,7 +137,48 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     assert_equal(updatedorigcontents, get_file_contents(@targetfile), 'Updated original contents unchanged')
   end
+  
+  def test_history_setup
+    #
+    # Use a setup command to put some contents into the target file (to
+    # simulate a common usage of setup commands to install a package before
+    # we backup the original file so that the original file has the default
+    # config file contents) and ensure those contents are backed up as the
+    # original file
+    #
+    
+    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
+    origcontents = "This is the original text"
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <setup>
+            <exec>echo "#{origcontents}" > #{@targetfile}</exec>
+          </setup>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
 
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running history setup test"
+    run_etch(@port, @testbase)
+
+    assert_equal(origcontents + "\n", get_file_contents(origfile), 'original backup of file via setup')
+  end
+  
   def test_history_link
     #
     # Ensure original file is backed up when it is a link

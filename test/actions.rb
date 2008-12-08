@@ -82,11 +82,11 @@ class EtchActionTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     # Verify that the actions were executed
-    #  The server_setup action will get run several times as we loop
+    #  The setup actions will get run several times as we loop
     #  back and forth with the server sending original sums and
-    #  contents.  So just verify that it was run at least once.
+    #  contents.  So just verify that they were run at least once.
     assert(get_file_contents("#{@repodir}/server_setup").include?("server_setup\n"), 'server_setup')
-    assert_equal("setup\n", get_file_contents("#{@repodir}/setup"), 'setup')
+    assert(get_file_contents("#{@repodir}/setup").include?("setup\n"), 'setup')
     assert_equal("pre\n", get_file_contents("#{@repodir}/pre"), 'pre')
     assert_equal(
       "exec_once\n", get_file_contents("#{@repodir}/exec_once"), 'exec_once')
@@ -143,7 +143,12 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial action test"
-    run_etch(@port, @testbase)
+    sleep 3
+    puts "#"
+    puts "# Errors expected here"
+    puts "#"
+    sleep 3
+    run_etch(@port, @testbase, true)
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed setup')
@@ -183,8 +188,13 @@ class EtchActionTests < Test::Unit::TestCase
     end
 
     # Run etch
-    #puts "Running initial action test"
-    run_etch(@port, @testbase)
+    #puts "Running failed pre test"
+    sleep 3
+    puts "#"
+    puts "# Errors expected here"
+    puts "#"
+    sleep 3
+    run_etch(@port, @testbase, true)
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed pre')

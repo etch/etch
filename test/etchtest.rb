@@ -69,9 +69,13 @@ module EtchTests
     Process.waitpid(@serverpid)
   end
 
-  def run_etch(port, testbase, extra_args='')
-    system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}")
-    #system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --debug #{extra_args}")
+  def run_etch(port, testbase, errors_expected=false, extra_args='')
+    #extra_args << " --debug"
+    if errors_expected
+      assert(!system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}"))
+    else
+      assert(system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}"))
+    end
   end
 
   def get_file_contents(file)

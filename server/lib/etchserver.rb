@@ -660,7 +660,7 @@ class Etch::Server
         RAILS_DEFAULT_LOGGER.info "No configuration for link #{file} destination, doing nothing" if (@debug)
       end
 
-      if !dest
+      if !dest || dest.empty?
         RAILS_DEFAULT_LOGGER.info "Destination for link #{file} empty, doing nothing" if (@debug)
       else
         # If there isn't a dest element in the XML (if the user used a
@@ -721,6 +721,7 @@ class Etch::Server
         script = config_xml.root.elements['/config/directory/script'].text
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         create = external.run_script(script)
+        create = false if create.empty?
         
         # Remove the script element from the XML, the client won't need
         # to see it
@@ -791,6 +792,7 @@ class Etch::Server
         script = config_xml.root.elements['/config/delete/script'].text
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         proceed = external.run_script(script)
+        proceed = false if proceed.empty?
         
         # Remove the script element from the XML, the client won't need
         # to see it
@@ -900,7 +902,7 @@ class Etch::Server
       # escaped in attribute values, so you have to use &lt;
       # That's been decoded by the XML parser before it gets to us
       # here so we don't have to handle it specially
-      if value =~ %r{^(<|<=|>=|>)([\d\.]+)$}
+      if value =~ %r{^(<|<=|>=|>)\s*([\d\.]+)$}
         operator = $1
         valueversion = Version.new($2)
         compversion = Version.new(comp)

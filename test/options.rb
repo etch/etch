@@ -69,7 +69,7 @@ class EtchOptionTests < Test::Unit::TestCase
     puts "# Errors expected here"
     puts "#"
     sleep 3
-    run_etch(@port, @testbase)
+    run_etch(@port, @testbase, true)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
     
@@ -107,7 +107,7 @@ class EtchOptionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running --dry-run test"
-    run_etch(@port, @testbase, '--dry-run')
+    run_etch(@port, @testbase, false, '--dry-run')
 
     assert_equal(origcontents, get_file_contents(@targetfile), '--dry-run')
   end

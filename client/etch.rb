@@ -283,17 +283,17 @@ class Etch::Client
       done = true
     end
 
-    if config.elements['/config/file'] && !done  # Regular file
-      # Perform any setup commands that the user has requested.
-      # These are occasionally needed to install software that is
-      # required to generate the file (think m4 for sendmail.cf) or to
-      # install a package containing a sample config file which we
-      # then edit with a script, and thus doing the install in <pre>
-      # is too late.
-      if config.elements['/config/setup']
-        process_setup(file, config)
-      end
+    # Perform any setup commands that the user has requested.
+    # These are occasionally needed to install software that is
+    # required to generate the file (think m4 for sendmail.cf) or to
+    # install a package containing a sample config file which we
+    # then edit with a script, and thus doing the install in <pre>
+    # is too late.
+    if config.elements['/config/setup'] && !done
+      process_setup(file, config)
+    end
 
+    if config.elements['/config/file'] && !done  # Regular file
       newcontents = nil
       if config.elements['/config/file/contents']
         newcontents = Base64.decode64(config.elements['/config/file/contents'].text)
@@ -545,16 +545,6 @@ class Etch::Client
 
       dest = config.elements['/config/link/dest'].text
 
-      # Perform any setup commands that the user has requested.
-      # These are occasionally needed to install software that is
-      # required to generate the file (think m4 for sendmail.cf) or to
-      # install a package containing a sample config file which we
-      # then edit with a script, and thus doing the install in <pre>
-      # is too late.
-      if config.elements['/config/setup']
-        process_setup(file, config)
-      end
-
       set_link_destination = compare_link_destination(file, dest)
       absdest = File.expand_path(dest, File.dirname(file))
 
@@ -795,16 +785,6 @@ class Etch::Client
       create = config.elements['/config/directory/create']
       abort "No create element found in directory section" if !create
     
-      # Perform any setup commands that the user has requested.
-      # These are occasionally needed to install software that is
-      # required to generate the file (think m4 for sendmail.cf) or to
-      # install a package containing a sample config file which we
-      # then edit with a script, and thus doing the install in <pre>
-      # is too late.
-      if config.elements['/config/setup']
-        process_setup(file, config)
-      end
-
       permstring = config.elements['/config/directory/perms'].text
       perms = permstring.oct
       owner = config.elements['/config/directory/owner'].text
@@ -963,16 +943,6 @@ class Etch::Client
       # A little safety check
       proceed = config.elements['/config/delete/proceed']
       abort "No proceed element found in delete section" if !proceed
-
-      # Perform any setup commands that the user has requested.
-      # These are occasionally needed to install software that is
-      # required to generate the file (think m4 for sendmail.cf) or to
-      # install a package containing a sample config file which we
-      # then edit with a script, and thus doing the install in <pre>
-      # is too late.
-      if config.elements['/config/setup']
-        process_setup(file, config)
-      end
 
       # Proceed only if the file currently exists
       if !File.exist?(file) && !File.symlink?(file)
@@ -1674,7 +1644,14 @@ class Etch::Client
     if ! File.exist?(file) && ! File.symlink?(file)
       puts "remove_file: #{file} doesn't exist" if (@debug)
     else
-      FileUtils.rmtree(file, :secure => true)
+      # The secure delete mechanism doesn't seem to work consistently
+      # when not root (in the ever-so-helpful way of not actually
+      # removing the file and not indicating any error)
+      if Process.euid == 0
+        FileUtils.rmtree(file, :secure => true)
+      else
+        FileUtils.rmtree(file)
+      end
     end
   end
 

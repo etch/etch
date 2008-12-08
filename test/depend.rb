@@ -80,7 +80,7 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial dependency test"
-    run_etch(@port, @testbase, '--debug')
+    run_etch(@port, @testbase, false, '--debug')
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'dependency file 1')
@@ -140,7 +140,7 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running single request dependency test"
-    run_etch(@port, @testbase, @targetfile)
+    run_etch(@port, @testbase, false, @targetfile)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'single request dependency file 1')
@@ -198,7 +198,7 @@ class EtchDependTests < Test::Unit::TestCase
     puts "# Errors expected here"
     puts "#"
     sleep 3
-    run_etch(@port, @testbase, @targetfile)
+    run_etch(@port, @testbase, true, @targetfile)
 
     # Verify that the files weren't modified
     assert_equal(oldsourcecontents, get_file_contents(@targetfile), 'circular dependency file 1')

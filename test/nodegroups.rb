@@ -185,7 +185,7 @@ echo "grouper_group2"
     puts "# Errors expected here"
     puts "#"
     sleep 3
-    run_etch(@port, @testbase)
+    run_etch(@port, @testbase, true)
 
     # Verify that the file wasn't modified
     assert_equal(oldsourcecontents, get_file_contents(@targetfile), testname)
