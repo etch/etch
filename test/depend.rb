@@ -193,11 +193,6 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running circular test"
-    sleep 3
-    puts "#"
-    puts "# Errors expected here"
-    puts "#"
-    sleep 3
     run_etch(@port, @testbase, true, @targetfile)
 
     # Verify that the files weren't modified

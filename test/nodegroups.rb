@@ -180,11 +180,6 @@ echo "grouper_group2"
 
     # Run etch
     #puts "Running '#{testname}' test"
-    sleep 3
-    puts "#"
-    puts "# Errors expected here"
-    puts "#"
-    sleep 3
     run_etch(@port, @testbase, true)
 
     # Verify that the file wasn't modified

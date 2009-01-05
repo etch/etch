@@ -62,14 +62,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_ctime = File.stat(@targetfile).ctime
 
     # Run etch
-    # Maybe:
-    #  Dumping etch output to /dev/null so that we don't confuse the user
     #puts "Running script with syntax error test"
-    sleep 3
-    puts "#"
-    puts "# Errors expected here"
-    puts "#"
-    sleep 3
     run_etch(@port, @testbase, true)
 
     # Verify that etch didn't do anything to the file

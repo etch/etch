@@ -72,6 +72,13 @@ module EtchTests
   def run_etch(port, testbase, errors_expected=false, extra_args='')
     #extra_args << " --debug"
     if errors_expected
+      # Warn the user that errors are expected.  Otherwise it can be
+      # disconcerting if you're watching the tests run and see errors.
+      sleep 3
+      puts "#"
+      puts "# Errors expected here"
+      puts "#"
+      sleep 3
       assert(!system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}"))
     else
       assert(system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}"))

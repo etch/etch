@@ -64,11 +64,6 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running killswitch test"
-    sleep 3
-    puts "#"
-    puts "# Errors expected here"
-    puts "#"
-    sleep 3
     run_etch(@port, @testbase, true)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
