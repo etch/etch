@@ -1,10 +1,6 @@
-file
-link
 directory
-delete
-  Basic operation (done for file and link)
-  Owner/group/perms (done for file and link)
-  Original backup
+  Basic operation
+  Owner/group/perms
 
 config.xml:
   Etch aborts when given contradictory instructions
