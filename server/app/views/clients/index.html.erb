@@ -1,0 +1,38 @@
+<%- @page_title = 'Clients' -%>
+
+<%- if @clients.size > 0 -%>
+<table width="100%">
+  <tr>
+    <td><h1>Clients</h1></td>
+    <td align="right">Search by name: <%- form_tag(clients_path, :method => :get) do -%><%= text_field_tag('name_substring') %><%- end -%></td>
+  </tr>
+</table>
+
+<div id="results_table">
+  <%= will_paginate @clients %>
+
+  <table cellspacing="0" class="styled">
+    <thead>
+      <tr>
+        <th nowrap="nowrap" width="5%">&nbsp;</th>
+        <th <%= sort_td_class_helper "client" %> > <%= sort_link_helper "Client", "client" %></th>
+        <th <%= sort_td_class_helper "status" %> > <%= sort_link_helper "Status", "status" %></th>
+        <th <%= sort_td_class_helper "updated_at" %> > <%= sort_link_helper "Last Update", "updated_at" %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <%- @clients.each do |client| -%>
+      <tr class="<%= cycle('odd', 'even') -%>">
+        <td nowrap="nowrap" width="5%"><%= link_to 'View', client_path(client) %>
+        <td><%= client.name %></td>
+        <td><%= client.status %></td>
+        <td><%= client.updated_at %></td>
+      </tr>
+      <%- end -%>
+    </tbody>
+  </table>
+</div> <!-- end results_table div -->
+
+<%- else -%>
+<em>We could not find any results in the system for that search.</em>
+<%- end -%>

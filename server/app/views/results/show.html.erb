@@ -1,0 +1,23 @@
+<%- @page_title = "Result" %>
+
+<div class="record_view">
+
+<h1>Result</h1>
+
+<p>
+  <strong>Client:</strong>  <%= link_to(h(@result.client.name), client_path(@result.client)) %><br />
+  <strong>File:</strong>    <%= h(@result.file) %><br />
+  <strong>Success:</strong> <%= h(@result.success) %><br />
+</p>
+
+<p class="metadata">
+  <strong>Time:</strong> <%= h(@result.created_at) %><br />
+</p>
+
+<p>
+  <strong>Message:</strong><br />
+  <pre><%= h(@result.message) %></pre>
+</p>
+
+</div> 
+

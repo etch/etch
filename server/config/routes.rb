@@ -5,7 +5,8 @@ ActionController::Routing::Routes.draw do |map|
   #   map.connect 'products/:id', :controller => 'catalog', :action => 'view'
   # Keep in mind you can assign values other than :controller and :action
   map.connect 'files', :controller => 'files', :action => 'index'
-  map.connect 'results', :controller => 'results', :action => 'index'
+  map.resources :clients
+  map.resources :results
 
   # Sample of named route:
   #   map.purchase 'products/:id/purchase', :controller => 'catalog', :action => 'purchase'
@@ -34,6 +35,7 @@ ActionController::Routing::Routes.draw do |map|
 
   # You can have the root of your site routed with map.root -- just remember to delete public/index.html.
   # map.root :controller => "welcome"
+  map.connect '', :controller => "dashboard"
 
   # See how all your routes lay out with "rake routes"
 

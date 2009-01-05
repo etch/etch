@@ -1,0 +1,60 @@
+form
+{
+	margin: 0;
+	padding: 0;
+}
+
+#errorExplanation
+{
+	border-color: #c00;
+	border-width: 1px;
+	border-style: solid;
+	width: 90%;
+	margin: 1em auto;
+	font-size: 14px;
+	background-color: #eee;
+}
+
+#errorExplanation p { margin: 1em; }
+
+#errorExplanation h2
+{
+	margin: 0;
+	background-color: #c00;
+	color: #fff;
+	font-size: 14px;
+	letter-spacing: 1px;
+	padding: 5px 10px;
+}
+
+.fieldWithErrors
+{
+	margin: 0;
+	display: inline;
+	border-color: #c00;
+	border-width: 0 3px;
+	border-style: solid;
+	padding: 2px 4px;
+}
+
+#notice
+{
+	background-color: #cfc;
+	border-color: #090;
+	border-width: 1px 0;
+	border-style: solid;
+	padding: 5px 10px;
+	font-size: 14px;
+	margin: 1em 0;
+}
+
+#error
+{
+	background-color: #FCC;
+	border-color: #c00;
+	border-width: 1px 0;
+	border-style: solid;
+	padding: 5px 10px;
+	font-size: 14px;
+	margin: 1em 0;
+}

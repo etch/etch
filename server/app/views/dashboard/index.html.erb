@@ -1,0 +1,28 @@
+<%- @page_title = "Dashboard" %>
+
+<div id="dashboard_menu">
+</div> <!-- end dashboard_menu -->
+
+<div id="dashboard_body">
+
+<%- total_count    = Client.count -%>
+<%- healthy_count  = Client.count(:conditions => ["status = 0 AND updated_at > ?", 24.hours.ago]) -%>
+<%- broken_count   = Client.count(:conditions => ["status != 0 AND status != 200 AND updated_at > ?", 24.hours.ago]) -%>
+<%- disabled_count = Client.count(:conditions => ["status = 200 AND updated_at > ?", 24.hours.ago]) -%>
+<%- stale_count    = Client.count(:conditions => ["updated_at <= ?", 24.hours.ago]) -%>
+
+<table class="network_summary">
+  <caption>Client Summary</caption>
+  <tbody>
+    <tr>
+    <tr><td class="network_summary_left">Number of clients: &nbsp;</td> <td class="network_summary_right"><%= total_count == 0 ? total_count : link_to(total_count, clients_path) %></td></tr>
+    <tr><td>Healthy:</td>           <td><%= healthy_count  == 0 ? healthy_count  : link_to(healthy_count,  clients_path + "?health=healthy") %></td></tr>
+    <tr><td>Broken:</td>            <td><%= broken_count   == 0 ? broken_count   : link_to(broken_count,   clients_path + "?health=broken") %></td></tr>
+    <tr><td>Disabled:</td>          <td><%= disabled_count == 0 ? disabled_count : link_to(disabled_count, clients_path + "?health=disabled") %></td></tr>
+    <tr><td>Stale:</td>             <td><%= stale_count    == 0 ? stale_count    : link_to(stale_count,    clients_path + "?health=stale") %></td></tr>
+    </tr>
+  </tbody>
+</table>
+
+</div> <!-- end dashboard_body -->
+

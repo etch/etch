@@ -9,6 +9,7 @@ class CreateResults < ActiveRecord::Migration
     end
     add_index :results, :client_id
     add_index :results, :file
+    add_index :results, :created_at
   end
 
   def self.down

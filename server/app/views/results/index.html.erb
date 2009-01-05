@@ -1,0 +1,57 @@
+<%- @page_title = 'Results' -%>
+
+<%- if @results.size > 0 -%>
+<h1>Results</h1>
+
+<%- if @combined -%>
+  <%- @results.each do |result| -%>
+<p>
+  <strong>Client:</strong>  <%= link_to(h(result.client.name), client_path(result.client)) %><br />
+  <strong>File:</strong>    <%= h(result.file) %><br />
+  <strong>Success:</strong> <%= h(result.success) %><br />
+</p>
+
+<p class="metadata">
+  <strong>Time:</strong> <%= h(result.created_at) %><br />
+</p>
+
+<p>
+  <strong>Message:</strong><br />
+  <pre><%= h(result.message) %></pre>
+</p>
+  <%- end -%>
+<%- else -%>
+<div id="results_table">
+  <%= link_to('View all these combined', results_path + "?combined=1&#{@query_params.join('&')}") %><br/>
+  <%= will_paginate @results %>
+  
+  <table cellspacing="0" class="styled">
+    <thead>
+      <tr>
+        <th nowrap="nowrap" width="5%">&nbsp;</th>
+        <th <%= sort_td_class_helper "client" %> > <%= sort_link_helper "Client", "client" %></th>
+        <th <%= sort_td_class_helper "file" %> > <%= sort_link_helper "File", "file" %></th>
+        <th <%= sort_td_class_helper "created_at" %> > <%= sort_link_helper "Time", "created_at" %></th>
+        <th <%= sort_td_class_helper "success" %> > <%= sort_link_helper "Success", "success" %></th>
+        <th <%= sort_td_class_helper "message_size" %> > <%= sort_link_helper "Message Size", "message_size" %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <%- @results.each do |result| -%>
+      <tr class="<%= cycle('odd', 'even') -%>">
+        <td nowrap="nowrap" width="5%"><%= link_to 'View', result_path(result) %></td>
+        <td><%= result.client.name %></td>
+        <td><%= result.file %></td>
+        <td><%= result.created_at %></td>
+        <td><%= result.success %></td>
+        <td><%= result.message.length %></td>
+      </tr>
+      <%- end -%>
+    </tbody>
+  </table>
+</div> <!-- end results_table div -->
+<%- end -%>
+
+<%- else -%>
+<em>We could not find any results in the system for that search.</em>
+<%- end -%>
