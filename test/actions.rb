@@ -143,11 +143,6 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial action test"
-    sleep 3
-    puts "#"
-    puts "# Errors expected here"
-    puts "#"
-    sleep 3
     run_etch(@port, @testbase, true)
 
     # Verify that the file was not touched
@@ -189,11 +184,6 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed pre test"
-    sleep 3
-    puts "#"
-    puts "# Errors expected here"
-    puts "#"
-    sleep 3
     run_etch(@port, @testbase, true)
 
     # Verify that the file was not touched
@@ -281,7 +271,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test_before_post test"
-    run_etch(@port, @testbase)
+    run_etch(@port, @testbase, true)
 
     # Verify that post was not run
     assert(!File.exist?("#{@repodir}/post"), 'failed test_before_post post')
@@ -297,7 +287,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test symlink test"
-    run_etch(@port, @testbase)
+    run_etch(@port, @testbase, true)
 
     # Verify that the original symlink was restored
     assert_equal(@destfile, File.readlink(@targetfile), 'failed test symlink')
@@ -314,7 +304,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test directory test"
-    run_etch(@port, @testbase)
+    run_etch(@port, @testbase, true)
 
     # Verify that the original directory was restored
     assert(File.directory?(@targetfile), 'failed test directory')
@@ -336,10 +326,49 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test no original file test"
-    run_etch(@port, @testbase)
+    run_etch(@port, @testbase, true)
 
     # Verify that the lack of an original file was restored
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'failed test no original file')
+    
+    #
+    # Test an action requiring XML escape
+    # The XML spec says that < and & must be escaped almost anywhere
+    # outside of their use as markup.  That includes the character data of
+    # actions.
+    # http://www.w3.org/TR/2006/REC-xml-20060816/#syntax
+    # So if the user wants to use something like && in an action they must
+    # escape the & with &amp;
+    #
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+          <post>
+            <exec>true &amp;&amp; echo post >> #{@repodir}/post_with_escape</exec>
+          </post>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "This is a test of a post with XML escapes\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running XML escape test"
+    run_etch(@port, @testbase)
+
+    # Verify that the action was executed
+    assert_equal("post\n", get_file_contents("#{@repodir}/post_with_escape"), 'post with escape')
   end
 
   def teardown
