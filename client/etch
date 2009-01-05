@@ -87,5 +87,6 @@ end
 #
 
 etchclient = Etch::Client.new($server, $tag, $varbase, $debug, $dryrun, $interactive, $filenameonly, $fullfile)
-etchclient.process_until_done(files_to_generate, $disableforce, $lockforce)
+status = etchclient.process_until_done(files_to_generate, $disableforce, $lockforce)
+exit status
 
