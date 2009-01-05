@@ -237,9 +237,15 @@ class Etch::Server
     configs_xml = REXML::Element.new 'configs'
     @configs.each do |file, config_xml|
       # Update the stored record of the config
-      config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file, :config => config_xml.to_s)
-      if config.config != config_xml.to_s
-        config.update_attributes(:config => config_xml.to_s)
+      # Exclude configs which correspond to files for which we're
+      # requesting a sum or orig.  In that case any config is just a
+      # partial config with setup and depend elements that we send to
+      # the client to ensure it supplies a proper orig file.
+      if !@need_sum.has_key?(file) && !@need_orig.has_key?(file)
+        config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file, :config => config_xml.to_s)
+        if config.config != config_xml.to_s
+          config.update_attributes(:config => config_xml.to_s)
+        end
       end
       # And add the config to the response to return to the client
       configs_xml.add_element config_xml.root
@@ -996,9 +1002,14 @@ class EtchExternalSource
     begin
       eval(IO.read(script))
     rescue Exception => e
-      # Help the user figure out where the exception occurred, otherwise they
-      # just get told it happened here in eval, which isn't very helpful.
-      raise e.exception("Exception while processing script #{script} for file #{@file}:\n" + e.message)
+      if e.kind_of?(SystemExit)
+        # The user might call exit within a script.  We want the scripts
+        # to act as much like a real script as possible, so ignore those.
+      else
+        # Help the user figure out where the exception occurred, otherwise they
+        # just get told it happened here in eval, which isn't very helpful.
+        raise e.exception("Exception while processing script #{script} for file #{@file}:\n" + e.message)
+      end
     end
     @contents
   end
