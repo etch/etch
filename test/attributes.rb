@@ -547,6 +547,42 @@ class EtchAttributeTests < Test::Unit::TestCase
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
     
+    #
+    # Version fact operator comparison requiring XML escape
+    # The XML spec says that < and & must be escaped almost anywhere
+    # outside of their use as markup.  That includes inside attribute values.
+    # http://www.w3.org/TR/2006/REC-xml-20060816/#syntax
+    # So if the user wants to use the < or <= operators they must escape
+    # the < with &lt;
+    #
+    testname = 'version fact operator comparison requiring XML escape'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain operatingsystemrelease="&lt;=#{osrel}">source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+    
+    # Verify that the file was created properly
+    assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+
   end
   
   def teardown
