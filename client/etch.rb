@@ -6,6 +6,7 @@ require 'facter'
 require 'find'
 require 'digest/sha1' # hexdigest
 require 'base64'      # decode64, encode64
+require 'uri'
 require 'net/http'
 require 'net/https'
 require 'rexml/document'
@@ -31,9 +32,13 @@ class Etch::Client
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
   CONFIRM_QUIT = 3
-
+  
+  # We need these in relation to the output capturing
+  ORIG_STDOUT = STDOUT.dup
+  ORIG_STDERR = STDERR.dup
+  
   attr_reader :exec_once_per_run
-
+  
   # Cutting down the size of the arg list would be nice
   def initialize(server=nil, tag=nil, varbase=nil, debug=false, dryrun=false, interactive=false, filenameonly=false, fullfile=false)
     @server = server.nil? ? 'https://etch' : server
@@ -49,14 +54,17 @@ class Etch::Client
     # cron.
     # FIXME: Read from config file
     ENV['PATH'] = '/bin:/usr/bin:/sbin:/usr/sbin:/opt/csw/bin:/opt/csw/sbin'
-
+    
+    @filesuri = URI.parse(@server + '/files')
+    @resultsuri = URI.parse(@server + '/results')
+    
     @origbase    = File.join(@varbase, 'orig')
     @historybase = File.join(@varbase, 'history')
     @lockbase    = File.join(@varbase, 'locks')
     
     @blankrequest = {}
-    facts = Facter.to_hash
-    facts.each_pair { |key, value| @blankrequest["facts[#{key}]"] = value.to_s }
+    @facts = Facter.to_hash
+    @facts.each_pair { |key, value| @blankrequest["facts[#{key}]"] = value.to_s }
     if @debug
       @blankrequest['debug'] = '1'
     end
@@ -69,37 +77,23 @@ class Etch::Client
     @already_processed = {}
     @exec_already_processed = {}
     @exec_once_per_run = {}
+    @results = []
+    # See start/stop_output_capture for these
+    @output_pipes = []
     
     @lchown_supported = nil
     @lchmod_supported = nil
   end
   
   def process_until_done(files_to_generate, disableforce, lockforce)
-    check_for_disable_etch_file(disableforce)
-    remove_stale_lock_files(lockforce)
-
-    # Assemble the initial request
-    request = get_blank_request
-
-    if !files_to_generate.nil? && !files_to_generate.empty?
-      files_to_generate.each do |file|
-        request["files[#{CGI.escape(file)}][sha1sum]"] = get_orig_sum(file)
-      end
-    else
-      request['files[GENERATEALL]'] = '1'
-    end
-
-    #
-    # Loop back and forth with the server sending requests for files and
-    # responding to the server's requests for original contents or sums
-    # it needs
-    #
-
-    Signal.trap('EXIT') { unlock_all_files }
-
-    uri = URI.parse(@server + '/files')
-    http = Net::HTTP.new(uri.host, uri.port)
-    if uri.scheme == "https"
+    # Our overall status.  Will be reported to the server and used as the
+    # return value for this method.  Command-line clients should use it as
+    # their exit value.  Zero indicates no errors.
+    status = 0
+    message = ''
+    
+    http = Net::HTTP.new(@filesuri.host, @filesuri.port)
+    if @filesuri.scheme == "https"
       http.use_ssl = true
       if File.exist?('/etc/etch/ca.pem')
         http.ca_file = '/etc/etch/ca.pem'
@@ -110,943 +104,1077 @@ class Etch::Client
       end
     end
     http.start
+    
+    # catch/throw for expected/non-error events that end processing
+    # begin/raise for error events that end processing
+    catch :stop_processing do
+      begin
+        enabled, message = check_for_disable_etch_file(disableforce)
+        if !enabled
+          # 200 is the arbitrarily picked exit value indicating
+          # that etch is disabled
+          status = 200
+          throw :stop_processing
+        end
+        remove_stale_lock_files(lockforce)
 
-    10.times do
-      #
-      # Send request to server
-      #
+        # Assemble the initial request
+        request = get_blank_request
 
-      puts "Sending request to server #{uri}" if (@debug)
-      post = Net::HTTP::Post.new(uri.path)
-      post.set_form_data(request)
-      response = http.request(post)
-      response_xml = nil
+        if !files_to_generate.nil? && !files_to_generate.empty?
+          files_to_generate.each do |file|
+            request["files[#{CGI.escape(file)}][sha1sum]"] = get_orig_sum(file)
+          end
+        else
+          request['files[GENERATEALL]'] = '1'
+        end
+
+        #
+        # Loop back and forth with the server sending requests for files and
+        # responding to the server's requests for original contents or sums
+        # it needs
+        #
+        
+        Signal.trap('EXIT') do
+          STDOUT.reopen(ORIG_STDOUT)
+          STDERR.reopen(ORIG_STDERR)
+          unlock_all_files
+        end
+        
+        10.times do
+          #
+          # Send request to server
+          #
+          
+          puts "Sending request to server #{@filesuri}" if (@debug)
+          post = Net::HTTP::Post.new(@filesuri.path)
+          post.set_form_data(request)
+          response = http.request(post)
+          response_xml = nil
+          case response
+          when Net::HTTPSuccess
+            puts "Response from server:\n'#{response.body}'" if (@debug)
+            if !response.body.nil? && !response.body.empty?
+                response_xml = REXML::Document.new(response.body)
+            else
+              puts "  Response is empty" if (@debug)
+              break
+            end
+          else
+            $stderr.puts response.body
+            # error! raises an exception
+            response.error!
+          end
+
+          #
+          # Process the response from the server
+          #
+
+          # Prep a clean request hash
+          request = get_blank_request
+
+          # With generateall we expect to make at least two round trips to the server.
+          # 1) Send GENERATEALL request, get back a list of need_sums
+          # 2) Send sums, possibly get back some need_origs
+          # 3) Send origs, get back generated files
+          need_to_loop = false
+          reset_already_processed
+          # Process configs first, as they may contain setup entries that are
+          # needed to create the original files.
+          response_xml.root.elements.each('/files/configs/config') do |config|
+            file = config.attributes['filename']
+            puts "Processing config for #{file}" if (@debug)
+            continue_processing = process(response_xml, file)
+            if !continue_processing
+              throw :stop_processing
+            end
+          end
+          response_xml.root.elements.each('/files/need_sums/need_sum') do |need_sum|
+            puts "Processing request for sum of #{need_sum.text}" if (@debug)
+            request["files[#{CGI.escape(need_sum.text)}][sha1sum]"] = get_orig_sum(need_sum.text)
+            need_to_loop = true
+          end
+          response_xml.root.elements.each('/files/need_origs/need_orig') do |need_orig|
+            puts "Processing request for contents of #{need_orig.text}" if (@debug)
+            request["files[#{CGI.escape(need_orig.text)}][contents]"] = Base64.encode64(get_orig_contents(need_orig.text))
+            request["files[#{CGI.escape(need_orig.text)}][sha1sum]"] = get_orig_sum(need_orig.text)
+            need_to_loop = true
+          end
+
+          if !need_to_loop
+            break
+          end
+        end
+
+        puts "Processing 'exec once per run' commands" if (!exec_once_per_run.empty?)
+        exec_once_per_run.keys.each do |exec|
+          process_exec('post', exec)
+        end
+      rescue Exception => e
+        status = 1
+        $stderr.puts e.message
+        $stderr.puts e.backtrace.join("\n") if @debug
+      end  # begin/rescue
+    end  # catch
+    
+    # Send results to server
+    if !@dryrun
+      rails_results = []
+      # CGI.escape doesn't work on things that aren't strings, so we don't
+      # call it on a few of the fields here that are numbers or booleans
+      rails_results << "fqdn=#{CGI.escape(@facts['fqdn'])}"
+      rails_results << "status=#{status}"
+      rails_results << "message=#{CGI.escape(message)}"
+      @results.each do |result|
+        # Strangely enough this works.  Even though the key is not unique to
+        # each result the Rails parameter parsing code keeps track of keys it
+        # has seen, and if it sees a duplicate it starts a new hash.
+        rails_results << "results[][file]=#{CGI.escape(result['file'])}"
+        rails_results << "results[][success]=#{result['success']}"
+        rails_results << "results[][message]=#{CGI.escape(result['message'])}"
+      end
+      puts "Sending results to server #{@resultsuri}" if (@debug)
+      resultspost = Net::HTTP::Post.new(@resultsuri.path)
+      # We have to bypass Net::HTTP's set_form_data method in this case
+      # because it expects a hash and we can't provide the results in the
+      # format we want in a hash because we'd have duplicate keys (see above).
+      resultspost.body = rails_results.join('&')
+      resultspost.content_type = 'application/x-www-form-urlencoded'
+      response = http.request(resultspost)
       case response
       when Net::HTTPSuccess
         puts "Response from server:\n'#{response.body}'" if (@debug)
-        if !response.body.nil? && !response.body.empty?
-            response_xml = REXML::Document.new(response.body)
-        else
-          puts "  Response is empty" if (@debug)
-          break
-        end
       else
-        puts response.body
-        # error! raises an exception
-        response.error!
+        $stderr.puts "Error submitting results:"
+        $stderr.puts response.body
       end
-
-      #
-      # Process the response from the server
-      #
-
-      # Prep a clean request hash
-      request = get_blank_request
-
-      # With generateall we expect to make at least two round trips to the server.
-      # 1) Send GENERATEALL request, get back a list of need_sums
-      # 2) Send sums, possibly get back some need_origs
-      # 3) Send origs, get back generated files
-      need_to_loop = false
-      reset_already_processed
-      # Process configs first, as they may contain setup entries that are
-      # needed to create the original files.
-      response_xml.root.elements.each('/files/configs/config') do |config|
-        puts "Processing config for #{config.attributes['filename']}" if (@debug)
-        process(response_xml, config.attributes['filename'])
-      end
-      response_xml.root.elements.each('/files/need_sums/need_sum') do |need_sum|
-        puts "Processing request for sum of #{need_sum.text}" if (@debug)
-        request["files[#{CGI.escape(need_sum.text)}][sha1sum]"] = get_orig_sum(need_sum.text)
-        need_to_loop = true
-      end
-      response_xml.root.elements.each('/files/need_origs/need_orig') do |need_orig|
-        puts "Processing request for contents of #{need_orig.text}" if (@debug)
-        request["files[#{CGI.escape(need_orig.text)}][contents]"] = Base64.encode64(get_orig_contents(need_orig.text))
-        request["files[#{CGI.escape(need_orig.text)}][sha1sum]"] = get_orig_sum(need_orig.text)
-        need_to_loop = true
-      end
-
-      if !need_to_loop
-        break
-      end
-    end
-
-    puts "Processing 'exec once per run' commands" if (!exec_once_per_run.empty?)
-    exec_once_per_run.keys.each do |exec|
-      process_exec('post', exec)
     end
     
-    # Send results to server
-    # FIXME
+    status
   end
 
   def check_for_disable_etch_file(disableforce)
     disable_etch = File.join(@varbase, 'disable_etch')
+    message = ''
     if File.exist?(disable_etch)
       if !disableforce
-        puts "Etch disabled:"
-        $stdout.write(IO.read(disable_etch))
-        exit(200)
+        message = "Etch disabled:\n"
+        message << IO.read(disable_etch)
+        puts message
+        return false, message
       else
         puts "Ignoring disable_etch file"
       end
     end
+    return true, message
   end
   
   def get_blank_request
     @blankrequest.dup
   end
   
+  # Raises an exception if any fatal error is encountered
+  # Returns a boolean, true unless the user indicated in interactive mode
+  # that further processing should be halted
   def process(response_xml, file)
-    puts "Processing #{file}" if (@debug)
-
+    continue_processing = true
+    save_results = true
+    exception = nil
+    
     # Skip files we've already processed in response to <depend>
     # statements.
     if @already_processed.has_key?(file)
       puts "Skipping already processed #{file}" if (@debug)
-      return
+      return continue_processing
     end
-
-    # The %locked_files hash provides a convenient way to
-    # detect circular dependancies.  It doesn't give us an ordered
-    # list of dependancies, which might be handy to help the user
-    # debug the problem, but I don't think it's worth maintaining a
-    # seperate array just for that purpose.
-    if @locked_files.has_key?(file)
-      abort "Circular dependancy detected.  " +
-        "Dependancy list (unsorted) contains:\n  " +
-        @locked_files.keys.join(', ')
-    end
-
-    lock_file(file)
-    done = false
-
-    # We have to make a new document so that XPath paths are referenced
-    # relative to the configuration for this specific file.
-    config = REXML::Document.new(response_xml.root.elements["/files/configs/config[@filename='#{file}']"].to_s)
-
-    # Process any other files that this file depends on
-    config.elements.each('/config/depend') do |depend|
-      puts "Generating dependency #{depend.text}" if (@debug)
-      process(response_xml, depend.text)
-    end
-
-    # See what type of action the user has requested
-
-    # Check to see if the user has requested that we revert back to the
-    # original file.
-    if config.elements['/config/revert']
-      origpathbase = File.join(@origbase, file)
-
-      # Restore the original file if it is around
-      if File.exist?("#{origpathbase}.ORIG")
-        origpath = "#{origpathbase}.ORIG"
-        origdir = File.dirname(origpath)
-        origbase = File.basename(origpath)
-        filedir = File.dirname(file)
-
-        # Remove anything we might have written out for this file
-        remove_file(file) if (!@dryrun)
-
-        puts "Restoring #{origpath} to #{file}"
-        recursive_copy_and_rename(origdir, origbase, file) if (!@dryrun)
-
-        # Now remove the backed-up original so that future runs
-        # don't do anything
-        remove_file(origpath) if (!@dryrun)
-      elsif File.exist?("#{origpathbase}.TAR")
-        origpath = "#{origpathbase}.TAR"
-        filedir = File.dirname(file)
-
-        # Remove anything we might have written out for this file
-        remove_file(file) if (!@dryrun)
-
-        puts "Restoring #{file} from #{origpath}"
-        system("cd #{filedir} && tar xf #{origpath}") if (!@dryrun)
-
-        # Now remove the backed-up original so that future runs
-        # don't do anything
-        remove_file(origpath) if (!@dryrun)
-      elsif File.exist?("#{origpathbase}.NOORIG")
-        origpath = "#{origpathbase}.NOORIG"
-        puts "Original #{file} didn't exist, restoring that state"
-
-        # Remove anything we might have written out for this file
-        remove_file(file) if (!@dryrun)
-
-        # Now remove the backed-up original so that future runs
-        # don't do anything
-        remove_file(origpath) if (!@dryrun)
-      end
-
-      done = true
-    end
-
-    # Perform any setup commands that the user has requested.
-    # These are occasionally needed to install software that is
-    # required to generate the file (think m4 for sendmail.cf) or to
-    # install a package containing a sample config file which we
-    # then edit with a script, and thus doing the install in <pre>
-    # is too late.
-    if config.elements['/config/setup'] && !done
-      process_setup(file, config)
-    end
-
-    if config.elements['/config/file'] && !done  # Regular file
-      newcontents = nil
-      if config.elements['/config/file/contents']
-        newcontents = Base64.decode64(config.elements['/config/file/contents'].text)
-      end
-
-      permstring = config.elements['/config/file/perms'].text
-      perms = permstring.oct
-      owner = config.elements['/config/file/owner'].text
-      group = config.elements['/config/file/group'].text
-      uid = lookup_uid(owner)
-      gid = lookup_gid(group)
-
-      set_file_contents = false
-      if newcontents
-        set_file_contents = compare_file_contents(file, newcontents)
-      end
-      set_permissions = nil
-      set_ownership = nil
-      # If the file is currently something other than a plain file then
-      # always set the flags to set the permissions and ownership.
-      # Checking the permissions/ownership of whatever is there currently
-      # is useless.
-      if set_file_contents && (!File.file?(file) || File.symlink?(file))
-        set_permissions = true
-        set_ownership = true
-      else
-        set_permissions = compare_permissions(file, perms)
-        set_ownership = compare_ownership(file, uid, gid)
-      end
-
-      # Proceed if:
-      # - The new contents are different from the current file
-      # - The permissions or ownership requested don't match the
-      #   current permissions or ownership
-      if !set_file_contents &&
-         !set_permissions &&
-         !set_ownership
-        puts "No change to #{file} necessary" if (@debug)
-        done = true
-      else
-        # Tell the user what we're going to do
-        if set_file_contents
-          # If the new contents are different from the current file
-          # show that to the user in the format they've requested.
-          # If the requested permissions are not world-readable then
-          # use the filenameonly format so that we don't disclose
-          # non-public data, unless we're in interactive mode
-          if @filenameonly || (permstring.to_i(8) & 0004 == 0 && !@interactive)
-            puts "Will write out new #{file}"
-          elsif @fullfile
-            # Grab the first 8k of the contents
-            first8k = newcontents.slice(0, 8192)
-            # Then check it for null characters.  If it has any it's
-            # likely a binary file.
-            hasnulls = true if (first8k =~ /\0/)
-
-            if !hasnulls
-              puts "Generated contents for #{file}:"
-              puts "============================================="
-              puts newcontents
-              puts "============================================="
-            else
-              puts "Will write out new #{file}, but " +
-                   "generated contents are not plain text so " +
-                   "they will not be displayed"
-            end
-          else
-            # Default is to show a diff of the current file and the
-            # newly generated file.
-            puts "Will make the following changes to #{file}, diff -c:"
-            tempfile = Tempfile.new(File.basename(file))
-            tempfile.write(newcontents)
-            tempfile.close
-            puts "============================================="
-            if File.file?(file) && !File.symlink?(file)
-              system("diff -c #{file} #{tempfile.path}")
-            else
-              # Either the file doesn't currently exist,
-              # or is something other than a normal file
-              # that we'll be replacing with a file.  In
-              # either case diffing against /dev/null will
-              # produce the most logical output.
-              system("diff -c /dev/null #{tempfile.path}")
-            end
-            puts "============================================="
-            tempfile.delete
-          end
-        end
-        if set_permissions
-          puts "Will set permissions on #{file} to #{permstring}"
-        end
-        if set_ownership
-          puts "Will set ownership of #{file} to #{uid}:#{gid}"
+    
+    # Prep the results capturing for this file
+    result = {}
+    result['file'] = file
+    result['success'] = true
+    result['message'] = ''
+    
+    # catch/throw for expected/non-error events that end processing
+    # begin/raise for error events that end processing
+    # Within this block you should throw :process_done if you've reached
+    # a natural stopping point and nothing further needs to be done.  You
+    # should raise an exception if you encounter an error condition.
+    # Do not 'return' or 'abort'.
+    catch :process_done do
+      begin
+        start_output_capture
+    
+        puts "Processing #{file}" if (@debug)
+    
+        # The %locked_files hash provides a convenient way to
+        # detect circular dependancies.  It doesn't give us an ordered
+        # list of dependencies, which might be handy to help the user
+        # debug the problem, but I don't think it's worth maintaining a
+        # seperate array just for that purpose.
+        if @locked_files.has_key?(file)
+          raise "Circular dependancy detected.  " +
+            "Dependancy list (unsorted) contains:\n  " +
+            @locked_files.keys.join(', ')
         end
 
-        # If the user requested interactive mode ask them for
-        # confirmation to proceed.
-        if @interactive
-          case get_user_confirmation()
-          when CONFIRM_PROCEED
-            # No need to do anything
-          when CONFIRM_SKIP
-            # FIXME
-            abort
-          when CONFIRM_QUIT
-            unlock_all_files
-            exit
-          else
-            abort "Unexpected result from get_user_confirmation()"
-          end
+        # This needs to be after the circular dependency check
+        lock_file(file)
+    
+        # We have to make a new document so that XPath paths are referenced
+        # relative to the configuration for this specific file.
+        config = REXML::Document.new(response_xml.root.elements["/files/configs/config[@filename='#{file}']"].to_s)
+
+        # Process any other files that this file depends on
+        config.elements.each('/config/depend') do |depend|
+          puts "Generating dependency #{depend.text}" if (@debug)
+          process(response_xml, depend.text)
         end
 
-        # Perform any pre-action commands that the user has requested
-        if config.elements['/config/pre']
-          process_pre(file, config)
-        end
+        # See what type of action the user has requested
 
-        # If the original "file" is a directory and the user hasn't
-        # specifically told us we can overwrite it then abort.
-        # 
-        # The test is here, rather than a bit earlier where you might
-        # expect it, because the pre section may be used to address
-        # originals which are directories.  So we don't check until
-        # after any pre commands are run.
-        if File.directory?(file) && !File.symlink?(file) &&
-           !config.elements['/config/file/overwrite_directory']
-          abort "Can't proceed, original of #{file} is a directory,\n" +
-                "  consider the overwrite_directory flag if appropriate."
-        end
+        # Check to see if the user has requested that we revert back to the
+        # original file.
+        if config.elements['/config/revert']
+          origpathbase = File.join(@origbase, file)
 
-        # Give save_orig a definitive answer on whether or not to save the
-        # contents of an original directory.
-        origpath = save_orig(file, true)
-        # Update the history log
-        save_history(file)
-
-        # Make a backup in case we need to roll back.  We have no use
-        # for a backup if there are no test commands defined (since we
-        # only use the backup to roll back if the test fails), so don't
-        # bother to create a backup unless there is a test command defined.
-        backup = nil
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          backup = make_backup(file)
-          puts "Created backup #{backup}"
-        end
-
-        # Make sure the directory tree for this file exists
-        filedir = File.dirname(file)
-        if !File.directory?(filedir)
-          puts "Making directory tree #{filedir}"
-          FileUtils.mkpath(filedir) if (!@dryrun)
-        end
-
-        # If the new contents are different from the current file,
-        # replace the file.
-        if set_file_contents
-          if !@dryrun
-            # Write out the new contents into a temporary file
-            filebase = File.basename(file)
+          # Restore the original file if it is around
+          if File.exist?("#{origpathbase}.ORIG")
+            origpath = "#{origpathbase}.ORIG"
+            origdir = File.dirname(origpath)
+            origbase = File.basename(origpath)
             filedir = File.dirname(file)
-            newfile = Tempfile.new(filebase, filedir)
 
-            # Set the proper permissions on the file before putting
-            # data into it.
-            newfile.chmod(perms)
+            # Remove anything we might have written out for this file
+            remove_file(file) if (!@dryrun)
+
+            puts "Restoring #{origpath} to #{file}"
+            recursive_copy_and_rename(origdir, origbase, file) if (!@dryrun)
+
+            # Now remove the backed-up original so that future runs
+            # don't do anything
+            remove_file(origpath) if (!@dryrun)
+          elsif File.exist?("#{origpathbase}.TAR")
+            origpath = "#{origpathbase}.TAR"
+            filedir = File.dirname(file)
+
+            # Remove anything we might have written out for this file
+            remove_file(file) if (!@dryrun)
+
+            puts "Restoring #{file} from #{origpath}"
+            system("cd #{filedir} && tar xf #{origpath}") if (!@dryrun)
+
+            # Now remove the backed-up original so that future runs
+            # don't do anything
+            remove_file(origpath) if (!@dryrun)
+          elsif File.exist?("#{origpathbase}.NOORIG")
+            origpath = "#{origpathbase}.NOORIG"
+            puts "Original #{file} didn't exist, restoring that state"
+
+            # Remove anything we might have written out for this file
+            remove_file(file) if (!@dryrun)
+
+            # Now remove the backed-up original so that future runs
+            # don't do anything
+            remove_file(origpath) if (!@dryrun)
+          end
+
+          throw :process_done
+        end
+
+        # Perform any setup commands that the user has requested.
+        # These are occasionally needed to install software that is
+        # required to generate the file (think m4 for sendmail.cf) or to
+        # install a package containing a sample config file which we
+        # then edit with a script, and thus doing the install in <pre>
+        # is too late.
+        if config.elements['/config/setup']
+          process_setup(file, config)
+        end
+
+        if config.elements['/config/file']  # Regular file
+          newcontents = nil
+          if config.elements['/config/file/contents']
+            newcontents = Base64.decode64(config.elements['/config/file/contents'].text)
+          end
+
+          permstring = config.elements['/config/file/perms'].text
+          perms = permstring.oct
+          owner = config.elements['/config/file/owner'].text
+          group = config.elements['/config/file/group'].text
+          uid = lookup_uid(owner)
+          gid = lookup_gid(group)
+
+          set_file_contents = false
+          if newcontents
+            set_file_contents = compare_file_contents(file, newcontents)
+          end
+          set_permissions = nil
+          set_ownership = nil
+          # If the file is currently something other than a plain file then
+          # always set the flags to set the permissions and ownership.
+          # Checking the permissions/ownership of whatever is there currently
+          # is useless.
+          if set_file_contents && (!File.file?(file) || File.symlink?(file))
+            set_permissions = true
+            set_ownership = true
+          else
+            set_permissions = compare_permissions(file, perms)
+            set_ownership = compare_ownership(file, uid, gid)
+          end
+
+          # Proceed if:
+          # - The new contents are different from the current file
+          # - The permissions or ownership requested don't match the
+          #   current permissions or ownership
+          if !set_file_contents &&
+             !set_permissions &&
+             !set_ownership
+            puts "No change to #{file} necessary" if (@debug)
+            throw :process_done
+          else
+            # Tell the user what we're going to do
+            if set_file_contents
+              # If the new contents are different from the current file
+              # show that to the user in the format they've requested.
+              # If the requested permissions are not world-readable then
+              # use the filenameonly format so that we don't disclose
+              # non-public data, unless we're in interactive mode
+              if @filenameonly || (permstring.to_i(8) & 0004 == 0 && !@interactive)
+                puts "Will write out new #{file}"
+              elsif @fullfile
+                # Grab the first 8k of the contents
+                first8k = newcontents.slice(0, 8192)
+                # Then check it for null characters.  If it has any it's
+                # likely a binary file.
+                hasnulls = true if (first8k =~ /\0/)
+
+                if !hasnulls
+                  puts "Generated contents for #{file}:"
+                  puts "============================================="
+                  puts newcontents
+                  puts "============================================="
+                else
+                  puts "Will write out new #{file}, but " +
+                       "generated contents are not plain text so " +
+                       "they will not be displayed"
+                end
+              else
+                # Default is to show a diff of the current file and the
+                # newly generated file.
+                puts "Will make the following changes to #{file}, diff -c:"
+                tempfile = Tempfile.new(File.basename(file))
+                tempfile.write(newcontents)
+                tempfile.close
+                puts "============================================="
+                if File.file?(file) && !File.symlink?(file)
+                  system("diff -c #{file} #{tempfile.path}")
+                else
+                  # Either the file doesn't currently exist,
+                  # or is something other than a normal file
+                  # that we'll be replacing with a file.  In
+                  # either case diffing against /dev/null will
+                  # produce the most logical output.
+                  system("diff -c /dev/null #{tempfile.path}")
+                end
+                puts "============================================="
+                tempfile.delete
+              end
+            end
+            if set_permissions
+              puts "Will set permissions on #{file} to #{permstring}"
+            end
+            if set_ownership
+              puts "Will set ownership of #{file} to #{uid}:#{gid}"
+            end
+
+            # If the user requested interactive mode ask them for
+            # confirmation to proceed.
+            if @interactive
+              case get_user_confirmation()
+              when CONFIRM_PROCEED
+                # No need to do anything
+              when CONFIRM_SKIP
+                save_results = false
+                throw :process_done
+              when CONFIRM_QUIT
+                unlock_all_files
+                continue_processing = false
+                save_results = false
+                throw :process_done
+              else
+                raise "Unexpected result from get_user_confirmation()"
+              end
+            end
+
+            # Perform any pre-action commands that the user has requested
+            if config.elements['/config/pre']
+              process_pre(file, config)
+            end
+
+            # If the original "file" is a directory and the user hasn't
+            # specifically told us we can overwrite it then raise an exception.
+            # 
+            # The test is here, rather than a bit earlier where you might
+            # expect it, because the pre section may be used to address
+            # originals which are directories.  So we don't check until
+            # after any pre commands are run.
+            if File.directory?(file) && !File.symlink?(file) &&
+               !config.elements['/config/file/overwrite_directory']
+              raise "Can't proceed, original of #{file} is a directory,\n" +
+                    "  consider the overwrite_directory flag if appropriate."
+            end
+
+            # Give save_orig a definitive answer on whether or not to save the
+            # contents of an original directory.
+            origpath = save_orig(file, true)
+            # Update the history log
+            save_history(file)
+
+            # Make a backup in case we need to roll back.  We have no use
+            # for a backup if there are no test commands defined (since we
+            # only use the backup to roll back if the test fails), so don't
+            # bother to create a backup unless there is a test command defined.
+            backup = nil
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              backup = make_backup(file)
+              puts "Created backup #{backup}"
+            end
+
+            # Make sure the directory tree for this file exists
+            filedir = File.dirname(file)
+            if !File.directory?(filedir)
+              puts "Making directory tree #{filedir}"
+              FileUtils.mkpath(filedir) if (!@dryrun)
+            end
+
+            # If the new contents are different from the current file,
+            # replace the file.
+            if set_file_contents
+              if !@dryrun
+                # Write out the new contents into a temporary file
+                filebase = File.basename(file)
+                filedir = File.dirname(file)
+                newfile = Tempfile.new(filebase, filedir)
+
+                # Set the proper permissions on the file before putting
+                # data into it.
+                newfile.chmod(perms)
+                begin
+                  newfile.chown(uid, gid)
+                rescue Errno::EPERM
+                  raise if Process.euid == 0
+                end
+
+                puts "Writing new contents of #{file} to #{newfile.path}" if (@debug)
+                newfile.write(newcontents)
+                newfile.close
+
+                # If the current file is not a plain file, remove it.
+                # Plain files are left alone so that the replacement is
+                # atomic.
+                if File.symlink?(file) || (File.exist?(file) && ! File.file?(file))
+                  puts "Current #{file} is not a plain file, removing it" if (@debug)
+                  remove_file(file)
+                end
+
+                # Move the new file into place
+                File.rename(newfile.path, file)
+          
+                # Check the permissions and ownership now to ensure they
+                # end up set properly
+                set_permissions = compare_permissions(file, perms)
+                set_ownership = compare_ownership(file, uid, gid)
+              end
+            end
+
+            # Ensure the permissions are set properly
+            if set_permissions
+              File.chmod(perms, file) if (!@dryrun)
+            end
+
+            # Ensure the ownership is set properly
+            if set_ownership
+              begin
+                File.chown(uid, gid, file) if (!@dryrun)
+              rescue Errno::EPERM
+                raise if Process.euid == 0
+              end
+            end
+
+            # Perform any test_before_post commands that the user has requested
+            if config.elements['/config/test_before_post']
+              if !process_test_before_post(file, config)
+                restore_backup(file, backup)
+                raise "test_before_post failed"
+              end
+            end
+
+            # Perform any post-action commands that the user has requested
+            if config.elements['/config/post']
+              process_post(file, config)
+            end
+
+            # Perform any test commands that the user has requested
+            if config.elements['/config/test']
+              if !process_test(file, config)
+                restore_backup(file, backup)
+
+                # Re-run any post commands
+                if config.elements['/config/post']
+                  process_post(file, config)
+                end
+              end
+            end
+
+            # Clean up the backup, we don't need it anymore
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              puts "Removing backup #{backup}"
+              remove_file(backup) if (!@dryrun);
+            end
+
+            # Update the history log again
+            save_history(file)
+
+            throw :process_done
+          end
+        end
+
+        if config.elements['/config/link']  # Symbolic link
+
+          dest = config.elements['/config/link/dest'].text
+
+          set_link_destination = compare_link_destination(file, dest)
+          absdest = File.expand_path(dest, File.dirname(file))
+
+          permstring = config.elements['/config/link/perms'].text
+          perms = permstring.oct
+          owner = config.elements['/config/link/owner'].text
+          group = config.elements['/config/link/group'].text
+          uid = lookup_uid(owner)
+          gid = lookup_gid(group)
+    
+          # lchown and lchmod are not supported on many platforms.  The server
+          # always includes ownership and permissions settings with any link
+          # (pulling them from defaults.xml if the user didn't specify them in
+          # the config.xml file.)  As such link management would always fail
+          # on systems which don't support lchown/lchmod, which seems like bad
+          # behavior.  So instead we check to see if they are implemented, and
+          # if not just ignore ownership/permissions settings.  I suppose the
+          # ideal would be for the server to tell the client whether the
+          # ownership/permissions were specifically requested (in config.xml)
+          # rather than just defaults, and then for the client to always try to
+          # manage ownership/permissions if the settings are not defaults (and
+          # fail in the event that they aren't implemented.)
+          if @lchown_supported.nil?
+            lchowntestlink = Tempfile.new('etchlchowntest').path
+            lchowntestfile = Tempfile.new('etchlchowntest').path
+            File.delete(lchowntestlink)
+            File.symlink(lchowntestfile, lchowntestlink)
             begin
-              newfile.chown(uid, gid)
+              File.lchown(0, 0, lchowntestfile)
+              @lchown_supported = true
+            rescue NotImplementedError
+              @lchown_supported = false
             rescue Errno::EPERM
               raise if Process.euid == 0
             end
-
-            puts "Writing new contents of #{file} to #{newfile.path}" if (@debug)
-            newfile.write(newcontents)
-            newfile.close
-
-            # If the current file is not a plain file, remove it.
-            # Plain files are left alone so that the replacement is
-            # atomic.
-            if File.symlink?(file) || (File.exist?(file) && ! File.file?(file))
-              puts "Current #{file} is not a plain file, removing it" if (@debug)
-              remove_file(file)
-            end
-
-            # Move the new file into place
-            File.rename(newfile.path, file)
-            
-            # Check the permissions and ownership now to ensure they
-            # end up set properly
-            set_permissions = compare_permissions(file, perms)
-            set_ownership = compare_ownership(file, uid, gid)
           end
-        end
-
-        # Ensure the permissions are set properly
-        if set_permissions
-          File.chmod(perms, file) if (!@dryrun)
-        end
-
-        # Ensure the ownership is set properly
-        if set_ownership
-          begin
-            File.chown(uid, gid, file) if (!@dryrun)
-          rescue Errno::EPERM
-            raise if Process.euid == 0
-          end
-        end
-
-        # Perform any test_before_post commands that the user has requested
-        if config.elements['/config/test_before_post']
-          if !process_test_before_post(file, config)
-            restore_backup(file, backup)
-            return
-          end
-        end
-
-        # Perform any post-action commands that the user has requested
-        if config.elements['/config/post']
-          process_post(file, config)
-        end
-
-        # Perform any test commands that the user has requested
-        if config.elements['/config/test']
-          if !process_test(file, config)
-            restore_backup(file, backup)
-
-            # Re-run any post commands
-            if config.elements['/config/post']
-              process_post(file, config)
+          if @lchmod_supported.nil?
+            lchmodtestlink = Tempfile.new('etchlchmodtest').path
+            lchmodtestfile = Tempfile.new('etchlchmodtest').path
+            File.delete(lchmodtestlink)
+            File.symlink(lchmodtestfile, lchmodtestlink)
+            begin
+              File.lchmod(0644, lchmodtestfile)
+              @lchmod_supported = true        
+            rescue NotImplementedError
+              @lchmod_supported = false
             end
           end
-        end
-
-        # Clean up the backup, we don't need it anymore
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          puts "Removing backup #{backup}"
-          remove_file(backup) if (!@dryrun);
-        end
-
-        # Update the history log again
-        save_history(file)
-
-        done = true
-      end
-    end
-
-    if config.elements['/config/link'] && !done  # Symbolic link
-
-      dest = config.elements['/config/link/dest'].text
-
-      set_link_destination = compare_link_destination(file, dest)
-      absdest = File.expand_path(dest, File.dirname(file))
-
-      permstring = config.elements['/config/link/perms'].text
-      perms = permstring.oct
-      owner = config.elements['/config/link/owner'].text
-      group = config.elements['/config/link/group'].text
-      uid = lookup_uid(owner)
-      gid = lookup_gid(group)
-      
-      # lchown and lchmod are not supported on many platforms.  The server
-      # always includes ownership and permissions settings with any link
-      # (pulling them from defaults.xml if the user didn't specify them in
-      # the config.xml file.)  As such link management would always fail
-      # on systems which don't support lchown/lchmod, which seems like bad
-      # behavior.  So instead we check to see if they are implemented, and
-      # if not just ignore ownership/permissions settings.  I suppose the
-      # ideal would be for the server to tell the client whether the
-      # ownership/permissions were specifically requested (in config.xml)
-      # rather than just defaults, and then for the client to always try to
-      # manage ownership/permissions if the settings are not defaults (and
-      # fail in the event that they aren't implemented.)
-      if @lchown_supported.nil?
-        lchowntestlink = Tempfile.new('etchlchowntest').path
-        lchowntestfile = Tempfile.new('etchlchowntest').path
-        File.delete(lchowntestlink)
-        File.symlink(lchowntestfile, lchowntestlink)
-        begin
-          File.lchown(0, 0, lchowntestfile)
-          @lchown_supported = true
-        rescue NotImplementedError
-          @lchown_supported = false
-        rescue Errno::EPERM
-          raise if Process.euid == 0
-        end
-      end
-      if @lchmod_supported.nil?
-        lchmodtestlink = Tempfile.new('etchlchmodtest').path
-        lchmodtestfile = Tempfile.new('etchlchmodtest').path
-        File.delete(lchmodtestlink)
-        File.symlink(lchmodtestfile, lchmodtestlink)
-        begin
-          File.lchmod(0644, lchmodtestfile)
-          @lchmod_supported = true        
-        rescue NotImplementedError
-          @lchmod_supported = false
-        end
-      end
-      
-      set_permissions = false
-      if @lchmod_supported
-        # If the file is currently something other than a link then
-        # always set the flags to set the permissions and ownership.
-        # Checking the permissions/ownership of whatever is there currently
-        # is useless.
-        if set_link_destination && !File.symlink?(file)
-          set_permissions = true
-        else
-          set_permissions = compare_permissions(file, perms)
-        end
-      end
-      set_ownership = false
-      if @lchown_supported
-        if set_link_destination && !File.symlink?(file)
-          set_ownership = true
-        else
-          set_ownership = compare_ownership(file, uid, gid)
-        end
-      end
-
-      # Proceed if:
-      # - The new link destination differs from the current one
-      # - The permissions or ownership requested don't match the
-      #   current permissions or ownership
-      if !set_link_destination &&
-         !set_permissions &&
-         !set_ownership
-        puts "No change to #{file} necessary" if (@debug)
-        done = true
-      # Check that the link destination exists, and refuse to create
-      # the link unless it does exist or the user told us to go ahead
-      # anyway.
-      # 
-      # Note that the destination may be a relative path, and the
-      # target directory may not exist yet, so we have to convert the
-      # destination to an absolute path and test that for existence.
-      # expand_path should handle paths that are already absolute
-      # properly.
-      elsif ! File.exist?(absdest) && ! File.symlink?(absdest) &&
-            ! config.elements['/config/link/allow_nonexistent_dest']
-        puts "Destination #{dest} for link #{file} does not exist," +
-             "  consider the allow_nonexistent_dest flag if appropriate."
-        done = true
-      else
-        # Tell the user what we're going to do
-        if set_link_destination
-          puts "Linking #{file} -> #{dest}"
-        end
-        if set_permissions
-          puts "Will set permissions on #{file} to #{permstring}"
-        end
-        if set_ownership
-          puts "Will set ownership of #{file} to #{uid}:#{gid}"
-        end
-
-        # If the user requested interactive mode ask them for
-        # confirmation to proceed.
-        if @interactive
-          case get_user_confirmation()
-          when CONFIRM_PROCEED
-            # No need to do anything
-          when CONFIRM_SKIP
-            # FIXME
-            abort
-          when CONFIRM_QUIT
-            unlock_all_files
-            exit
-          else
-            abort "Unexpected result from get_user_confirmation()"
-          end
-        end
-
-        # Perform any pre-action commands that the user has requested
-        if config.elements['/config/pre']
-          process_pre(file, config)
-        end
-
-        # If the original "file" is a directory and the user hasn't
-        # specifically told us we can overwrite it then abort.
-        # 
-        # The test is here, rather than a bit earlier where you might
-        # expect it, because the pre section may be used to address
-        # originals which are directories.  So we don't check until
-        # after any pre commands are run.
-        if File.directory?(file) && !File.symlink?(file) &&
-           !config.elements['/config/link/overwrite_directory']
-          abort "Can't proceed, original of #{file} is a directory,\n" +
-                "  consider the overwrite_directory flag if appropriate."
-        end
-
-        # Give save_orig a definitive answer on whether or not to save the
-        # contents of an original directory.
-        origpath = save_orig(file, true)
-        # Update the history log
-        save_history(file)
-
-        # Make a backup in case we need to roll back.  We have no use
-        # for a backup if there are no test commands defined (since we
-        # only use the backup to roll back if the test fails), so don't
-        # bother to create a backup unless there is a test command defined.
-        backup = nil
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          backup = make_backup(file)
-          puts "Created backup #{backup}"
-        end
-
-        # Make sure the directory tree for this link exists
-        filedir = File.dirname(file)
-        if !File.directory?(filedir)
-          puts "Making directory tree #{filedir}"
-          FileUtils.mkpath(filedir) if (!@dryrun)
-        end
-
-        # Create the link
-        if set_link_destination
-          remove_file(file) if (!@dryrun)
-          File.symlink(dest, file) if (!@dryrun)
-
-          # Check the permissions and ownership now to ensure they
-          # end up set properly
+    
+          set_permissions = false
           if @lchmod_supported
-            set_permissions = compare_permissions(file, perms)
+            # If the file is currently something other than a link then
+            # always set the flags to set the permissions and ownership.
+            # Checking the permissions/ownership of whatever is there currently
+            # is useless.
+            if set_link_destination && !File.symlink?(file)
+              set_permissions = true
+            else
+              set_permissions = compare_permissions(file, perms)
+            end
           end
+          set_ownership = false
           if @lchown_supported
+            if set_link_destination && !File.symlink?(file)
+              set_ownership = true
+            else
+              set_ownership = compare_ownership(file, uid, gid)
+            end
+          end
+
+          # Proceed if:
+          # - The new link destination differs from the current one
+          # - The permissions or ownership requested don't match the
+          #   current permissions or ownership
+          if !set_link_destination &&
+             !set_permissions &&
+             !set_ownership
+            puts "No change to #{file} necessary" if (@debug)
+            throw :process_done
+          # Check that the link destination exists, and refuse to create
+          # the link unless it does exist or the user told us to go ahead
+          # anyway.
+          # 
+          # Note that the destination may be a relative path, and the
+          # target directory may not exist yet, so we have to convert the
+          # destination to an absolute path and test that for existence.
+          # expand_path should handle paths that are already absolute
+          # properly.
+          elsif ! File.exist?(absdest) && ! File.symlink?(absdest) &&
+                ! config.elements['/config/link/allow_nonexistent_dest']
+            puts "Destination #{dest} for link #{file} does not exist," +
+                 "  consider the allow_nonexistent_dest flag if appropriate."
+            throw :process_done
+          else
+            # Tell the user what we're going to do
+            if set_link_destination
+              puts "Linking #{file} -> #{dest}"
+            end
+            if set_permissions
+              puts "Will set permissions on #{file} to #{permstring}"
+            end
+            if set_ownership
+              puts "Will set ownership of #{file} to #{uid}:#{gid}"
+            end
+
+            # If the user requested interactive mode ask them for
+            # confirmation to proceed.
+            if @interactive
+              case get_user_confirmation()
+              when CONFIRM_PROCEED
+                # No need to do anything
+              when CONFIRM_SKIP
+                save_results = false
+                throw :process_done
+              when CONFIRM_QUIT
+                unlock_all_files
+                continue_processing = false
+                save_results = false
+                throw :process_done
+              else
+                raise "Unexpected result from get_user_confirmation()"
+              end
+            end
+
+            # Perform any pre-action commands that the user has requested
+            if config.elements['/config/pre']
+              process_pre(file, config)
+            end
+
+            # If the original "file" is a directory and the user hasn't
+            # specifically told us we can overwrite it then raise an exception.
+            # 
+            # The test is here, rather than a bit earlier where you might
+            # expect it, because the pre section may be used to address
+            # originals which are directories.  So we don't check until
+            # after any pre commands are run.
+            if File.directory?(file) && !File.symlink?(file) &&
+               !config.elements['/config/link/overwrite_directory']
+              raise "Can't proceed, original of #{file} is a directory,\n" +
+                    "  consider the overwrite_directory flag if appropriate."
+            end
+
+            # Give save_orig a definitive answer on whether or not to save the
+            # contents of an original directory.
+            origpath = save_orig(file, true)
+            # Update the history log
+            save_history(file)
+
+            # Make a backup in case we need to roll back.  We have no use
+            # for a backup if there are no test commands defined (since we
+            # only use the backup to roll back if the test fails), so don't
+            # bother to create a backup unless there is a test command defined.
+            backup = nil
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              backup = make_backup(file)
+              puts "Created backup #{backup}"
+            end
+
+            # Make sure the directory tree for this link exists
+            filedir = File.dirname(file)
+            if !File.directory?(filedir)
+              puts "Making directory tree #{filedir}"
+              FileUtils.mkpath(filedir) if (!@dryrun)
+            end
+
+            # Create the link
+            if set_link_destination
+              remove_file(file) if (!@dryrun)
+              File.symlink(dest, file) if (!@dryrun)
+
+              # Check the permissions and ownership now to ensure they
+              # end up set properly
+              if @lchmod_supported
+                set_permissions = compare_permissions(file, perms)
+              end
+              if @lchown_supported
+                set_ownership = compare_ownership(file, uid, gid)
+              end
+            end
+
+            # Ensure the permissions are set properly
+            if set_permissions
+              # Note: lchmod
+              File.lchmod(perms, file) if (!@dryrun)
+            end
+
+            # Ensure the ownership is set properly
+            if set_ownership
+              begin
+                # Note: lchown
+                File.lchown(uid, gid, file) if (!@dryrun)
+              rescue Errno::EPERM
+                raise if Process.euid == 0
+              end
+            end
+
+            # Perform any test_before_post commands that the user has requested
+            if config.elements['/config/test_before_post']
+              if !process_test_before_post(file, config)
+                restore_backup(file, backup)
+                raise "test_before_post failed"
+              end
+            end
+
+            # Perform any post-action commands that the user has requested
+            if config.elements['/config/post']
+              process_post(file, config)
+            end
+
+            # Perform any test commands that the user has requested
+            if config.elements['/config/test']
+              if !process_test(file, config)
+                restore_backup(file, backup)
+
+                # Re-run any post commands
+                if config.elements['/config/post']
+                  process_post(file, config)
+                end
+              end
+            end
+
+            # Clean up the backup, we don't need it anymore
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              puts "Removing backup #{backup}"
+              remove_file(backup) if (!@dryrun);
+            end
+
+            # Update the history log again
+            save_history(file)
+
+            throw :process_done
+          end
+        end
+
+        if config.elements['/config/directory']  # Directory
+  
+          # A little safety check
+          create = config.elements['/config/directory/create']
+          raise "No create element found in directory section" if !create
+  
+          permstring = config.elements['/config/directory/perms'].text
+          perms = permstring.oct
+          owner = config.elements['/config/directory/owner'].text
+          group = config.elements['/config/directory/group'].text
+          uid = lookup_uid(owner)
+          gid = lookup_gid(group)
+
+          set_directory = !File.directory?(file) || File.symlink?(file)
+          set_permissions = nil
+          set_ownership = nil
+          # If the file is currently something other than a directory then
+          # always set the flags to set the permissions and ownership.
+          # Checking the permissions/ownership of whatever is there currently
+          # is useless.
+          if set_directory
+            set_permissions = true
+            set_ownership = true
+          else
+            set_permissions = compare_permissions(file, perms)
             set_ownership = compare_ownership(file, uid, gid)
           end
-        end
 
-        # Ensure the permissions are set properly
-        if set_permissions
-          # Note: lchmod
-          File.lchmod(perms, file) if (!@dryrun)
-        end
-
-        # Ensure the ownership is set properly
-        if set_ownership
-          begin
-            # Note: lchown
-            File.lchown(uid, gid, file) if (!@dryrun)
-          rescue Errno::EPERM
-            raise if Process.euid == 0
-          end
-        end
-
-        # Perform any test_before_post commands that the user has requested
-        if config.elements['/config/test_before_post']
-          if !process_test_before_post(file, config)
-            restore_backup(file, backup)
-            return
-          end
-        end
-
-        # Perform any post-action commands that the user has requested
-        if config.elements['/config/post']
-          process_post(file, config)
-        end
-
-        # Perform any test commands that the user has requested
-        if config.elements['/config/test']
-          if !process_test(file, config)
-            restore_backup(file, backup)
-
-            # Re-run any post commands
-            if config.elements['/config/post']
-              process_post(file, config)
-            end
-          end
-        end
-
-        # Clean up the backup, we don't need it anymore
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          puts "Removing backup #{backup}"
-          remove_file(backup) if (!@dryrun);
-        end
-
-        # Update the history log again
-        save_history(file)
-
-        done = true
-      end
-    end
-
-    if config.elements['/config/directory'] && !done  # Directory
-    
-      # A little safety check
-      create = config.elements['/config/directory/create']
-      abort "No create element found in directory section" if !create
-    
-      permstring = config.elements['/config/directory/perms'].text
-      perms = permstring.oct
-      owner = config.elements['/config/directory/owner'].text
-      group = config.elements['/config/directory/group'].text
-      uid = lookup_uid(owner)
-      gid = lookup_gid(group)
-
-      set_directory = !File.directory?(file) || File.symlink?(file)
-      set_permissions = nil
-      set_ownership = nil
-      # If the file is currently something other than a directory then
-      # always set the flags to set the permissions and ownership.
-      # Checking the permissions/ownership of whatever is there currently
-      # is useless.
-      if set_directory
-        set_permissions = true
-        set_ownership = true
-      else
-        set_permissions = compare_permissions(file, perms)
-        set_ownership = compare_ownership(file, uid, gid)
-      end
-
-      # Proceed if:
-      # - The current file is not a directory
-      # - The permissions or ownership requested don't match the
-      #   current permissions or ownership
-      if !set_directory &&
-         !set_permissions &&
-         !set_ownership
-        puts "No change to #{file} necessary" if (@debug)
-        done = true
-      else
-        # Tell the user what we're going to do
-        if set_directory
-          puts "Making directory #{file}"
-        end
-        if set_permissions
-          puts "Will set permissions on #{file} to #{permstring}"
-        end
-        if set_ownership
-          puts "Will set ownership of #{file} to #{uid}:#{gid}"
-        end
-
-        # If the user requested interactive mode ask them for
-        # confirmation to proceed.
-        if @interactive
-          case get_user_confirmation()
-          when CONFIRM_PROCEED
-            # No need to do anything
-          when CONFIRM_SKIP
-            # FIXME
-            abort
-          when CONFIRM_QUIT
-            unlock_all_files
-            exit
+          # Proceed if:
+          # - The current file is not a directory
+          # - The permissions or ownership requested don't match the
+          #   current permissions or ownership
+          if !set_directory &&
+             !set_permissions &&
+             !set_ownership
+            puts "No change to #{file} necessary" if (@debug)
+            throw :process_done
           else
-            abort "Unexpected result from get_user_confirmation()"
-          end
-        end
+            # Tell the user what we're going to do
+            if set_directory
+              puts "Making directory #{file}"
+            end
+            if set_permissions
+              puts "Will set permissions on #{file} to #{permstring}"
+            end
+            if set_ownership
+              puts "Will set ownership of #{file} to #{uid}:#{gid}"
+            end
 
-        # Perform any pre-action commands that the user has requested
-        if config.elements['/config/pre']
-          process_pre(file, config)
-        end
+            # If the user requested interactive mode ask them for
+            # confirmation to proceed.
+            if @interactive
+              case get_user_confirmation()
+              when CONFIRM_PROCEED
+                # No need to do anything
+              when CONFIRM_SKIP
+                save_results = false
+                throw :process_done
+              when CONFIRM_QUIT
+                unlock_all_files
+                continue_processing = false
+                save_results = false
+                throw :process_done
+              else
+                raise "Unexpected result from get_user_confirmation()"
+              end
+            end
 
-        # Give save_orig a definitive answer on whether or not to save the
-        # contents of an original directory.
-        origpath = save_orig(file, false)
-        # Update the history log
-        save_history(file)
+            # Perform any pre-action commands that the user has requested
+            if config.elements['/config/pre']
+              process_pre(file, config)
+            end
 
-        # Make a backup in case we need to roll back.  We have no use
-        # for a backup if there are no test commands defined (since we
-        # only use the backup to roll back if the test fails), so don't
-        # bother to create a backup unless there is a test command defined.
-        backup = nil
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          backup = make_backup(file)
-          puts "Created backup #{backup}"
-        end
+            # Give save_orig a definitive answer on whether or not to save the
+            # contents of an original directory.
+            origpath = save_orig(file, false)
+            # Update the history log
+            save_history(file)
 
-        # Make sure the directory tree for this directory exists
-        filedir = File.dirname(file)
-        if !File.directory?(filedir)
-          puts "Making directory tree #{filedir}"
-          FileUtils.mkpath(filedir) if (!@dryrun)
-        end
+            # Make a backup in case we need to roll back.  We have no use
+            # for a backup if there are no test commands defined (since we
+            # only use the backup to roll back if the test fails), so don't
+            # bother to create a backup unless there is a test command defined.
+            backup = nil
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              backup = make_backup(file)
+              puts "Created backup #{backup}"
+            end
 
-        # Create the directory
-        if set_directory
-          remove_file(file) if (!@dryrun)
-          Dir.mkdir(file) if (!@dryrun)
+            # Make sure the directory tree for this directory exists
+            filedir = File.dirname(file)
+            if !File.directory?(filedir)
+              puts "Making directory tree #{filedir}"
+              FileUtils.mkpath(filedir) if (!@dryrun)
+            end
 
-          # Check the permissions and ownership now to ensure they
-          # end up set properly
-          set_permissions = compare_permissions(file, perms)
-          set_ownership = compare_ownership(file, uid, gid)
-        end
+            # Create the directory
+            if set_directory
+              remove_file(file) if (!@dryrun)
+              Dir.mkdir(file) if (!@dryrun)
 
-        # Ensure the permissions are set properly
-        if set_permissions
-          File.chmod(perms, file) if (!@dryrun)
-        end
+              # Check the permissions and ownership now to ensure they
+              # end up set properly
+              set_permissions = compare_permissions(file, perms)
+              set_ownership = compare_ownership(file, uid, gid)
+            end
 
-        # Ensure the ownership is set properly
-        if set_ownership
-          begin
-            File.chown(uid, gid, file) if (!@dryrun)
-          rescue Errno::EPERM
-            raise if Process.euid == 0
-          end
-        end
+            # Ensure the permissions are set properly
+            if set_permissions
+              File.chmod(perms, file) if (!@dryrun)
+            end
 
-        # Perform any test_before_post commands that the user has requested
-        if config.elements['/config/test_before_post']
-          if !process_test_before_post(file, config)
-            restore_backup(file, backup)
-            return
-          end
-        end
+            # Ensure the ownership is set properly
+            if set_ownership
+              begin
+                File.chown(uid, gid, file) if (!@dryrun)
+              rescue Errno::EPERM
+                raise if Process.euid == 0
+              end
+            end
 
-        # Perform any post-action commands that the user has requested
-        if config.elements['/config/post']
-          process_post(file, config)
-        end
+            # Perform any test_before_post commands that the user has requested
+            if config.elements['/config/test_before_post']
+              if !process_test_before_post(file, config)
+                restore_backup(file, backup)
+                raise "test_before_post failed"
+              end
+            end
 
-        # Perform any test commands that the user has requested
-        if config.elements['/config/test']
-          if !process_test(file, config)
-            restore_backup(file, backup)
-
-            # Re-run any post commands
+            # Perform any post-action commands that the user has requested
             if config.elements['/config/post']
               process_post(file, config)
             end
+
+            # Perform any test commands that the user has requested
+            if config.elements['/config/test']
+              if !process_test(file, config)
+                restore_backup(file, backup)
+
+                # Re-run any post commands
+                if config.elements['/config/post']
+                  process_post(file, config)
+                end
+              end
+            end
+
+            # Clean up the backup, we don't need it anymore
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              puts "Removing backup #{backup}"
+              remove_file(backup) if (!@dryrun);
+            end
+
+            # Update the history log again
+            save_history(file)
+
+            throw :process_done
           end
         end
 
-        # Clean up the backup, we don't need it anymore
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          puts "Removing backup #{backup}"
-          remove_file(backup) if (!@dryrun);
-        end
+        if config.elements['/config/delete']  # Delete whatever is there
 
-        # Update the history log again
-        save_history(file)
+          # A little safety check
+          proceed = config.elements['/config/delete/proceed']
+          raise "No proceed element found in delete section" if !proceed
 
-        done = true
-      end
-    end
-
-    if config.elements['/config/delete'] && !done  # Delete whatever is there
-
-      # A little safety check
-      proceed = config.elements['/config/delete/proceed']
-      abort "No proceed element found in delete section" if !proceed
-
-      # Proceed only if the file currently exists
-      if !File.exist?(file) && !File.symlink?(file)
-        done = true
-      else
-        # Tell the user what we're going to do
-        puts "Removing #{file}"
-
-        # If the user requested interactive mode ask them for
-        # confirmation to proceed.
-        if @interactive
-          case get_user_confirmation()
-          when CONFIRM_PROCEED
-            # No need to do anything
-          when CONFIRM_SKIP
-            # FIXME
-            abort
-          when CONFIRM_QUIT
-            unlock_all_files
-            exit
+          # Proceed only if the file currently exists
+          if !File.exist?(file) && !File.symlink?(file)
+            throw :process_done
           else
-            abort "Unexpected result from get_user_confirmation()"
-          end
-        end
+            # Tell the user what we're going to do
+            puts "Removing #{file}"
 
-        # Perform any pre-action commands that the user has requested
-        if config.elements['/config/pre']
-          process_pre(file, config)
-        end
+            # If the user requested interactive mode ask them for
+            # confirmation to proceed.
+            if @interactive
+              case get_user_confirmation()
+              when CONFIRM_PROCEED
+                # No need to do anything
+              when CONFIRM_SKIP
+                save_results = false
+                throw :process_done
+              when CONFIRM_QUIT
+                unlock_all_files
+                continue_processing = false
+                save_results = false
+                throw :process_done
+              else
+                raise "Unexpected result from get_user_confirmation()"
+              end
+            end
 
-        # If the original "file" is a directory and the user hasn't
-        # specifically told us we can overwrite it then abort.
-        # 
-        # The test is here, rather than a bit earlier where you might
-        # expect it, because the pre section may be used to address
-        # originals which are directories.  So we don't check until
-        # after any pre commands are run.
-        if File.directory?(file) && !File.symlink?(file) &&
-           !config.elements['/config/delete/overwrite_directory']
-          abort "Can't proceed, original of #{file} is a directory,\n" +
-                "  consider the overwrite_directory flag if appropriate."
-        end
+            # Perform any pre-action commands that the user has requested
+            if config.elements['/config/pre']
+              process_pre(file, config)
+            end
 
-        # Give save_orig a definitive answer on whether or not to save the
-        # contents of an original directory.
-        origpath = save_orig(file, true)
-        # Update the history log
-        save_history(file)
+            # If the original "file" is a directory and the user hasn't
+            # specifically told us we can overwrite it then raise an exception.
+            # 
+            # The test is here, rather than a bit earlier where you might
+            # expect it, because the pre section may be used to address
+            # originals which are directories.  So we don't check until
+            # after any pre commands are run.
+            if File.directory?(file) && !File.symlink?(file) &&
+               !config.elements['/config/delete/overwrite_directory']
+              raise "Can't proceed, original of #{file} is a directory,\n" +
+                    "  consider the overwrite_directory flag if appropriate."
+            end
 
-        # Make a backup in case we need to roll back.  We have no use
-        # for a backup if there are no test commands defined (since we
-        # only use the backup to roll back if the test fails), so don't
-        # bother to create a backup unless there is a test command defined.
-        backup = nil
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          backup = make_backup(file)
-          puts "Created backup #{backup}"
-        end
+            # Give save_orig a definitive answer on whether or not to save the
+            # contents of an original directory.
+            origpath = save_orig(file, true)
+            # Update the history log
+            save_history(file)
 
-        # Remove the file
-        remove_file(file) if (!@dryrun)
+            # Make a backup in case we need to roll back.  We have no use
+            # for a backup if there are no test commands defined (since we
+            # only use the backup to roll back if the test fails), so don't
+            # bother to create a backup unless there is a test command defined.
+            backup = nil
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              backup = make_backup(file)
+              puts "Created backup #{backup}"
+            end
 
-        # Perform any test_before_post commands that the user has requested
-        if config.elements['/config/test_before_post']
-          if !process_test_before_post(file, config)
-            restore_backup(file, backup)
-            return
-          end
-        end
+            # Remove the file
+            remove_file(file) if (!@dryrun)
 
-        # Perform any post-action commands that the user has requested
-        if config.elements['/config/post']
-          process_post(file, config)
-        end
+            # Perform any test_before_post commands that the user has requested
+            if config.elements['/config/test_before_post']
+              if !process_test_before_post(file, config)
+                restore_backup(file, backup)
+                raise "test_before_post failed"
+              end
+            end
 
-        # Perform any test commands that the user has requested
-        if config.elements['/config/test']
-          if !process_test(file, config)
-            restore_backup(file, backup)
-
-            # Re-run any post commands
+            # Perform any post-action commands that the user has requested
             if config.elements['/config/post']
               process_post(file, config)
             end
+
+            # Perform any test commands that the user has requested
+            if config.elements['/config/test']
+              if !process_test(file, config)
+                restore_backup(file, backup)
+
+                # Re-run any post commands
+                if config.elements['/config/post']
+                  process_post(file, config)
+                end
+              end
+            end
+
+            # Clean up the backup, we don't need it anymore
+            if config.elements['/config/test_before_post'] ||
+               config.elements['/config/test']
+              puts "Removing backup #{backup}"
+              remove_file(backup) if (!@dryrun);
+            end
+
+            # Update the history log again
+            save_history(file)
+
+            throw :process_done
           end
         end
-
-        # Clean up the backup, we don't need it anymore
-        if config.elements['/config/test_before_post'] ||
-           config.elements['/config/test']
-          puts "Removing backup #{backup}"
-          remove_file(backup) if (!@dryrun);
-        end
-
-        # Update the history log again
-        save_history(file)
-
-        done = true
-      end
-    end
-
-    @already_processed[file] = true
+      rescue Exception
+        result['success'] = false
+        exception = $!
+      end # End begin block
+    end  # End :process_done catch block
+    
     unlock_file(file)
+    
+    output = stop_output_capture
+    if exception
+      output << exception.message
+      output << exception.backtrace.join("\n") if @debug
+    end
+    result['message'] << output
+    if save_results
+      @results << result
+    end
+    
+    if exception
+      raise exception
+    end
+    
+    @already_processed[file] = true
+
+    continue_processing
   end
 
   # Returns true if the new contents are different from the current file,
@@ -1386,7 +1514,7 @@ class Etch::Client
         # anything except remove our NOORIG marker file
         remove_file(backup)
       else
-        abort "No backup found in #{backup} to restore to #{file}"
+        raise "No backup found in #{backup} to restore to #{file}"
       end
     end
   end
@@ -1399,7 +1527,7 @@ class Etch::Client
     puts "Processing #{exectype} commands" if (@debug)
     config.elements.each("/config/#{exectype}/exec") do |setup|
       r = process_exec(exectype, setup.text, file);
-      # process_exec currently aborts if a setup or pre command
+      # process_exec currently raises an exception if a setup or pre command
       # fails.  In case that ever changes make sure we propagate
       # the error.
       return r if (!r)
@@ -1410,7 +1538,7 @@ class Etch::Client
     puts "Processing #{exectype} commands"
     config.elements.each("/config/#{exectype}/exec") do |pre|
       r = process_exec(exectype, pre.text, file);
-      # process_exec currently aborts if a setup or pre command
+      # process_exec currently raises an exception if a setup or pre command
       # fails.  In case that ever changes make sure we propagate
       # the error.
       return r if (!r)
@@ -1533,7 +1661,7 @@ class Etch::Client
       # those software installs fail.  So consider it a fatal error if
       # that occurs.
       if exectype == 'setup' || exectype == 'pre'
-        abort "    Setup/Pre command " + execmsg + filemsg +
+        raise "    Setup/Pre command " + execmsg + filemsg +
           "exited with non-zero value"
       # Post commands are generally used to restart services.  While
       # it is unfortunate if they fail, there is little to be gained
@@ -1660,7 +1788,7 @@ class Etch::Client
     # prevent that, but Solaris cp does not, so we resort to cpio.
     # GNU cpio has a --quiet option, but Solaris cpio does not.  Sigh.
     system("cd #{sourcedir} && find #{sourcefile} | cpio -pdum #{destdir}") or
-      abort "Copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
+      raise "Copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
   end
   def recursive_copy_and_rename(sourcedir, sourcefile, destname)
     tmpdir = tempdir(destname)
@@ -1696,7 +1824,7 @@ class Etch::Client
       end
     end
 
-    abort "Unable to acquire lock for #{file} after repeated attempts"
+    raise "Unable to acquire lock for #{file} after repeated attempts"
   end
 
   def unlock_file(file)
@@ -1715,7 +1843,7 @@ class Etch::Client
         @locked_files.delete(file)
       else
         # This shouldn't happen, if it does it's a bug
-        abort "Asked to unlock #{file} which is locked by another process (pid #{pid})"
+        raise "Process #{Process.pid} asked to unlock #{file} which is locked by another process (pid #{pid})"
       end
     else
       # This shouldn't happen either
@@ -1746,6 +1874,82 @@ class Etch::Client
   def reset_already_processed
     @already_processed.clear
   end
-
+  
+  def start_output_capture
+    # Establish a pipe, spawn a child process, and redirect stdout/stderr
+    # to the pipe.  The child gathers up anything sent over the pipe and
+    # when we close the pipe later it sends the captured output back to us
+    # over a second pipe.
+    pread, pwrite = IO.pipe
+    oread, owrite = IO.pipe
+    if fork
+      # Parent
+      pread.close
+      owrite.close
+      # Can't use $stdout and $stderr here, child processes don't
+      # inherit them and process() spawns a variety of child
+      # processes which have output we want to capture.
+      oldstdout = STDOUT.dup
+      oldstderr = STDERR.dup
+      STDOUT.reopen(pwrite)
+      STDERR.reopen(pwrite)
+      pwrite.close
+      @output_pipes << [oread, oldstdout, oldstderr]
+    else
+      # Child
+      # We need to catch any exceptions in the child because the parent
+      # might spawn this process in the context of a begin block (in fact
+      # it does at the time of this writing), in which case if we throw an
+      # exception here execution will jump back to that block, therefore not
+      # exiting the child where we want but rather making a big mess of
+      # things by continuing to execute the main body of code in parallel
+      # with the parent process.
+      begin
+        pwrite.close
+        oread.close
+        # If we're somewhere past the first level of the recursion in
+        # processing files the stdout/stderr we inherit from our parent will
+        # actually be a pipe to the previous file's child process.  We want
+        # every child process to talk directly to the real filehandles,
+        # otherwise every file that has dependencies will end up with the
+        # output for those dependencies gathered with its output.
+        STDOUT.reopen(ORIG_STDOUT)
+        STDERR.reopen(ORIG_STDERR)
+        # stdout is line buffered by default, so if we didn't enable sync here
+        # then we wouldn't see the output of the putc below until we output a
+        # newline.
+        $stdout.sync = true
+        output = ''
+        while char = pread.getc
+          putc(char)
+          output << char.chr
+        end
+        pread.close
+        owrite.write(output)
+        owrite.close
+      rescue Exception => e
+        $stderr.puts "Exception in output capture child: " + e.message
+        $stderr.puts e.backtrace.join("\n") if @debug
+      end
+      # Exit in such a way that we don't trigger any signal handlers that
+      # we might have inherited from the parent process
+      exit!
+    end
+  end
+  def stop_output_capture
+    oread, oldstdout, oldstderr = @output_pipes.pop
+    # The reopen and close closes the parent's end of the pipe to the child
+    STDOUT.reopen(oldstdout)
+    STDERR.reopen(oldstderr)
+    oldstdout.close
+    oldstderr.close
+    # Which triggers the child to send us the gathered output over the
+    # second pipe
+    output = oread.read
+    oread.close
+    # And then the child exits
+    Process.wait
+    output
+  end
 end
 
