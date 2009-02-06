@@ -54,6 +54,7 @@ module EtchTests
       sleep(5)
     else
       Dir.chdir('../server/trunk')
+      #Dir.chdir('../server/branches/libxml')
       # Causes ruby to fork, so we're left with a useless pid
       #exec("./script/server -d -p #{port}")
       # Causes ruby to invoke a copy of sh to run the command (to handle
@@ -70,7 +71,7 @@ module EtchTests
   end
 
   def run_etch(port, testbase, errors_expected=false, extra_args='')
-    #extra_args << " --debug"
+    #extra_args = extra_args + " --debug"
     if errors_expected
       # Warn the user that errors are expected.  Otherwise it can be
       # disconcerting if you're watching the tests run and see errors.
