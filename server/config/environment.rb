@@ -25,6 +25,10 @@ Rails::Initializer.run do |config|
   # config.gem "bj"
   # config.gem "hpricot", :version => '0.6', :source => "http://code.whytheluckystiff.net"
   # config.gem "aws-s3", :lib => "aws/s3"
+  # This is the syntax in the will_paginate docs, but seems to trigger
+  # an install of exactly 2.3.6.  At this point I don't know of any
+  # specific version requirement we have, so I'm just letting it install
+  # the latest.
   #config.gem 'mislav-will_paginate', :version => '~> 2.3.6', :lib => 'will_paginate', :source => 'http://gems.github.com'
   config.gem 'mislav-will_paginate', :lib => 'will_paginate', :source => 'http://gems.github.com'
 
