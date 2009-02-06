@@ -164,6 +164,70 @@ class EtchDeleteTests < Test::Unit::TestCase
     # the assert within run_etch.
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
 
+    #
+    # Test duplicate script instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <delete>
+          <script>source</script>
+          <script>source</script>
+        </delete>
+      </config>
+      EOF
+    end
+    
+    File.open(@targetfile, 'w') do |file|
+      file.puts('Original contents')
+    end
+
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << 'true'")
+    end
+
+    # Run etch
+    #puts "Running duplicate script instructions test"
+    run_etch(@port, @testbase)
+
+    assert(!File.exist?(@targetfile), 'duplicate script instructions')
+
+    #
+    # Test contradictory script instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <delete>
+          <script>source</script>
+          <script>source2</script>
+        </delete>
+      </config>
+      EOF
+    end
+
+    File.open(@targetfile, 'w') do |file|
+      file.puts('Original contents')
+    end
+
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << 'true'")
+    end
+    File.open("#{@repodir}/source/#{@targetfile}/source2", 'w') do |file|
+      file.puts("@contents << 'true'")
+    end
+
+    # Run etch
+    #puts "Running contradictory script instructions test"
+    run_etch(@port, @testbase, true)
+
+    # Verify that the file wasn't removed
+    assert(File.exist?(@targetfile), 'contradictory script instructions')
+
   end
 
   def teardown

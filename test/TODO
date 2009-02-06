@@ -1,8 +1,6 @@
 directory
   Basic operation
   Owner/group/perms
-
-config.xml:
   Etch aborts when given contradictory instructions
 
 Command-line options:

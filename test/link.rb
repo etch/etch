@@ -219,6 +219,116 @@ class EtchLinkTests < Test::Unit::TestCase
     # Verify that the link permissions got set correctly
     perms = File.lstat(@targetfile).mode & 07777
     assert_equal(0777, perms, 'link perms')
+    
+    #
+    # Test duplicate dest instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <link>
+          <dest>#{@destfile}</dest>
+          <dest>#{@destfile}</dest>
+        </link>
+      </config>
+      EOF
+    end
+
+    File.delete(@targetfile)
+
+    # Run etch
+    #puts "Running duplicate dest instructions test"
+    run_etch(@port, @testbase)
+
+    assert_equal(@destfile, File.readlink(@targetfile), 'duplicate dest instructions')
+
+    #
+    # Test contradictory dest instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <link>
+          <dest>#{@destfile}</dest>
+          <dest>#{@destfile2}</dest>
+        </link>
+      </config>
+      EOF
+    end
+
+    File.delete(@targetfile) if File.symlink?(@targetfile)
+
+    # Run etch
+    #puts "Running contradictory dest instructions test"
+    run_etch(@port, @testbase, true)
+
+    # Verify that the link wasn't created
+    assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory dest instructions')
+
+    #
+    # Test duplicate script instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <link>
+          <script>source</script>
+          <script>source</script>
+        </link>
+      </config>
+      EOF
+    end
+    
+    File.delete(@targetfile) if File.symlink?(@targetfile)
+
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << '#{@destfile}'")
+    end
+
+    # Run etch
+    #puts "Running duplicate script instructions test"
+    run_etch(@port, @testbase)
+
+    assert_equal(@destfile, File.readlink(@targetfile), 'duplicate script instructions')
+
+    #
+    # Test contradictory script instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <link>
+          <script>source</script>
+          <script>source2</script>
+        </link>
+      </config>
+      EOF
+    end
+
+    File.delete(@targetfile) if File.symlink?(@targetfile)
+
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << '#{@destfile}'")
+    end
+    File.open("#{@repodir}/source/#{@targetfile}/source2", 'w') do |file|
+      file.puts("@contents << '#{@destfile2}'")
+    end
+
+    # Run etch
+    #puts "Running contradictory script instructions test"
+    run_etch(@port, @testbase, true)
+
+    # Verify that the link wasn't created
+    assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory script instructions')
+
   end
 
   def teardown

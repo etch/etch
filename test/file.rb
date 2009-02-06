@@ -427,6 +427,232 @@ class EtchFileTests < Test::Unit::TestCase
   
     # And verify that the file contents didn't change
     assert_equal(testcontents, get_file_contents(@targetfile), 'always_manage_metadata contents')
+
+    #
+    # Test duplicate plain instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <warning_file/>
+          <source>
+            <plain>source</plain>
+            <plain>source</plain>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running duplicate plain instructions test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file contents were updated
+    assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate plain instructions')
+
+    #
+    # Test contradictory plain instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <source>
+            <plain>source</plain>
+            <plain>source2</plain>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the first source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    source2contents = "This is the second source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source2", 'w') do |file|
+      file.write(source2contents)
+    end
+
+    # Run etch
+    #puts "Running contradictory plain instructions test"
+    run_etch(@port, @testbase, true)
+
+    # Verify that the file contents didn't change
+    assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory plain instructions')
+
+    #
+    # Test duplicate template instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <warning_file/>
+          <source>
+            <template>source</template>
+            <template>source</template>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running duplicate template instructions test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file contents were updated
+    assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate template instructions')
+
+    #
+    # Test contradictory template instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <source>
+            <template>source</template>
+            <template>source2</template>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the first source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    source2contents = "This is the second source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source2", 'w') do |file|
+      file.write(source2contents)
+    end
+
+    # Run etch
+    #puts "Running contradictory template instructions test"
+    run_etch(@port, @testbase, true)
+
+    # Verify that the file contents didn't change
+    assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory template instructions')
+
+    #
+    # Test duplicate script instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <warning_file/>
+          <source>
+            <script>source</script>
+            <script>source</script>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << '#{sourcecontents}'")
+    end
+
+    # Run etch
+    #puts "Running duplicate script instructions test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file contents were updated
+    assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate script instructions')
+
+    #
+    # Test contradictory script instructions
+    #
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <source>
+            <script>source</script>
+            <script>source2</script>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the first source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    source2contents = "This is the second source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source2", 'w') do |file|
+      file.write(source2contents)
+    end
+
+    # Run etch
+    #puts "Running contradictory script instructions test"
+    run_etch(@port, @testbase, true)
+
+    # Verify that the file contents didn't change
+    assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory script instructions')
+
   end
 
   def teardown
