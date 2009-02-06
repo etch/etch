@@ -333,8 +333,15 @@ class Etch::Server
     end
     @filestack[file] = true
     
+    # LibXML doesn't handle attempting to open a non-existent file well
+    # http://rubyforge.org/tracker/index.php?func=detail&aid=23836&group_id=494&atid=1971
+    config_xml_file = File.join(@sourcebase, file, 'config.xml')
+    if !File.exist?(config_xml_file)
+      raise "config.xml for #{file} does not exist"
+    end
+    
     # Load the config.xml file
-    config_xml = LibXML::XML::Document.file(File.join(@sourcebase, file, 'config.xml'))
+    config_xml = LibXML::XML::Document.file(config_xml_file)
     
     # Filter the config.xml file by looking for attributes
     configfilter!(config_xml.root)
