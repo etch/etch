@@ -41,7 +41,8 @@ Welcome back, <%= link_to logged_in_account.name, account_path(logged_in_account
 <div id="error"><%= flash[:error] %></div> 
 <% end -%>
 
-<%= @content_for_layout %>
+<%- # Calling yield here triggers the insertion of the specific view -%>
+<%= yield %>
 
 <hr />
 </div> <!-- end content -->
