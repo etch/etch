@@ -1,7 +1,8 @@
 class Client < ActiveRecord::Base
 
   has_many :facts, :dependent => :destroy
-  has_many :configs, :dependent => :destroy
+  has_many :originals, :dependent => :destroy
+  has_many :etch_configs, :dependent => :destroy
   has_many :results, :dependent => :destroy
 
   validates_presence_of :name
