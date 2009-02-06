@@ -3,7 +3,7 @@ require 'pathname'    # absolute?
 require 'digest/sha1' # hexdigest
 require 'base64'      # decode64, encode64
 require 'fileutils'   # mkdir_p
-require 'rexml/document'
+require 'libxml'
 require 'erb'
 require 'versiontype' # Version
 
@@ -85,28 +85,34 @@ class Etch::Server
     # base directory.
     @sourcebase      = "#{@tagbase}/source"
     @sitelibbase     = "#{@tagbase}/sitelibs"
+    @config_dtd_file = "#{@tagbase}/config.dtd"
     @defaults_file   = "#{@tagbase}/defaults.xml"
     @nodes_file      = "#{@tagbase}/nodes.xml"
     @nodegroups_file = "#{@tagbase}/nodegroups.xml"
     @origbase        = "#{@configbase}/orig"
     
     #
+    # Load the DTD which is used to validate config.xml files
+    #
+    @config_dtd = LibXML::XML::Dtd.new(IO.read(@config_dtd_file))
+    
+    #
     # Load the defaults.xml file which sets defaults for parameters that the
     # user doesn't specify in his config.xml files.
     #
-
-    @defaults_xml = REXML::Document.new(File.open(@defaults_file))
-
+    
+    @defaults_xml = LibXML::XML::Document.file(@defaults_file)
+    
     #
     # Load the nodes file
     #
 
-    @nodes_xml = REXML::Document.new(File.open(@nodes_file))
+    @nodes_xml = LibXML::XML::Document.file(@nodes_file)
     # Extract the groups for this node
-    thisnodeelem = @nodes_xml.root.elements["/nodes/node[@name='#{@fqdn}']"]
+    thisnodeelem = @nodes_xml.find_first("/nodes/node[@name='#{@fqdn}']")
     groupshash = {}
     if thisnodeelem
-      thisnodeelem.elements.each('group') { |group| groupshash[group.text] = true }
+      thisnodeelem.find('group').each { |group| groupshash[group.content] = true }
     else
       RAILS_DEFAULT_LOGGER.info "No entry found for node #{@fqdn} in nodes.xml" if (@debug)
       # Some folks might want to terminate here
@@ -118,14 +124,14 @@ class Etch::Server
     # Load the node groups file
     #
 
-    @nodegroups_xml = REXML::Document.new(File.open(@nodegroups_file))
+    @nodegroups_xml = LibXML::XML::Document.file(@nodegroups_file)
 
     # Extract the node group hierarchy into a hash for easy reference
     @group_hierarchy = {}
-    @nodegroups_xml.root.elements.each('/nodegroups/nodegroup') do |parent|
-      parent.elements.each('child') do |child|
-        @group_hierarchy[child.text] = [] if !@group_hierarchy[child.text]
-        @group_hierarchy[child.text] << parent.attributes['name']
+    @nodegroups_xml.find('/nodegroups/nodegroup').each do |parent|
+      parent.find('child').each do |child|
+        @group_hierarchy[child.content] = [] if !@group_hierarchy[child.content]
+        @group_hierarchy[child.content] << parent.attributes['name']
       end
     end
 
@@ -232,9 +238,10 @@ class Etch::Server
     end
 
     # Generate the XML document to return to the client
-    response_xml = REXML::Document.new '<files></files>'
+    response_xml = LibXML::XML::Document.new
+    response_xml.root = LibXML::XML::Node.new('files')
     # Add configs for files we generated
-    configs_xml = REXML::Element.new 'configs'
+    configs_xml = LibXML::XML::Node.new('configs')
     @configs.each do |file, config_xml|
       # Update the stored record of the config
       # Exclude configs which correspond to files for which we're
@@ -248,30 +255,30 @@ class Etch::Server
         end
       end
       # And add the config to the response to return to the client
-      configs_xml.add_element config_xml.root
+      configs_xml << config_xml.root.copy(true)
     end
-    response_xml.root.add_element configs_xml
+    response_xml.root << configs_xml
     # Add the files for which we need sums
-    need_sums_xml = REXML::Element.new 'need_sums'
+    need_sums_xml = LibXML::XML::Node.new('need_sums')
     @need_sum.each_key do |need|
-      need_xml = REXML::Element.new 'need_sum'
-      need_xml.text = need
-      need_sums_xml.add_element need_xml
+      need_xml = LibXML::XML::Node.new('need_sum')
+      need_xml.content = need
+      need_sums_xml << need_xml
     end
-    response_xml.root.add_element need_sums_xml
+    response_xml.root << need_sums_xml
     # Add the files for which we need originals
-    need_origs_xml = REXML::Element.new 'need_origs'
+    need_origs_xml = LibXML::XML::Node.new('need_origs')
     @need_orig.each_key do |need|
-      need_xml = REXML::Element.new 'need_orig'
-      need_xml.text = need
-      need_origs_xml.add_element need_xml
+      need_xml = LibXML::XML::Node.new('need_orig')
+      need_xml.content = need
+      need_origs_xml << need_xml
     end
-    response_xml.root.add_element need_origs_xml
+    response_xml.root << need_origs_xml
     
     # FIXME: clean up XML formatting
     # But only if we're in debug mode, in regular mode nobody but the
     # machines will see the XML and they don't care if it is pretty.
-    # Tidy's formatting breaks things, it inserts leading/trailing whitespace into text elements
+    # Tidy's formatting breaks things, it inserts leading/trailing whitespace into text nodes
     if @debug && false
       require 'tidy'
       Tidy.path = '/sw/lib/libtidy.dylib'
@@ -325,30 +332,26 @@ class Etch::Server
       raise "Circular dependency detected for #{file}"
     end
     @filestack[file] = true
-
+    
     # Load the config.xml file
-    begin
-      config_xml = REXML::Document.new(File.open("#{@sourcebase}/#{file}/config.xml"))
-    rescue => e
-      # Help the user figure out where the exception occurred, REXML doesn't
-      # include the filename when it throws a parse exception.
-      raise e.exception("Exception while processing config.xml for file #{file}:\n" + e.message)
-    end
-
+    config_xml = LibXML::XML::Document.file(File.join(@sourcebase, file, 'config.xml'))
+    
     # Filter the config.xml file by looking for attributes
     configfilter!(config_xml.root)
-
-    # REXML doesn't support validation, otherwise we'd validate
-    # the filtered file against config.dtd here
-
+    
+    # Validate the filtered file against config.dtd
+    if !config_xml.validate(@config_dtd)
+      raise "Filtered config.xml for #{file} fails validation"
+    end
+    
     done = false
 
     # Generate any other files that this file depends on
     depends = []
-    config_xml.root.elements.each('/config/depend') do |depend|
-      RAILS_DEFAULT_LOGGER.info "Generating dependency #{depend.text}" if (@debug)
-      depends << depend.text
-      generate_file(depend.text, files)
+    config_xml.find('/config/depend').each do |depend|
+      RAILS_DEFAULT_LOGGER.info "Generating dependency #{depend.content}" if (@debug)
+      depends << depend.content
+      generate_file(depend.content, files)
     end
     # If any dependency failed to generate (due to a need for orig sum or
     # contents from the client) then we need to unroll the whole dependency
@@ -384,20 +387,20 @@ class Etch::Server
 
     # Check to see if the user has requested that we revert back to the
     # original file.
-    if config_xml.root.elements['/config/revert'] && !done
+    if config_xml.find_first('/config/revert') && !done
       # Pass the revert action back to the client
       filter_xml!(config_xml, ['revert'])
       done = true
     end
   
     # Perform any server setup commands
-    if config_xml.root.elements['/config/server_setup'] && !done
+    if config_xml.find_first('/config/server_setup') && !done
       RAILS_DEFAULT_LOGGER.info "Processing server setup commands" if (@debug)
-      config_xml.root.elements.each('/config/server_setup/exec') do |cmd|
-        RAILS_DEFAULT_LOGGER.info "  Executing #{cmd.text}" if (@debug)
-        success = system(cmd.text)
+      config_xml.find('/config/server_setup/exec').each do |cmd|
+        RAILS_DEFAULT_LOGGER.info "  Executing #{cmd.content}" if (@debug)
+        success = system(cmd.content)
         if !success
-          raise "Server setup command #{cmd.text} for file #{file} exited with non-zero value"
+          raise "Server setup command #{cmd.content} for file #{file} exited with non-zero value"
         end
       end
     end
@@ -435,43 +438,42 @@ class Etch::Server
     # Regular file
     #
 
-    if config_xml.root.elements['/config/file'] && !done
+    if config_xml.find_first('/config/file') && !done
       #
       # Assemble the contents for the file
       #
       newcontents = ''
       
-      if config_xml.root.elements['/config/file/source/plain']
-        plain_elements = config_xml.root.elements.to_a('/config/file/source/plain')
+      if config_xml.find_first('/config/file/source/plain')
+        plain_elements = config_xml.find('/config/file/source/plain').to_a
         if check_for_inconsistency(plain_elements)
           raise "Inconsistent 'plain' entries for #{file}"
         end
         
         # Just slurp the file in
-        plain_file = config_xml.root.elements['/config/file/source/plain'].text
+        plain_file = plain_elements.first.content
         newcontents = IO::read(plain_file)
-        
-      elsif config_xml.root.elements['/config/file/source/template']
-        template_elements = config_xml.root.elements.to_a('/config/file/source/template')
+      elsif config_xml.find_first('/config/file/source/template')
+        template_elements = config_xml.find('/config/file/source/template').to_a
         if check_for_inconsistency(template_elements)
           raise "Inconsistent 'template' entries for #{file}"
         end
         
         # Run the template through ERB to generate the file contents
-        template = config_xml.root.elements['/config/file/source/template'].text
+        template = template_elements.first.content
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         newcontents = external.process_template(template)
-      elsif config_xml.root.elements['/config/file/source/script']
-        script_elements = config_xml.root.elements.to_a('/config/file/source/script')
+      elsif config_xml.find_first('/config/file/source/script')
+        script_elements = config_xml.find('/config/file/source/script').to_a
         if check_for_inconsistency(script_elements)
           raise "Inconsistent 'script' entries for #{file}"
         end
         
         # Run the script to generate the file contents
-        script = config_xml.root.elements['/config/file/source/script'].text
+        script = script_elements.first.content
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         newcontents = external.run_script(script)
-      elsif config_xml.root.elements['/config/file/always_manage_metadata']
+      elsif config_xml.find_first('/config/file/always_manage_metadata')
         # always_manage_metadata is a special case where we proceed
         # even if we don't have any source for file contents.
       else
@@ -490,8 +492,8 @@ class Etch::Server
       # keep empty files or always manage the metadata, then assume
       # this file is not applicable to this node and do nothing.
       if newcontents == '' &&
-          ! config_xml.root.elements['/config/file/allow_empty'] &&
-          ! config_xml.root.elements['/config/file/always_manage_metadata']
+          ! config_xml.find_first('/config/file/allow_empty') &&
+          ! config_xml.find_first('/config/file/always_manage_metadata')
         RAILS_DEFAULT_LOGGER.info "New contents for file #{file} empty, doing nothing" if (@debug)
       else
         # Finish assembling the file contents as long as we're not
@@ -499,34 +501,38 @@ class Etch::Server
         # proceeding based only on always_manage_metadata we want to make
         # sure that the only action we'll take is to manage metadata, not
         # muck with the file's contents.
-        if !(newcontents == '' && config_xml.elements['/config/file/always_manage_metadata'])
+        if !(newcontents == '' && config_xml.find_first('/config/file/always_manage_metadata'))
           # Add the warning message (if defined)
           warning_file = nil
-          if config_xml.root.elements['/config/file/warning_file']
-            warning_file = config_xml.root.elements['/config/file/warning_file'].text
-          elsif @defaults_xml.root.elements['/config/file/warning_file']
-            warning_file = @defaults_xml.root.elements['/config/file/warning_file'].text
+          if config_xml.find_first('/config/file/warning_file')
+            if !config_xml.find_first('/config/file/warning_file').content.empty?
+              warning_file = config_xml.find_first('/config/file/warning_file').content
+            end
+          elsif @defaults_xml.find_first('/config/file/warning_file')
+            if !@defaults_xml.find_first('/config/file/warning_file').content.empty?
+              warning_file = @defaults_xml.find_first('/config/file/warning_file').content
+            end
           end
           if warning_file
-            message = ''
+            warning = ''
 
             # First the comment opener
-            comment_open = ''
-            if config_xml.root.elements['/config/file/comment_open']
-              comment_open = config_xml.root.elements['/config/file/comment_open'].text
-            elsif @defaults_xml.root.elements['/config/file/comment_open']
-              comment_open = @defaults_xml.root.elements['/config/file/comment_open'].text
+            comment_open = nil
+            if config_xml.find_first('/config/file/comment_open')
+              comment_open = config_xml.find_first('/config/file/comment_open').content
+            elsif @defaults_xml.find_first('/config/file/comment_open')
+              comment_open = @defaults_xml.find_first('/config/file/comment_open').content
             end
-            if comment_open
-              message << comment_open << "\n"
+            if comment_open && !comment_open.empty?
+              warning << comment_open << "\n"
             end
 
             # Then the message
             comment_line = '# '
-            if config_xml.root.elements['/config/file/comment_line']
-              comment_line = config_xml.root.elements['/config/file/comment_line'].text
-            elsif @defaults_xml.root.elements['/config/file/comment_line']
-              comment_line = @defaults_xml.root.elements['/config/file/comment_line'].text
+            if config_xml.find_first('/config/file/comment_line')
+              comment_line = config_xml.find_first('/config/file/comment_line').content
+            elsif @defaults_xml.find_first('/config/file/comment_line')
+              comment_line = @defaults_xml.find_first('/config/file/comment_line').content
             end
 
             warnpath = Pathname.new(warning_file)
@@ -536,19 +542,19 @@ class Etch::Server
 
             File.open(warning_file) do |warnfile|
               while line = warnfile.gets
-                message << comment_line << line
+                warning << comment_line << line
               end
             end
 
             # And last the comment closer
-            comment_close = ''
-            if config_xml.root.elements['/config/file/comment_close']
-              comment_close = config_xml.root.elements['/config/file/comment_close'].text
-            elsif @defaults_xml.root.elements['/config/file/comment_close']
-              comment_close = @defaults_xml.root.elements['/config/file/comment_close'].text
+            comment_close = nil
+            if config_xml.find_first('/config/file/comment_close')
+              comment_close = config_xml.find_first('/config/file/comment_close').content
+            elsif @defaults_xml.find_first('/config/file/comment_close')
+              comment_close = @defaults_xml.find_first('/config/file/comment_close').content
             end
-            if comment_close
-              message << comment_close << "\n"
+            if comment_close && !comment_close.empty?
+              warning << comment_close << "\n"
             end
 
             # By default we insert the warning at the top of the
@@ -556,67 +562,65 @@ class Etch::Server
             # scripts) have a special first line.  The user can flag
             # those files to have the warning inserted starting at the
             # second line.
-            if !config_xml.root.elements['/config/file/warning_on_second_line']
+            if !config_xml.find_first('/config/file/warning_on_second_line')
               # And then other files (notably Solaris crontabs) can't
               # have any blank lines.  Normally we insert a blank
               # line between the warning message and the generated
               # file to improve readability.  The user can flag us to
               # not insert that blank line.
-              if !config_xml.root.elements['/config/file/no_space_around_warning']
-                newcontents = message + "\n" + newcontents
+              if !config_xml.find_first('/config/file/no_space_around_warning')
+                newcontents = warning + "\n" + newcontents
               else
-                newcontents = message + newcontents
+                newcontents = warning + newcontents
               end
             else
               parts = newcontents.split("\n", 2)
-              if !config_xml.root.elements['/config/file/no_space_around_warning']
-                newcontents = parts[0] << "\n\n" << message << "\n" << parts[1]
+              if !config_xml.find_first('/config/file/no_space_around_warning')
+                newcontents = parts[0] << "\n\n" << warning << "\n" << parts[1]
               else
-                newcontents = parts[0] << message << parts[1]
+                newcontents = parts[0] << warning << parts[1]
               end
             end
           end # if warning_file
     
           # Add the generated file contents to the XML
-          contentselem = REXML::Element.new 'contents'
-          contentselem.text = Base64.encode64(newcontents)
-          config_xml.root.elements['/config/file'].add_element contentselem
+          contentselem = LibXML::XML::Node.new('contents')
+          contentselem.content = Base64.encode64(newcontents)
+          config_xml.find_first('/config/file') << contentselem
         end
 
         # Remove the source configuration from the XML, the
         # client won't need to see it
-        config_xml.root.delete_element '/config/file/source'
+        config_xml.find('/config/file/source').each { |elem| elem.remove! }
 
         # Remove all of the warning related elements from the XML, the
         # client won't need to see them
-        config_xml.root.delete_element '/config/file/warning_file'
-        config_xml.root.delete_element '/config/file/warning_on_second_line'
-        config_xml.root.delete_element '/config/file/no_space_around_warning'
-        config_xml.root.delete_element '/config/file/comment_open'
-        config_xml.root.delete_element '/config/file/comment_line'
-        config_xml.root.delete_element '/config/file/comment_close'
-        config_xml.root.delete_element '/config/file/warning_file'
-        config_xml.root.delete_element '/config/file/warning_file'
-      
+        config_xml.find('/config/file/warning_file').each { |elem| elem.remove! }
+        config_xml.find('/config/file/warning_on_second_line').each { |elem| elem.remove! }
+        config_xml.find('/config/file/no_space_around_warning').each { |elem| elem.remove! }
+        config_xml.find('/config/file/comment_open').each { |elem| elem.remove! }
+        config_xml.find('/config/file/comment_line').each { |elem| elem.remove! }
+        config_xml.find('/config/file/comment_close').each { |elem| elem.remove! }
+        
         # If the XML doesn't contain ownership and permissions entries
         # then add appropriate ones based on the defaults
-        if !config_xml.root.elements['/config/file/owner']
-          if @defaults_xml.root.elements['/config/file/owner']
-            config_xml.root.elements['/config/file'].add_element(@defaults_xml.root.elements['/config/file/owner'].dup)
+        if !config_xml.find_first('/config/file/owner')
+          if @defaults_xml.find_first('/config/file/owner')
+            config_xml.find_first('/config/file') << @defaults_xml.find_first('/config/file/owner').copy(true)
           else
             raise "defaults.xml needs /config/file/owner"
           end
         end
-        if !config_xml.root.elements['/config/file/group']
-          if @defaults_xml.root.elements['/config/file/group']
-            config_xml.root.elements['/config/file'].add_element(@defaults_xml.root.elements['/config/file/group'].dup)
+        if !config_xml.find_first('/config/file/group')
+          if @defaults_xml.find_first('/config/file/group')
+            config_xml.find_first('/config/file') << @defaults_xml.find_first('/config/file/group').copy(true)
           else
             raise "defaults.xml needs /config/file/group"
           end
         end
-        if !config_xml.root.elements['/config/file/perms']
-          if @defaults_xml.root.elements['/config/file/perms']
-            config_xml.root.elements['/config/file'].add_element(@defaults_xml.root.elements['/config/file/perms'].dup)
+        if !config_xml.find_first('/config/file/perms')
+          if @defaults_xml.find_first('/config/file/perms')
+            config_xml.find_first('/config/file') << @defaults_xml.find_first('/config/file/perms').copy(true)
           else
             raise "defaults.xml needs /config/file/perms"
           end
@@ -633,33 +637,33 @@ class Etch::Server
     # Symbolic link
     #
   
-    if config_xml.root.elements['/config/link'] && !done
+    if config_xml.find_first('/config/link') && !done
       dest = nil
     
-      if config_xml.root.elements['/config/link/dest']
-        dest_elements = config_xml.root.elements.to_a('/config/link/dest')
+      if config_xml.find_first('/config/link/dest')
+        dest_elements = config_xml.find('/config/link/dest').to_a
         if check_for_inconsistency(dest_elements)
           raise "Inconsistent 'dest' entries for #{file}"
         end
       
-        dest = config_xml.root.elements['/config/link/dest'].text
-      elsif config_xml.root.elements['/config/link/script']
+        dest = dest_elements.first.content
+      elsif config_xml.find_first('/config/link/script')
         # The user can specify a script to perform more complex
         # testing to decide whether to create the link or not and
         # what its destination should be.
         
-        script_elements = config_xml.root.elements.to_a('/config/link/script')
+        script_elements = config_xml.find('/config/link/script').to_a
         if check_for_inconsistency(script_elements)
           raise "Inconsistent 'script' entries for #{file}"
         end
         
-        script = config_xml.root.elements['/config/link/script'].text
+        script = script_elements.first.content
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         dest = external.run_script(script)
         
-        # Remove the script element from the XML, the client won't need
-        # to see it
-        config_xml.root.delete_element '/config/link/script'
+        # Remove the script element(s) from the XML, the client won't need
+        # to see them
+        script_elements.each { |se| se.remove! }
       else
         # If the filtering has removed the destination for the link,
         # that means it doesn't apply to this node.
@@ -671,31 +675,31 @@ class Etch::Server
       else
         # If there isn't a dest element in the XML (if the user used a
         # script) then insert one for the benefit of the client
-        if !config_xml.root.elements['/config/link/dest']
-          destelem = REXML::Element.new 'dest'
-          destelem.text = dest
-          config_xml.root.elements['/config/link'].add_element destelem
+        if !config_xml.find_first('/config/link/dest')
+          destelem = LibXML::XML::Node.new('dest')
+          destelem.content = dest
+          config_xml.find_first('/config/link') << destelem
         end
 
         # If the XML doesn't contain ownership and permissions entries
         # then add appropriate ones based on the defaults
-        if !config_xml.root.elements['/config/link/owner']
-          if @defaults_xml.root.elements['/config/link/owner']
-            config_xml.root.elements['/config/link'].add_element(@defaults_xml.root.elements['/config/link/owner'].dup)
+        if !config_xml.find_first('/config/link/owner')
+          if @defaults_xml.find_first('/config/link/owner')
+            config_xml.find_first('/config/link') << @defaults_xml.find_first('/config/link/owner').copy(true)
           else
             raise "defaults.xml needs /config/link/owner"
           end
         end
-        if !config_xml.root.elements['/config/link/group']
-          if @defaults_xml.root.elements['/config/link/group']
-            config_xml.root.elements['/config/link'].add_element(@defaults_xml.root.elements['/config/link/group'].dup)
+        if !config_xml.find_first('/config/link/group')
+          if @defaults_xml.find_first('/config/link/group')
+            config_xml.find_first('/config/link') << @defaults_xml.find_first('/config/link/group').copy(true)
           else
             raise "defaults.xml needs /config/link/group"
           end
         end
-        if !config_xml.root.elements['/config/link/perms']
-          if @defaults_xml.root.elements['/config/link/perms']
-            config_xml.root.elements['/config/link'].add_element(@defaults_xml.root.elements['/config/link/perms'].dup)
+        if !config_xml.find_first('/config/link/perms')
+          if @defaults_xml.find_first('/config/link/perms')
+            config_xml.find_first('/config/link') << @defaults_xml.find_first('/config/link/perms').copy(true)
           else
             raise "defaults.xml needs /config/link/perms"
           end
@@ -712,26 +716,26 @@ class Etch::Server
     # Directory
     #
   
-    if config_xml.root.elements['/config/directory'] && !done
+    if config_xml.find_first('/config/directory') && !done
       create = false
-      if config_xml.root.elements['/config/directory/create']
+      if config_xml.find_first('/config/directory/create')
         create = true
-      elsif config_xml.root.elements['/config/directory/script']
+      elsif config_xml.find_first('/config/directory/script')
         # The user can specify a script to perform more complex testing
         # to decide whether to create the directory or not.
-        script_elements = config_xml.root.elements.to_a('/config/directory/script')
+        script_elements = config_xml.find('/config/directory/script').to_a
         if check_for_inconsistency(script_elements)
           raise "Inconsistent 'script' entries for #{file}"
         end
         
-        script = config_xml.root.elements['/config/directory/script'].text
+        script = script_elements.first.content
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         create = external.run_script(script)
         create = false if create.empty?
         
-        # Remove the script element from the XML, the client won't need
-        # to see it
-        config_xml.root.delete_element '/config/directory/script'
+        # Remove the script element(s) from the XML, the client won't need
+        # to see them
+        script_elements.each { |se| se.remove! }
       else
         # If the filtering has removed the directive to create this
         # directory, that means it doesn't apply to this node.
@@ -743,30 +747,30 @@ class Etch::Server
       else
         # If there isn't a create element in the XML (if the user used a
         # script) then insert one for the benefit of the client
-        if !config_xml.root.elements['/config/directory/create']
-          createelem = REXML::Element.new 'create'
-          config_xml.root.elements['/config/directory'].add_element createelem
+        if !config_xml.find_first('/config/directory/create')
+          createelem = LibXML::XML::Node.new('create')
+          config_xml.find_first('/config/directory') << createelem
         end
 
         # If the XML doesn't contain ownership and permissions entries
         # then add appropriate ones based on the defaults
-        if !config_xml.root.elements['/config/directory/owner']
-          if @defaults_xml.root.elements['/config/directory/owner']
-            config_xml.root.elements['/config/directory'].add_element(@defaults_xml.root.elements['/config/directory/owner'].dup)
+        if !config_xml.find_first('/config/directory/owner')
+          if @defaults_xml.find_first('/config/directory/owner')
+            config_xml.find_first('/config/directory') << @defaults_xml.find_first('/config/directory/owner').copy(true)
           else
             raise "defaults.xml needs /config/directory/owner"
           end
         end
-        if !config_xml.root.elements['/config/directory/group']
-          if @defaults_xml.root.elements['/config/directory/group']
-            config_xml.root.elements['/config/directory'].add_element(@defaults_xml.root.elements['/config/directory/group'].dup)
+        if !config_xml.find_first('/config/directory/group')
+          if @defaults_xml.find_first('/config/directory/group')
+            config_xml.find_first('/config/directory') << @defaults_xml.find_first('/config/directory/group').copy(true)
           else
             raise "defaults.xml needs /config/directory/group"
           end
         end
-        if !config_xml.root.elements['/config/directory/perms']
-          if @defaults_xml.root.elements['/config/directory/perms']
-            config_xml.root.elements['/config/directory'].add_element(@defaults_xml.root.elements['/config/directory/perms'].dup)
+        if !config_xml.find_first('/config/directory/perms')
+          if @defaults_xml.find_first('/config/directory/perms')
+            config_xml.find_first('/config/directory') << @defaults_xml.find_first('/config/directory/perms').copy(true)
           else
             raise "defaults.xml needs /config/directory/perms"
           end
@@ -783,26 +787,26 @@ class Etch::Server
     # Delete whatever is there
     #
 
-    if config_xml.root.elements['/config/delete'] && !done
+    if config_xml.find_first('/config/delete') && !done
       proceed = false
-      if config_xml.root.elements['/config/delete/proceed']
+      if config_xml.find_first('/config/delete/proceed')
         proceed = true
-      elsif config_xml.root.elements['/config/delete/script']
+      elsif config_xml.find_first('/config/delete/script')
         # The user can specify a script to perform more complex testing
         # to decide whether to delete the file or not.
-        script_elements = config_xml.root.elements.to_a('/config/delete/script')
+        script_elements = config_xml.find('/config/delete/script').to_a
         if check_for_inconsistency(script_elements)
           raise "Inconsistent 'script' entries for #{file}"
         end
         
-        script = config_xml.root.elements['/config/delete/script'].text
+        script = script_elements.first.content
         external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
         proceed = external.run_script(script)
         proceed = false if proceed.empty?
         
-        # Remove the script element from the XML, the client won't need
-        # to see it
-        config_xml.root.delete_element '/config/delete/script'
+        # Remove the script element(s) from the XML, the client won't need
+        # to see them
+        script_elements.each { |se| se.remove! }
       else
         # If the filtering has removed the directive to remove this
         # file, that means it doesn't apply to this node.
@@ -814,9 +818,9 @@ class Etch::Server
       else
         # If there isn't a proceed element in the XML (if the user used a
         # script) then insert one for the benefit of the client
-        if !config_xml.root.elements['/config/delete/proceed']
-          proceedelem = REXML::Element.new 'proceed'
-          config_xml.root.elements['/config/delete'].add_element proceedelem
+        if !config_xml.find_first('/config/delete/proceed')
+          proceedelem = LibXML::XML::Node.new('proceed')
+          config_xml.find_first('/config/delete') << proceedelem
         end
 
         # Send the file contents and metadata to the client
@@ -826,10 +830,10 @@ class Etch::Server
       end
     end
   
-    if done && !config_xml.root.elements.empty?
+    if done && config_xml.find_first('/config/*')
       # The client needs this attribute to know to which file
       # this chunk of XML refers
-      config_xml.root.add_attribute('filename', file)
+      config_xml.root.attributes['filename'] = file
       @configs[file] = config_xml
     end
   
@@ -840,11 +844,18 @@ class Etch::Server
 
   ALWAYS_KEEP = ['depend', 'setup', 'pre', 'test_before_post', 'post', 'test']
   def filter_xml_completely!(config_xml, keepers=[])
-    config_xml.root.elements.each do |elem|
+    remove = []
+    config_xml.root.each_element do |elem|
       if !keepers.include?(elem.name)
-        config_xml.root.elements.delete(elem)
+        # remove! throws off each_element, have to save up a list of
+        # elements to remove and remove them outside of the each_element
+        # block
+        # http://rubyforge.org/tracker/index.php?func=detail&aid=23799&group_id=494&atid=1971
+        #elem.remove!
+        remove << elem
       end
     end
+    remove.each { |elem| elem.remove! }
     # FIXME: strip comments (tidy is doing this now...)
   end
   def filter_xml!(config_xml, keepers=[])
@@ -852,23 +863,32 @@ class Etch::Server
   end
 
   def configfilter!(element)
-    element.elements.each do |child|
-      child.attributes.each_attribute do |attr|
-        if !check_attribute(attr.name, attr.value)
-          element.delete_element(child)
-          # FIXME:
-          # Ideally we'd jump to the next element here, looks like that
-          # would require a catch/throw block.  I think it will work
-          # anyway, just possibly spend some useless time evaluating
-          # additional attributes.
-        else
-          child.attributes.delete(attr)
+    elem_remove = []
+    attr_remove = []
+    element.each_element do |elem|
+      catch :next_element do
+        elem.attributes.each do |attribute|
+          if !check_attribute(attribute.name, attribute.value)
+            # Node#remove! throws off Node#each_element, so we have to save
+            # up a list of elements to remove and remove them outside of
+            # the each_element block
+            # http://rubyforge.org/tracker/index.php?func=detail&aid=23799&group_id=494&atid=1971
+            #elem.remove!
+            elem_remove << elem
+            throw :next_element
+          else
+            # Same deal with Attr#remove! and Attributes#each
+            # http://rubyforge.org/tracker/index.php?func=detail&aid=23829&group_id=494&atid=1971
+            #attribute.remove!
+            attr_remove << attribute
+          end
         end
+        # Then check any children of this element
+        configfilter!(elem)
       end
-
-      # Then check any children of this element
-      configfilter!(child)
     end
+    elem_remove.each { |elem| elem.remove! }
+    attr_remove.each { |attribute| attribute.remove! }
   end
 
   # Used when parsing each config.xml to filter out any elements which
@@ -954,7 +974,7 @@ class Etch::Server
   # This subroutine checks a list of XML elements to determine if they all
   # contain the same value.  Returns true if there is inconsistency.
   def check_for_inconsistency(elements)
-    elements_as_text = elements.collect { |elem| elem.text }
+    elements_as_text = elements.collect { |elem| elem.content }
     if elements_as_text.uniq.length != 1
       return true
     else
