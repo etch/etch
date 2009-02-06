@@ -28,7 +28,8 @@
 <!ELEMENT template (#PCDATA)>
 <!ELEMENT script (#PCDATA)>
 
-<!ELEMENT link (owner?, group?, perms?, overwrite_directory?, (dest|script)*)>
+<!ELEMENT link (owner?, group?, perms?, allow_nonexistent_dest?, overwrite_directory?, (dest|script)*)>
+<!ELEMENT allow_nonexistent_dest EMPTY>
 <!ELEMENT dest (#PCDATA)>
 
 <!ELEMENT directory (owner?, group?, perms?, (create|script)*)>
