@@ -583,6 +583,37 @@ class EtchAttributeTests < Test::Unit::TestCase
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
 
+    #
+    # Multiple fact comparison
+    #
+    testname = 'multiple fact comparison'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain operatingsystem="#{os}" operatingsystemrelease="#{osrel}">source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file was created properly
+    assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+
   end
   
   def teardown
