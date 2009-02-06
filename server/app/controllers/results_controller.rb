@@ -122,6 +122,10 @@ class ResultsController < ApplicationController
     end
     client.status = params[:status]
     client.message = params[:message]
+    # This forces an update of updated_at even if status/message haven't
+    # changed.  Otherwise clients will appear to go stale if their state
+    # remains unchanged.
+    client.updated_at = Time.now
     client.save
     success_count = 0
     params[:results].each do |result|
