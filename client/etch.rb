@@ -680,6 +680,7 @@ class Etch::Client
             rescue Errno::EPERM
               raise if Process.euid == 0
             end
+            File.delete(lchowntestlink)
           end
           if @lchmod_supported.nil?
             lchmodtestlink = Tempfile.new('etchlchmodtest').path
@@ -692,6 +693,7 @@ class Etch::Client
             rescue NotImplementedError
               @lchmod_supported = false
             end
+            File.delete(lchmodtestlink)
           end
     
           set_permissions = false
