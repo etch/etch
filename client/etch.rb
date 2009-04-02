@@ -65,6 +65,12 @@ class Etch::Client
     @blankrequest = {}
     @facts = Facter.to_hash
     @facts.each_pair { |key, value| @blankrequest["facts[#{key}]"] = value.to_s }
+    if @facts['operatingsystemrelease']
+      # Some versions of Facter have a bug that leaves extraneous
+      # whitespace on this fact.  Work around that with strip.  I.e. on
+      # CentOS you'll get '5 ' or '5.2 '.
+      @facts['operatingsystemrelease'].strip!
+    end
     if @debug
       @blankrequest['debug'] = '1'
     end
