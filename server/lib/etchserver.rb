@@ -344,7 +344,11 @@ class Etch::Server
     config_xml = LibXML::XML::Document.file(config_xml_file)
     
     # Filter the config.xml file by looking for attributes
-    configfilter!(config_xml.root)
+    begin
+      configfilter!(config_xml.root)
+    rescue Exception => e
+      raise e.exception("Error filtering config.xml for #{file}:\n" + e.message)
+    end
     
     # Validate the filtered file against config.dtd
     if !config_xml.validate(@config_dtd)
@@ -939,7 +943,7 @@ class Etch::Server
         operator = $1
         valueversion = Version.new($2)
         compversion = Version.new(comp)
-        if valueversion.send(operator.to_sym, compversion)
+        if compversion.send(operator.to_sym, valueversion)
           result = true
         end
       # Regular expressions

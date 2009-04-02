@@ -481,7 +481,17 @@ class EtchAttributeTests < Test::Unit::TestCase
     # Version fact operator comparison
     #
     testname = 'version fact operator comparison'
-
+    
+    # Try to make up a subset of operatingsystemrelease so that we really
+    # test the operator functionality and not just equality.  I.e. if osrel
+    # is 2.5.1 we'd like to extract 2.5
+    osrelsubset = osrel
+    osrelparts = osrel.split('.')
+    if osrelparts.length > 1
+      osrelparts.pop
+      osrelsubset = osrelparts.join('.')
+    end
+    
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
@@ -489,7 +499,7 @@ class EtchAttributeTests < Test::Unit::TestCase
           <file>
             <warning_file/>
             <source>
-              <plain operatingsystemrelease=">=#{osrel}">source</plain>
+              <plain operatingsystemrelease=">=#{osrelsubset}">source</plain>
             </source>
           </file>
         </config>
