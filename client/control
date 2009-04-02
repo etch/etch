@@ -2,6 +2,6 @@ Package: etch-client
 Version: 1.1-1
 Maintainer: etch-users@lists.sourceforge.net
 Architecture: all
-Depends: ruby facter rcs libdigest-sha1-perl
+Depends: ruby facter rcs
 Description: Etch client
 

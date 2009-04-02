@@ -1,20 +1,18 @@
-#!/usr/bin/perl
+#!/usr/bin/ruby -w
 
-use Digest::SHA1 qw(sha1_hex);
-use Sys::Hostname;
-use strict;
-use warnings;
+require 'socket'
+require 'digest/sha1'
 
 # Seed the random number generator with the hostname of this box so that
 # we get a consistent random number.  We want to run the registration at a
 # consistent time on each individual box, but randomize the runs across
 # the environment.
-srand(hex(substr(sha1_hex(hostname), 0, 7)));
+srand(Digest::SHA1.hexdigest(Socket.gethostname)[0,7].hex)
 
 # Cron job is set to run every hour
-my $MAX_SLEEP = 60 * 60;
+MAX_SLEEP = 60 * 60
 
-sleep(int(rand($MAX_SLEEP)));
+sleep(rand(MAX_SLEEP))
 
-exec '/usr/sbin/etch', '--generate-all';
+exec('/usr/sbin/etch', '--generate-all')
 
