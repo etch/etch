@@ -5,7 +5,7 @@
 		</source>
 	</file>
 	<post>
-		<exec>/usr/bin/pkill -HUP inetd</exec>
+		<exec>pkill -HUP inetd</exec>
 	</post>
 </config>
 
