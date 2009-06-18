@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/ruby
 
 IO.foreach(@original_file) do |line|
 	if line =~ /^\s*#/
