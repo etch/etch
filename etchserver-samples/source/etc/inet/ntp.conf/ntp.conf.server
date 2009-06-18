@@ -4,11 +4,7 @@ restrict default nomodify notrap
 # Permit all access from localhost
 restrict 127.0.0.1
 
-server time.caltech.edu
-server time.apple.com
-server clock.isc.org
-server tick.ucla.edu
-server timekeeper.isi.edu
-server nist1-dc.witime.net
-server nist1-ny.witime.net
+server 0.pool.ntp.org
+server 1.pool.ntp.org
+server 2.pool.ntp.org
 
