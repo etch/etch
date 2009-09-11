@@ -20,7 +20,7 @@ class EtchNodeGroupTests < Test::Unit::TestCase
     # Generate a directory for our test repository
     #  Specify that the node should be put into 'testgroup' in nodes.xml
     @repodir = initialize_repository(['testgroup'])
-    @port = start_server(@repodir)
+    @port, @pid = start_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -187,7 +187,7 @@ echo "grouper_group2"
   end
   
   def teardown
-    stop_server
+    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

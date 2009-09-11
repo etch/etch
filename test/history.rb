@@ -20,7 +20,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port = start_server(@repodir)
+    @port, @pid = start_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -220,7 +220,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     assert_equal(@destfile, File.readlink(origfile), 'original backup of link')
     system("cd #{historydir} && co -q -f -r1.1 #{historyfile}")
-    assert(get_file_contents(historyfile).include?("#{@targetfile} -> #{@destfile}"), 'history backup of link')
+    assert_match("#{@targetfile} -> #{@destfile}", get_file_contents(historyfile), 'history backup of link')
   end
 
   def test_history_directory
@@ -275,7 +275,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     assert_equal(before_mode, File.stat(origfile).mode, 'original directory mode')
     # Check that the history log looks reasonable, it should contain an
     # 'ls -ld' of the directory
-    assert(get_file_contents(historyfile).include?(" #{@targetfile}"), 'history backup of directory')
+    assert_match(" #{@targetfile}", get_file_contents(historyfile), 'history backup of directory')
   end
 
   def test_history_directory_contents
@@ -328,7 +328,7 @@ class EtchHistoryTests < Test::Unit::TestCase
   end
 
   def teardown
-    stop_server
+    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

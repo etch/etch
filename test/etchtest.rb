@@ -48,13 +48,13 @@ module EtchTests
   def start_server(repodir)
     ENV['etchserverbase'] = repodir
     # Pick a random port in the 3001-6000 range (range somewhat randomly chosen)
-    port = 3001 + rand(2999)
-    if @serverpid = fork
+    port = 3001 + rand(3000)
+    if pid = fork
       puts "Giving the server some time to start up"
       sleep(5)
     else
       Dir.chdir('../server/trunk')
-      #Dir.chdir('../server/branches/libxml')
+      # FIXME: silence the server (see various failed attempts...)
       # Causes ruby to fork, so we're left with a useless pid
       #exec("./script/server -d -p #{port}")
       # Causes ruby to invoke a copy of sh to run the command (to handle
@@ -62,12 +62,12 @@ module EtchTests
       #exec("./script/server -p #{port} > /dev/null")
       exec("./script/server -p #{port}")
     end
-    port
+    [port, pid]
   end
 
-  def stop_server
-    Process.kill('TERM', @serverpid)
-    Process.waitpid(@serverpid)
+  def stop_server(pid)
+    Process.kill('TERM', pid)
+    Process.waitpid(pid)
   end
 
   def run_etch(port, testbase, errors_expected=false, extra_args='')
@@ -80,9 +80,12 @@ module EtchTests
       puts "# Errors expected here"
       puts "#"
       sleep 3
-      assert(!system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}"))
+    end
+    result = system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --key=keys/testkey #{extra_args}")
+    if errors_expected
+      assert(!result)
     else
-      assert(system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} #{extra_args}"))
+      assert(result)
     end
   end
 

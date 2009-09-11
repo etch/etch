@@ -19,7 +19,7 @@ class EtchActionTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port = start_server(@repodir)
+    @port, @pid = start_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -85,8 +85,8 @@ class EtchActionTests < Test::Unit::TestCase
     #  The setup actions will get run several times as we loop
     #  back and forth with the server sending original sums and
     #  contents.  So just verify that they were run at least once.
-    assert(get_file_contents("#{@repodir}/server_setup").include?("server_setup\n"), 'server_setup')
-    assert(get_file_contents("#{@repodir}/setup").include?("setup\n"), 'setup')
+    assert_match("server_setup\n", get_file_contents("#{@repodir}/server_setup"), 'server_setup')
+    assert_match("setup\n", get_file_contents("#{@repodir}/setup"), 'setup')
     assert_equal("pre\n", get_file_contents("#{@repodir}/pre"), 'pre')
     assert_equal(
       "exec_once\n", get_file_contents("#{@repodir}/exec_once"), 'exec_once')
@@ -372,7 +372,7 @@ class EtchActionTests < Test::Unit::TestCase
   end
 
   def teardown
-    stop_server
+    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

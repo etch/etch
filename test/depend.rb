@@ -21,7 +21,7 @@ class EtchDependTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port = start_server(@repodir)
+    @port, @pid = start_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -202,7 +202,7 @@ class EtchDependTests < Test::Unit::TestCase
   end
 
   def teardown
-    stop_server
+    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)
