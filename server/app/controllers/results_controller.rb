@@ -1,11 +1,6 @@
+require 'intmax'
+
 class ResultsController < ApplicationController
-  # Turn off this Rails security mechanism, as it is doesn't work in the
-  # way this application works.  It expects POST requests to include a
-  # token that it auto-inserts into forms, but our POST requests aren't
-  # form data, they're unsolicited so Rails never gets a chance to insert
-  # the token.
-  skip_before_filter :verify_authenticity_token
-  
   # GET /results
   def index
     includes = {}
@@ -50,6 +45,7 @@ class ResultsController < ApplicationController
       next if key == 'page'
       @query_params << "#{key}=#{value}"  # Used by view
       next if key == 'sort'
+      next if key == 'combined'
       
       if key == 'starttime'
         conditions_query << "results.created_at > ?"
@@ -62,31 +58,28 @@ class ResultsController < ApplicationController
         conditions_values << value
       end
     end
+    conditions_string = conditions_query.join(' AND ')
     
-    if conditions_query.empty?
-      if @combined  # Don't paginate combined results
-        @results = Result.find(:all,
-                                   :include => includes,
-                                   :order => sort)
-      else
-        @results = Result.paginate(:all,
-                                   :include => includes,
-                                   :order => sort,
-                                   :page => params[:page])
-      end
-    else
-      conditions_string = conditions_query.join(' AND ')
-      if @combined  # Don't paginate combined results
-        @results = Result.find(:all,
-                                   :include => includes,
-                                   :conditions => [ conditions_string, *conditions_values ],
-                                   :order => sort)
-      else
-        @results = Result.paginate(:all,
-                                   :include => includes,
-                                   :conditions => [ conditions_string, *conditions_values ],
-                                   :order => sort,
-                                   :page => params[:page])
+    per_page = Result.per_page # will_paginate's default value
+    # Client's requesting XML get all entries
+    respond_to { |format| format.html {}; format.xml { per_page = Integer::MAX } }
+    # As do clients who specifically request everything
+    if @combined
+      per_page = Integer::MAX
+    end
+    
+    @results = Result.paginate(:all,
+                               :include => includes,
+                               :conditions => [ conditions_string, *conditions_values ],
+                               :order => sort,
+                               :page => params[:page],
+                               :per_page => per_page)
+    
+    respond_to do |format|
+      format.html # index.html.erb
+      format.xml do
+        render :xml => @results.to_xml(:include => convert_includes(includes),
+                                       :dasherize => false)
       end
     end
   end
@@ -94,8 +87,28 @@ class ResultsController < ApplicationController
   # GET /results/1
   def show
     @result = Result.find(params[:id])
+    respond_to do |format|
+      format.html # show.html.erb
+      format.xml  { render :xml => @result.to_xml(:include => convert_includes(includes),
+                                                  :dasherize => false) }
+    end
   end
   
+  # GET /results/new
+  def new
+    @result = Result.new
+
+    respond_to do |format|
+      format.html # new.html.erb
+      format.xml  { render :xml => @result }
+    end
+  end
+
+  # GET /results/1/edit
+  def edit
+    @result = Result.find(params[:id])
+  end
+
   # POST /results
   def create
     if !params.has_key?(:fqdn)
@@ -127,6 +140,13 @@ class ResultsController < ApplicationController
     # remains unchanged.
     client.updated_at = Time.now
     client.save
+    
+    # NOTE:  This skips over the individual file results recording below
+    # Re-enabled by jheiss, 7-July-2009  We have more disk space on the
+    # servers now, we'll see if they can keep up
+    #render :text => 'Client status recorded, individual file results recording disabled for now, jheiss, 9-May-2009'
+    #return
+    
     success_count = 0
     params[:results].each do |result|
       # The Rails parameter parsing strips out parameters with empty values.
@@ -147,5 +167,32 @@ class ResultsController < ApplicationController
     
     render :text => "Successfully recorded #{success_count} of #{params[:results].size} results"
   end
-  
+
+  # PUT /results/1
+  def update
+    @result = Result.find(params[:id])
+
+    respond_to do |format|
+      if @result.update_attributes(params[:result])
+        flash[:notice] = 'Result was successfully updated.'
+        format.html { redirect_to(@result) }
+        format.xml  { head :ok }
+      else
+        format.html { render :action => "edit" }
+        format.xml  { render :xml => @result.errors, :status => :unprocessable_entity }
+      end
+    end
+  end
+
+  # DELETE /results/1
+  def destroy
+    @result = Result.find(params[:id])
+    @result.destroy
+
+    respond_to do |format|
+      format.html { redirect_to(admin_results_url) }
+      format.xml  { head :ok }
+    end
+  end
 end
+

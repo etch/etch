@@ -1,17 +1,10 @@
+require 'etchserver'
+
 # Filters added to this controller apply to all controllers in the application.
 # Likewise, all the methods added will be available for all controllers.
 
 class ApplicationController < ActionController::Base
   helper :all # include all helpers, all the time
-
-  # See ActionController::RequestForgeryProtection for details
-  # Uncomment the :secret if you're not using the cookie session store
-  protect_from_forgery # :secret => '6f341ac14ba3f458f8420d3a2a879084'
-  
-  # GET requests with no user agent are probably monitoring agents of some
-  # sort (including load balancer health checks) and creating sessions for
-  # them just fills up the session table with junk
-  session :off, :if => Proc.new { |request| request.env['HTTP_USER_AGENT'].blank? && request.get? }
 
   # See ActionController::Base for details 
   # Uncomment this to filter the contents of submitted sensitive data parameters
@@ -25,4 +18,51 @@ class ApplicationController < ActionController::Base
   # Pick a unique cookie name to distinguish our session data from others'
   session :session_key => '_etch_session_id'
   
+  # Verify that any changes are signed if the administrator has
+  # enabled authentication
+  before_filter :authenticate, :only => [:create, :update, :destroy]
+  
+  # This authentication system is targeted at etch clients.  There should be
+  # an alternate authentication mechanism targeted at humans so that humans
+  # can interact with this service when authentication is enabled.
+  def authenticate
+    if Etch::Server.auth_enabled?
+      if request.headers['Authorization'] &&
+         request.headers['Authorization'] =~ /^EtchSignature /
+        signature = request.headers['Authorization'].sub(/^EtchSignature /, '')
+        verified = false
+        begin
+          verified = Etch::Server.verify_message(request.raw_post,
+                                                 signature,
+                                                 params)
+        rescue Exception => e
+          logger.error e.message
+          logger.info e.backtrace.join("\n") if params[:debug]
+          response = e.message
+          response << e.backtrace.join("\n") if params[:debug]
+          render :text => response, :status => :unauthorized
+        end
+      else
+        logger.info "Authentication required, no authentication data found"
+        render :text => "Authentication required, no authentication data found", :status => :unauthorized
+      end
+    end
+  end
+  
+  # find and to_xml take their :include options in different formats
+  # find wants:
+  # :include => { :rack => { :datacenter_rack_assignment => :datacenter } }
+  # or this (which is what we use because it is easier to generate recursively)
+  # :include => { :rack => { :datacenter_rack_assignment => { :datacenter => {} } } }
+  # to_xml wants:
+  # :include => { :rack => { :include => { :datacenter_rack_assignment => { :include => { :datacenter => {} } } } } }
+  # This method takes the find format and returns the to_xml format
+  def convert_includes(includes)
+    includes.each do |key, value|
+      unless (value.nil? || value.blank?)
+        includes[key] = { :include => convert_includes(value) }
+      end
+    end
+    includes
+  end
 end

@@ -2,7 +2,11 @@ require 'find'
 require 'pathname'    # absolute?
 require 'digest/sha1' # hexdigest
 require 'base64'      # decode64, encode64
+require 'openssl'
+require 'time'        # Time.parse
+require 'cgi'
 require 'fileutils'   # mkdir_p
+require 'rubygems'    # libxml is a gem
 require 'libxml'
 require 'erb'
 require 'versiontype' # Version
@@ -11,12 +15,193 @@ module Etch
 end
 
 class Etch::Server
+  DEFAULT_CONFIGBASE = '/etc/etchserver'
+  
+  @@configbase = nil
+  def self.configbase
+    if !@@configbase
+      if ENV['etchserverbase'] && !ENV['etchserverbase'].empty?
+        @@configbase = ENV['etchserverbase']
+      else
+        @@configbase = DEFAULT_CONFIGBASE
+      end
+    end
+    @@configbase
+  end
+  
+  @@auth_enabled = nil
+  @@auth_deny_new_clients = nil
+  def self.read_config_file
+    config_file = File.join(configbase, 'etchserver.conf')
+    if File.exist?(config_file)
+      auth_enabled = false
+      auth_deny_new_clients = false
+      IO.foreach(config_file) do |line|
+        # Skip blank lines and comments
+        next if line =~ /^\s*$/
+        next if line =~ /^\s*#/
+        line.chomp
+        if line =~ /^\s*auth_enabled\s*=\s*(.*)/
+          if $1 == 'true'
+            auth_enabled = true
+          end
+        end
+        if line =~ /^\s*auth_deny_new_clients\s*=\s*(.*)/
+          if $1 == 'true'
+            auth_deny_new_clients = true
+          end
+        end
+      end
+      @@auth_enabled = auth_enabled
+      @@auth_deny_new_clients = auth_deny_new_clients
+    end
+  end
+  def self.auth_enabled?
+    if @@auth_enabled.nil?
+      read_config_file
+    end
+    @@auth_enabled
+  end
+  # How to handle new clients (allow or deny)
+  def self.auth_deny_new_clients?
+    if @@auth_deny_new_clients.nil?
+      read_config_file
+    end
+    @@auth_deny_new_clients
+  end
+  
+  # This method verifies signatures from etch clients.
+  # message - the message to be verify
+  # signature - the signature of the message
+  # key - public key (in openssh format)
+  # Currently, this only supports RSA keys.
+  # Returns true if the signature is valid, false otherwise
+  def self.verify_signature(message, signature, key)
+    #
+    # Parse through the public key to get e and m
+    #
+    
+    str = Base64.decode64(key)
+    # check header
+    hdr = str.slice!(0..3)
+    unless hdr[0] == 0 && hdr[1] == 0 && hdr[2] == 0 && hdr[3] == 7
+      raise "Bad key format #{hdr}"
+    end
+    
+    # check key type
+    keytype = str.slice!(0..6)
+    unless keytype == "ssh-rsa"
+      raise "Unsupported key type #{keytype}. Only support ssh-rsa right now"
+    end
+    
+    # get exponent
+    elength = str.slice!(0..3)
+    num = 0
+    elength.each_byte { |x|
+      num = (num << 8) +  x.to_i
+    }
+    elength_i = num
+    
+    num = 0
+    e = str.slice!(0..elength_i-1)
+    e.each_byte { |x|
+      num = (num << 8) + x.to_i
+    }
+    e_i = num
+    
+    # get modulus
+    num = 0
+    nlength = str.slice!(0..3)
+    nlength.each_byte { |x|
+      num = (num << 8) + x.to_i
+    }
+    nlength_i = num
+    
+    num = 0
+    n = str.slice!(0..nlength_i-1)
+    n.each_byte { |x|
+      num = (num << 8) + x.to_i
+    }
+    
+    #
+    # Create key based on e and m
+    #
+    
+    key = OpenSSL::PKey::RSA.new
+    exponent = OpenSSL::BN.new e_i.to_s
+    modulus = OpenSSL::BN.new num.to_s
+    key.e = exponent
+    key.n = modulus
+    
+    #
+    # Check signature
+    #
+    
+    hash_from_sig = key.public_decrypt(Base64.decode64(signature))
+    hash_from_msg =  Digest::SHA1.hexdigest(message)
+    if hash_from_sig == hash_from_msg
+      return true # good signature
+    else
+      return false # bad signature
+    end
+  end
+  
+  def self.verify_message(message, signature, params)
+    timestamp = params[:timestamp]
+    # Don't accept if any of the required bits are missing
+    if message.nil?
+      raise "message is missing"
+    end
+    if signature.nil?
+      raise "signature is missing"
+    end
+    if timestamp.nil?
+      raise "timestamp param is missing"
+    end
+    
+    # Check timestamp, narrows the window of vulnerability to replay attack
+    # Window is set to 5 minutes
+    now = Time.new.to_i
+    parsed_timestamp = Time.parse(timestamp).to_i
+    timediff = now - parsed_timestamp
+    if timediff.abs >= (60 * 5)
+      raise "timestamp too far off (now:#{now}, timestamp:#{parsed_timestamp})"
+    end
+    
+    # Try to find the public key
+    public_key = nil
+    client = Client.find_by_name(params[:fqdn])
+    if client
+      sshrsakey_fact = Fact.find_by_key_and_client_id('sshrsakey', client.id)
+      if sshrsakey_fact
+        public_key = sshrsakey_fact.value
+      end
+    end
+    if !public_key
+      if !auth_deny_new_clients? &&
+         params[:facts] && params[:facts][:sshrsakey]
+        # If the user has configured the server to transparently accept
+        # new clients then do so, as long as the client is providing a
+        # key so that we won't consider them a new client on future
+        # connections. Otherwise a rogue client could continually
+        # impersonate any as-yet unregistered server by supplying some
+        # or all facts except the key fact.
+        return true
+      else
+        raise "Unknown client #{params[:fqdn]}, server configured to reject unknown clients"
+      end
+    end
+    
+    # Check signature
+    verify_signature(message, signature, public_key)
+  end
+  
   def initialize(facts, tag=nil, debug=false)
     @facts = facts
     @tag = tag
     @debug = debug
-
     @fqdn = @facts['fqdn']
+
     if !@fqdn
       raise "fqdn fact not supplied"
     end
@@ -34,12 +219,8 @@ class Etch::Server
         fact.destroy
       end
     end
-
-    if ENV['etchserverbase'] && !ENV['etchserverbase'].empty?
-      @configbase = ENV['etchserverbase']
-    else
-      @configbase = '/etc/etchserver'
-    end
+    
+    @configbase = Etch::Server.configbase
     RAILS_DEFAULT_LOGGER.info "Using #{@configbase} as config base for node #{@fqdn}" if (@debug)
     if !File.directory?(@configbase)
       raise "Config base #{@configbase} doesn't exist"
@@ -444,7 +625,13 @@ class Etch::Server
         done = true
       end
     end
-  
+    
+    # Pull out any local requests
+    local_requests = nil
+    if files[file] && files[file]['local_requests'] 
+      local_requests = files[file]['local_requests']
+    end
+    
     #
     # Regular file
     #
@@ -472,7 +659,7 @@ class Etch::Server
         
         # Run the template through ERB to generate the file contents
         template = template_elements.first.content
-        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @sitelibbase, @debug)
         newcontents = external.process_template(template)
       elsif config_xml.find_first('/config/file/source/script')
         script_elements = config_xml.find('/config/file/source/script').to_a
@@ -482,7 +669,7 @@ class Etch::Server
         
         # Run the script to generate the file contents
         script = script_elements.first.content
-        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @sitelibbase, @debug)
         newcontents = external.run_script(script)
       elsif config_xml.find_first('/config/file/always_manage_metadata')
         # always_manage_metadata is a special case where we proceed
@@ -669,7 +856,7 @@ class Etch::Server
         end
         
         script = script_elements.first.content
-        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @sitelibbase, @debug)
         dest = external.run_script(script)
         
         # Remove the script element(s) from the XML, the client won't need
@@ -740,7 +927,7 @@ class Etch::Server
         end
         
         script = script_elements.first.content
-        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @sitelibbase, @debug)
         create = external.run_script(script)
         create = false if create.empty?
         
@@ -811,7 +998,7 @@ class Etch::Server
         end
         
         script = script_elements.first.content
-        external = EtchExternalSource.new(file, original_file, @facts, @groups, @sourcebase, @sitelibbase, @debug)
+        external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @sitelibbase, @debug)
         proceed = external.run_script(script)
         proceed = false if proceed.empty?
         
@@ -996,7 +1183,7 @@ class Etch::Server
 end
 
 class EtchExternalSource
-  def initialize(file, original_file, facts, groups, sourcebase, sitelibbase, debug=false)
+  def initialize(file, original_file, facts, groups, local_requests, sourcebase, sitelibbase, debug=false)
     # The external source is going to be processed within the same Ruby
     # instance as etch.  We want to make it clear what variables we are
     # intentionally exposing to external sources, essentially this
@@ -1005,6 +1192,7 @@ class EtchExternalSource
     @original_file = original_file
     @facts = facts
     @groups = groups
+    @local_requests = local_requests
     @sourcebase = sourcebase
     @sitelibbase = sitelibbase
     @debug = debug

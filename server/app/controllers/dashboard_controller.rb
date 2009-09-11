@@ -39,30 +39,32 @@ class DashboardController < ApplicationController
           months = []
           # Find the oldest client
           oldest = Client.find(:first, :order => 'created_at')
-          # Get the month and year of that date
-          month = oldest.created_at.mon
-          year = oldest.created_at.year
-          # Iterate months to present
-          (year..Time.now.year).each do |y|
-            start_month = 1
-            end_month = 12
-            if y == year
-              start_month = month
-            end
-            if y == Time.now.year
-              end_month = Time.now.month
-            end
-            (start_month..end_month).each do |m|
-              end_time = nil
-              if m == 12
-                end_time = Time.local(y+1, 1)
-              else
-                end_time = Time.local(y, m+1)
+          if oldest
+            # Get the month and year of that date
+            month = oldest.created_at.mon
+            year = oldest.created_at.year
+            # Iterate months to present
+            (year..Time.now.year).each do |y|
+              start_month = 1
+              end_month = 12
+              if y == year
+                start_month = month
               end
-              # This should get us the last second of the desired month
-              end_time - 1
-              clients << Client.count(:conditions => ["created_at <= ?", end_time])
-              months << end_time.strftime('%b %Y')
+              if y == Time.now.year
+                end_month = Time.now.month
+              end
+              (start_month..end_month).each do |m|
+                end_time = nil
+                if m == 12
+                  end_time = Time.local(y+1, 1)
+                else
+                  end_time = Time.local(y, m+1)
+                end
+                # This should get us the last second of the desired month
+                end_time - 1
+                clients << Client.count(:conditions => ["created_at <= ?", end_time])
+                months << end_time.strftime('%b %Y')
+              end
             end
           end
           

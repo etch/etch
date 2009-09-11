@@ -4,8 +4,11 @@ ActionController::Routing::Routes.draw do |map|
   # Sample of regular route:
   #   map.connect 'products/:id', :controller => 'catalog', :action => 'view'
   # Keep in mind you can assign values other than :controller and :action
-  map.connect 'files', :controller => 'files', :action => 'index'
+  map.connect 'files', :controller => 'files', :action => 'create'
   map.resources :clients
+  map.resources :etch_configs
+  map.resources :facts
+  map.resources :originals
   map.resources :results
 
   # Sample of named route:

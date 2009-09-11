@@ -1,6 +1,11 @@
 #!/usr/bin/ruby -w
 
+require 'fileutils'
+require 'tempfile'
+
 Dir.mkdir('/etc/etchserver') if !File.directory?('/etc/etchserver')
+Dir.mkdir('/etc/etchserver/orig') if !File.directory?('/etc/etchserver/orig')
+FileUtils.chown('nobody', nil, '/etc/etchserver/orig')
 Dir.chdir('/etc/etchserver')
 system('svn update --quiet')
 
@@ -8,10 +13,16 @@ system('svn update --quiet')
 currenttag = Time.now.strftime('etchautotag-%Y%m%d-%H00')
 tagdir = File.join('tags', currenttag)
 if !File.directory?(tagdir)
-  #system('svn up trunk')
-  #system("svn copy trunk #{tagdir}")
-  #system("svn ci -m 'Creating current autotag' --non-interactive #{tagdir}")
-  system("cp -a trunk #{tagdir}")
+  # Use Tempfile to make a unique filename
+  tmpdirfile = Tempfile.new('newtag', 'tags')
+  # Turn it into a directory
+  File.delete(tmpdirfile.path)
+  Dir.mkdir(tmpdirfile.path)
+  # Use it to create the new tag atomically
+  system("cp -a trunk #{tmpdirfile.path}")
+  File.rename(File.join(tmpdirfile.path, 'trunk'), tagdir)
+  # Cleanup
+  Dir.delete(tmpdirfile.path)
 end
 
 def convert_tagtime_to_unixtime(tagdate, tagtime)
@@ -28,9 +39,7 @@ Dir.foreach('.') do |entry|
   next unless entry =~ /^etchautotag-(\d{8})-(\d{4})$/
   tagunixtime = convert_tagtime_to_unixtime($1, $2)
   if tagunixtime < timelimit
-    #system("svn delete #{entry}")
-    #system("svn ci -m 'Removing old autotag' --non-interactive #{entry}")
-    system("rm -rf #{entry}")
+    FileUtils.rm_rf(entry)
   end
 end
 
