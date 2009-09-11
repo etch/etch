@@ -2,9 +2,17 @@
 # Etch configuration file management tool library
 ##############################################################################
 
-require 'facter'
+begin
+  # Try loading facter w/o gems first so that we don't introduce a
+  # dependency on gems if it is not needed.
+  require 'facter'         # Facter
+rescue LoadError
+  require 'rubygems'
+  require 'facter'
+end
 require 'find'
 require 'digest/sha1' # hexdigest
+require 'openssl'     # OpenSSL
 require 'base64'      # decode64, encode64
 require 'uri'
 require 'net/http'
@@ -14,24 +22,19 @@ require 'fileutils'   # copy, mkpath, rmtree
 require 'fcntl'       # Fcntl::O_*
 require 'etc'         # getpwnam, getgrnam
 require 'tempfile'    # Tempfile
-
-# clean up "using default DH parameters" warning for https
-# http://blog.zenspider.com/2008/05/httpsssl-warning-cleanup.html
-class Net::HTTP
-  alias :old_use_ssl= :use_ssl=
-  def use_ssl= flag
-    self.old_use_ssl = flag
-    @ssl_context.tmp_dh_callback = proc {}
-  end
-end
+require 'cgi'
+require 'timeout'
 
 module Etch
 end
 
 class Etch::Client
+  VERSION = '1.13'
+  
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
   CONFIRM_QUIT = 3
+  PRIVATE_KEY_PATHS = ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh_host_rsa_key"]
   
   # We need these in relation to the output capturing
   ORIG_STDOUT = STDOUT.dup
@@ -39,16 +42,18 @@ class Etch::Client
   
   attr_reader :exec_once_per_run
   
-  # Cutting down the size of the arg list would be nice
-  def initialize(server=nil, tag=nil, varbase=nil, debug=false, dryrun=false, interactive=false, filenameonly=false, fullfile=false)
-    @server = server.nil? ? 'https://etch' : server
-    @tag = tag
-    @varbase = varbase.nil? ? '/var/etch' : varbase
-    @debug = debug
-    @dryrun = dryrun
-    @interactive = interactive
-    @filenameonly = filenameonly
-    @fullfile = fullfile
+  def initialize(options)
+    @server = options[:server] ? options[:server] : 'https://etch'
+    @tag = options[:tag]
+    @varbase = options[:varbase] ? options[:varbase] : '/var/etch'
+    @debug = options[:debug]
+    @dryrun = options[:dryrun]
+    @interactive = options[:interactive]
+    @filenameonly = options[:filenameonly]
+    @fullfile = options[:fullfile]
+    @key = options[:key] ? options[:key] : get_private_key_path
+    @disableforce = options[:disableforce]
+    @lockforce = options[:lockforce]
     
     # Ensure we have a sane path, particularly since we are often run from
     # cron.
@@ -61,10 +66,17 @@ class Etch::Client
     @origbase    = File.join(@varbase, 'orig')
     @historybase = File.join(@varbase, 'history')
     @lockbase    = File.join(@varbase, 'locks')
+    @requestbase = File.join(@varbase, 'requests')
     
     @blankrequest = {}
     @facts = Facter.to_hash
+    # If the user specified a non-standard key then override the sshrsakey
+    # fact so that authentication works
+    if @key
+      @facts['sshrsakey'] = IO.read(@key+'.pub').chomp.split[1]
+    end
     @facts.each_pair { |key, value| @blankrequest["facts[#{key}]"] = value.to_s }
+    @blankrequest['fqdn'] = @facts['fqdn']
     if @facts['operatingsystemrelease']
       # Some versions of Facter have a bug that leaves extraneous
       # whitespace on this fact.  Work around that with strip.  I.e. on
@@ -90,8 +102,8 @@ class Etch::Client
     @lchown_supported = nil
     @lchmod_supported = nil
   end
-  
-  def process_until_done(files_to_generate, disableforce, lockforce)
+
+  def process_until_done(files_to_generate)
     # Our overall status.  Will be reported to the server and used as the
     # return value for this method.  Command-line clients should use it as
     # their exit value.  Zero indicates no errors.
@@ -100,6 +112,12 @@ class Etch::Client
     
     http = Net::HTTP.new(@filesuri.host, @filesuri.port)
     if @filesuri.scheme == "https"
+      # Eliminate the OpenSSL "using default DH parameters" warning
+      if File.exist?('/etc/etch/dhparams')
+        dh = OpenSSL::PKey::DH.new(IO.read('/etc/etch/dhparams'))
+        Net::HTTP.ssl_context_accessor(:tmp_dh_callback)
+        http.tmp_dh_callback = proc { dh }
+      end
       http.use_ssl = true
       if File.exist?('/etc/etch/ca.pem')
         http.ca_file = '/etc/etch/ca.pem'
@@ -115,14 +133,14 @@ class Etch::Client
     # begin/raise for error events that end processing
     catch :stop_processing do
       begin
-        enabled, message = check_for_disable_etch_file(disableforce)
+        enabled, message = check_for_disable_etch_file
         if !enabled
           # 200 is the arbitrarily picked exit value indicating
           # that etch is disabled
           status = 200
           throw :stop_processing
         end
-        remove_stale_lock_files(lockforce)
+        remove_stale_lock_files
 
         # Assemble the initial request
         request = get_blank_request
@@ -130,6 +148,10 @@ class Etch::Client
         if !files_to_generate.nil? && !files_to_generate.empty?
           files_to_generate.each do |file|
             request["files[#{CGI.escape(file)}][sha1sum]"] = get_orig_sum(file)
+            local_requests = get_local_requests(file)
+            if local_requests
+              request["files[#{CGI.escape(file)}][local_requests]"] = local_requests
+            end
           end
         else
           request['files[GENERATEALL]'] = '1'
@@ -155,6 +177,7 @@ class Etch::Client
           puts "Sending request to server #{@filesuri}" if (@debug)
           post = Net::HTTP::Post.new(@filesuri.path)
           post.set_form_data(request)
+          sign_post!(post, @key)
           response = http.request(post)
           response_xml = nil
           case response
@@ -198,12 +221,20 @@ class Etch::Client
           response_xml.root.elements.each('/files/need_sums/need_sum') do |need_sum|
             puts "Processing request for sum of #{need_sum.text}" if (@debug)
             request["files[#{CGI.escape(need_sum.text)}][sha1sum]"] = get_orig_sum(need_sum.text)
+            local_requests = get_local_requests(need_sum.text)
+            if local_requests
+              request["files[#{CGI.escape(need_sum.text)}][local_requests]"] = local_requests
+            end
             need_to_loop = true
           end
           response_xml.root.elements.each('/files/need_origs/need_orig') do |need_orig|
             puts "Processing request for contents of #{need_orig.text}" if (@debug)
             request["files[#{CGI.escape(need_orig.text)}][contents]"] = Base64.encode64(get_orig_contents(need_orig.text))
             request["files[#{CGI.escape(need_orig.text)}][sha1sum]"] = get_orig_sum(need_orig.text)
+            local_requests = get_local_requests(need_orig.text)
+            if local_requests
+              request["files[#{CGI.escape(need_orig.text)}][local_requests]"] = local_requests
+            end
             need_to_loop = true
           end
 
@@ -226,17 +257,18 @@ class Etch::Client
     # Send results to server
     if !@dryrun
       rails_results = []
-      # CGI.escape doesn't work on things that aren't strings, so we don't
-      # call it on a few of the fields here that are numbers or booleans
+      # A few of the fields here are numbers or booleans and need a
+      # to_s to make them compatible with CGI.escape, which expects a
+      # string.
       rails_results << "fqdn=#{CGI.escape(@facts['fqdn'])}"
-      rails_results << "status=#{status}"
+      rails_results << "status=#{CGI.escape(status.to_s)}"
       rails_results << "message=#{CGI.escape(message)}"
       @results.each do |result|
         # Strangely enough this works.  Even though the key is not unique to
         # each result the Rails parameter parsing code keeps track of keys it
         # has seen, and if it sees a duplicate it starts a new hash.
         rails_results << "results[][file]=#{CGI.escape(result['file'])}"
-        rails_results << "results[][success]=#{result['success']}"
+        rails_results << "results[][success]=#{CGI.escape(result['success'].to_s)}"
         rails_results << "results[][message]=#{CGI.escape(result['message'])}"
       end
       puts "Sending results to server #{@resultsuri}" if (@debug)
@@ -244,8 +276,10 @@ class Etch::Client
       # We have to bypass Net::HTTP's set_form_data method in this case
       # because it expects a hash and we can't provide the results in the
       # format we want in a hash because we'd have duplicate keys (see above).
-      resultspost.body = rails_results.join('&')
+      results_as_string = rails_results.join('&')
+      resultspost.body = results_as_string
       resultspost.content_type = 'application/x-www-form-urlencoded'
+      sign_post!(resultspost, @key)
       response = http.request(resultspost)
       case response
       when Net::HTTPSuccess
@@ -259,11 +293,11 @@ class Etch::Client
     status
   end
 
-  def check_for_disable_etch_file(disableforce)
+  def check_for_disable_etch_file
     disable_etch = File.join(@varbase, 'disable_etch')
     message = ''
     if File.exist?(disable_etch)
-      if !disableforce
+      if !@disableforce
         message = "Etch disabled:\n"
         message << IO.read(disable_etch)
         puts message
@@ -1464,7 +1498,39 @@ class Etch::Client
     histrcspath = "#{histrcsdir}/#{histbase},v"
     File.chmod(histperms, histrcspath) if (!@dryrun)
   end
-
+  
+  def get_local_requests(file)
+    requestdir = File.join(@requestbase, file)
+    requestlist = []
+    if File.directory?(requestdir)
+      Dir.foreach(requestdir) do |entry|
+        next if entry == '.'
+        next if entry == '..'
+        requestfile = File.join(requestdir, entry)
+        request = IO.read(requestfile)
+        # Make sure it is valid XML
+        begin
+          request_xml = REXML::Document.new(request)
+        rescue REXML::ParseException => e
+          warn "Local request file #{requestfile} is not valid XML and will be ignored:\n" + e.message
+          next
+        end
+        # Make sure the root element is <request>
+        if request_xml.root.name != 'request'
+          warn "Local request file #{requestfile} is not properly formatted and will be ignored, XML root element is not <request>"
+          next
+        end
+        # Add it to the queue
+        requestlist << request
+      end
+    end
+    requests = nil
+    if !requestlist.empty?
+      requests = "<requests>\n#{requestlist.join('')}\n</requests>"
+    end
+    requests
+  end
+  
   # Haven't found a Ruby method for creating temporary directories,
   # so create a temporary file and replace it with a directory.
   def tempdir(file)
@@ -1866,13 +1932,13 @@ class Etch::Client
   
   # Any etch lockfiles more than a couple hours old are most likely stale
   # and can be removed.  If told to force we remove all lockfiles.
-  def remove_stale_lock_files(force=false)
+  def remove_stale_lock_files
     twohoursago = Time.at(Time.now - 60 * 60 * 2)
     Find.find(@lockbase) do |file|
       next unless file =~ /\.LOCK$/
       next unless File.file?(file)
 
-      if force || File.mtime(file) < twohoursago
+      if @lockforce || File.mtime(file) < twohoursago
         puts "Removing stale lock file #{file}"
         File.delete(file)
       end
@@ -1883,6 +1949,10 @@ class Etch::Client
     @already_processed.clear
   end
   
+  # We limit capturing to 5 minutes.  That should be plenty of time
+  # for etch to handle any given file, including running any
+  # setup/pre/post commands.
+  OUTPUT_CAPTURE_TIMEOUT = 5 * 60
   def start_output_capture
     # Establish a pipe, spawn a child process, and redirect stdout/stderr
     # to the pipe.  The child gathers up anything sent over the pipe and
@@ -1928,9 +1998,20 @@ class Etch::Client
         # newline.
         $stdout.sync = true
         output = ''
-        while char = pread.getc
-          putc(char)
-          output << char.chr
+        begin
+          # A surprising number of apps that we restart are ill-behaved and do
+          # not properly close stdin/stdout/stderr. With etch's output
+          # capturing feature this results in etch hanging around forever
+          # waiting for the pipes to close. We time out after a suitable
+          # period of time so that etch processes don't hang around forever.
+          Timeout.timeout(OUTPUT_CAPTURE_TIMEOUT) do
+            while char = pread.getc
+              putc(char)
+              output << char.chr
+            end
+          end
+        rescue Timeout::Error
+          $stderr.puts "Timeout in output capture, some app restarted via post probably didn't daemonize properly"
         end
         pread.close
         owrite.write(output)
@@ -1958,6 +2039,41 @@ class Etch::Client
     # And then the child exits
     Process.wait
     output
+  end
+  
+  def get_private_key_path
+    key = nil
+    PRIVATE_KEY_PATHS.each do |path|
+      if File.readable?(path)
+        key = path
+        break
+      end
+    end
+    if !key
+      warn "No readable private key found, messages to server will not be signed and may be rejected depending on server configuration"
+    end
+    key
+  end
+  
+  # This method takes in a Net::HTTP::Post and a path to a private key.
+  # It will insert a 'timestamp' parameter to the post body, hash the body of
+  # the post, sign the hash using the private key, and insert that signature
+  # in the HTTP Authorization header field in the post.
+  def sign_post!(post, key)
+    if key
+      post.body << "&timestamp=#{CGI.escape(Time.now.to_s)}"
+      private_key = OpenSSL::PKey::RSA.new(File.read(key))
+      hashed_body = Digest::SHA1.hexdigest(post.body)
+      signature = Base64.encode64(private_key.private_encrypt(hashed_body))
+      # encode64 breaks lines at 60 characters with newlines.  Having newlines
+      # in an HTTP header screws things up (the lines get interpreted as
+      # separate headers) so strip them out.  The Base64 standards seem to
+      # generally have a limit on line length, but Ruby's decode64 doesn't
+      # seem to complain.  If it ever becomes a problem the server could
+      # rebreak the lines.
+      signature.gsub!("\n", '')
+      post['Authorization'] = "EtchSignature #{signature}"
+    end
   end
 end
 

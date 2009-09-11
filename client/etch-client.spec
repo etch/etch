@@ -1,6 +1,6 @@
 Name: etch-client
 Summary: Etch client
-Version: 1.1
+Version: VER
 Release: 1
 Group: Applications/System
 License: MIT

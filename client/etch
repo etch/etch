@@ -13,25 +13,16 @@ require 'etch'
 # Parse the command line options
 #
 
-$generateall = nil
-$dryrun = nil
-$interactive = nil
-$fullfile = nil
-$filenameonly = nil
-$disableforce = nil
-$lockforce = nil
-$debug = nil
-$server = nil
-$tag = nil
-$varbase = nil
+options = {}
+@generateall = nil
 
 opts = OptionParser.new
 opts.banner = 'Usage: etch [options] [/path/to/config/file]'
 opts.on('--generate-all', 'Can be used instead of giving a specific file to generate.') do |opt|
-  $generateall = opt
+  @generateall = opt
 end
 opts.on('--dry-run', '-n', 'Prints contents of generated files instead of writing them out to disk.') do |opt|
-  $dryrun = opt
+  options[:dryrun] = opt
 end
 opts.on('--damp-run', "Perform a dry run but run 'setup' entries for files.  Normally all setup/pre/post entries are ignored for a dry run.  However, files with setup entries will generally fail to build if the setup entry hasn't been run.") do |opt|
   # Rather than sprinkle checks of two different variables throught the code, if
@@ -39,34 +30,41 @@ opts.on('--damp-run', "Perform a dry run but run 'setup' entries for files.  Nor
   # value.  Then we can just check for that specific value at the one place where
   # the two modes differ:  enabling or disabling the execution of 'setup'
   # entries.
-  $dryrun = 'damp'
+  options[:dryrun] = 'damp'
 end
 opts.on('--interactive', 'Causes etch to pause before making each change and prompt the user for confirmation.') do |opt|
-  $interactive = opt
+  options[:interactive] = opt
 end
 opts.on('--full-file', 'Normally etch will print a diff to show what changes it will make to a file.  This will cause etch to display the full new file contents instead.') do |opt|
-  $fullfile = opt
+  options[:fullfile] = opt
 end
 opts.on('--filename-only', 'Similar to the previous option, but in the opposite direction.   Etch will only display the name of file to be changed.') do |opt|
-  $filenameonly = opt
+  options[:filenameonly] = opt
 end
 opts.on('--disable-force', 'Ignore the disable_etch file.  Use with caution.') do |opt|
-  $disableforce = opt
+  options[:disableforce] = opt
 end
 opts.on('--lock-force', 'Force the removal of any existing lockfiles.  Normally only lockfile over 2 hours old are removed.') do |opt|
-  $lockforce = opt
+  options[:lockforce] = opt
 end
 opts.on('--debug', 'Print lots of messages about what etch is doing') do |opt|
-  $debug = opt
+  options[:debug] = opt
 end
 opts.on('--server SERVER', 'Point etch to an alternate server') do |opt|
-  $server = opt
+  options[:server] = opt
 end
 opts.on('--tag TAG', 'Request a specific repository tag from the server') do |opt|
-  $tag = opt
+  options[:tag] = opt
 end
 opts.on('--test-base TESTDIR', 'Use an alternate local working directory (for use by test suite only)') do |opt|
-  $varbase = opt
+  options[:varbase] = opt
+end
+opts.on('--key PRIVATE_KEY', 'Use this private key for signing messages that are sent to the server') do |opt|
+  options[:key] = opt
+end
+opts.on('--version', 'Show etch client version') do |opt|
+  puts Etch::Client::VERSION
+  exit
 end
 opts.on_tail("-h", "--help", "Show this message") do
   puts opts
@@ -77,7 +75,7 @@ end
 files_to_generate = opts.parse(ARGV)
 
 # Display a usage message if the user did not specify a valid action to perform.
-unless (!files_to_generate.nil? && !files_to_generate.empty?) || $generateall
+unless (!files_to_generate.nil? && !files_to_generate.empty?) || @generateall
   puts opts
   exit
 end
@@ -86,7 +84,7 @@ end
 # Do stuff
 #
 
-etchclient = Etch::Client.new($server, $tag, $varbase, $debug, $dryrun, $interactive, $filenameonly, $fullfile)
-status = etchclient.process_until_done(files_to_generate, $disableforce, $lockforce)
+etchclient = Etch::Client.new(options)
+status = etchclient.process_until_done(files_to_generate)
 exit status
 

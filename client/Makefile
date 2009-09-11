@@ -1,13 +1,15 @@
-# When updating the version number you currently need to update
-# etch-client.spec, control and pkginfo as well
-VER=1.1
+BUILDROOT=/var/tmp/etch-client-buildroot
+# Grab the current version from the library
+VER=$(shell ruby -e "$$:.unshift('.'); require 'etch'; puts Etch::Client::VERSION")
 
 all:
 
-redhat: rpmbuild-redhat rpm
-rpmbuild-redhat:
-	rpm --quiet -q rpm-build || yum -y install rpm-build
-BUILDROOT=/var/tmp/etch-client-buildroot
+redhat: redhatprep rpm
+redhatprep:
+	# Install everything needed for the command which sets VER above
+	rpm --quiet -q ruby || sudo yum install ruby
+	# And the package which contains the rpmbuild command
+	rpm --quiet -q rpm-build || sudo yum install rpm-build
 TMPSPEC = etch-client-temp.spec
 rpm: etch-client.spec
 	#
@@ -22,6 +24,7 @@ rpm: etch-client.spec
 	chmod 444 $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8/etch.rb
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
+	cp -p dhparams $(BUILDROOT)/etc/etch
 	# Cron job
 	mkdir -p $(BUILDROOT)/etc/cron.d
 	cp etch_cron $(BUILDROOT)/etc/cron.d/etch
@@ -30,26 +33,38 @@ rpm: etch-client.spec
 	#
 	# Now build the package
 	#
-	rpmbuild -bb --buildroot $(BUILDROOT) etch-client.spec
+	sed 's/VER/$(VER)/' etch-client.spec > etch-client.spec_withversion
+	rpmbuild -bb --buildroot $(BUILDROOT) etch-client.spec_withversion
 	rm -rf $(BUILDROOT)
 
-debian: control
-	rm -rf debtmp
-	mkdir -p debtmp/DEBIAN
-	grep -v '^#' control > debtmp/DEBIAN/control
-	mkdir -p debtmp/usr/sbin
-	cp -p etch debtmp/usr/sbin
-	chmod 555 debtmp/usr/sbin/etch
-	mkdir -p debtmp/usr/lib/ruby/site_ruby/1.8
-	cp -p etch.rb debtmp/usr/lib/ruby/site_ruby/1.8
-	chmod 444 debtmp/usr/lib/ruby/site_ruby/1.8
-	mkdir -p debtmp/etc/etch
-	cp -p ca.pem debtmp/etc/etch
-	sudo chown -R 0:0 debtmp
-	dpkg --build debtmp etch-client-$(VER).deb
-	rm -rf debtmp
+debian: debianprep deb
+debianprep:
+	# Install everything needed for the command which sets VER above
+	sudo apt-get --no-upgrade --quiet install ruby libopenssl-ruby rubygems facter
+deb: control
+	rm -rf $(BUILDROOT)
+	mkdir -p $(BUILDROOT)/DEBIAN
+	grep -v '^#' control | sed 's/VER/$(VER)/' > $(BUILDROOT)/DEBIAN/control
+	mkdir -p $(BUILDROOT)/usr/sbin
+	cp -p etch $(BUILDROOT)/usr/sbin
+	chmod 555 $(BUILDROOT)/usr/sbin/etch
+	mkdir -p $(BUILDROOT)/usr/local/lib/site_ruby/1.8
+	cp -p etch.rb $(BUILDROOT)/usr/local/lib/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/usr/local/lib/site_ruby/1.8/etch.rb
+	mkdir -p $(BUILDROOT)/etc/etch
+	cp -p ca.pem $(BUILDROOT)/etc/etch
+	cp -p dhparams $(BUILDROOT)/etc/etch
+	sudo chown -R 0:0 $(BUILDROOT)
+	dpkg --build $(BUILDROOT) etch-client-$(VER).deb
+	rm -rf $(BUILDROOT)
 
-solaris: pkginfo depend
+solaris: solarisprep sysvpkg sysvpkg-sparc
+solarisprep:
+	# Install everything needed for the command which sets VER above
+	pkginfo -q CSWruby || sudo pkg-get -i ruby
+	pkginfo -q CSWrubygems || sudo pkg-get -i rubygems
+	pkginfo -q CSWfacter || sudo pkg-get -i facter
+sysvpkg: pkginfo depend
 	#
 	# Create package file structure in build root
 	#
@@ -65,27 +80,33 @@ solaris: pkginfo depend
 	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etch.rb
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
+	cp -p dhparams $(BUILDROOT)/etc/etch
 	# Cron job for registration
 	cat etch_cron_wrapper | sed 's,/usr/bin/perl,/opt/csw/bin/perl,' > $(BUILDROOT)/usr/sbin/etch_cron_wrapper
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_cron_wrapper
 	#
 	# Now build the package
 	#
-	echo "i pkginfo=./pkginfo" > prototype
-	echo "i depend=./depend" >> prototype
-	echo "i postinstall=./postinstall" >> prototype
-	echo "i postremove=./postremove" >> prototype
+	rm -rf solbuild
+	mkdir solbuild
+	sed 's/%VER%/$(VER)/' pkginfo > solbuild/pkginfo
+	echo "i pkginfo=./pkginfo" > solbuild/prototype
+	cp depend solbuild/depend
+	echo "i depend=./depend" >> solbuild/prototype
+	cp postinstall solbuild/postinstall
+	echo "i postinstall=./postinstall" >> solbuild/prototype
+	cp postremove solbuild/postremove
+	echo "i postremove=./postremove" >> solbuild/prototype
 	# The tail +2 removes the first line, which is the base directory
 	# and doesn't need to be included in the package.
 	# The first sed just cleans up the directory names
 	# The second sed tell pkgadd to not force our permissions on directories
 	#  The $$ in that sed escapes the $ from make
-	find $(BUILDROOT) | pkgproto | tail +2 | sed "s,$(BUILDROOT),," | sed '/^d/s/[^ ]* [^ ]* [^ ]*$$/? ? ?/' >> prototype
-	pkgmk -r $(BUILDROOT) -d $(PWD)
-	pkgtrans . YPCetch-$(VER).pkg YPCetch
-	rm -rf YPCetch
+	find $(BUILDROOT) | pkgproto | tail +2 | sed "s,$(BUILDROOT),," | sed '/^d/s/[^ ]* [^ ]* [^ ]*$$/? ? ?/' >> solbuild/prototype
+	cd solbuild && pkgmk -r $(BUILDROOT) -d $(PWD)/solbuild
+	pkgtrans solbuild ../YPCetch-$(VER).pkg YPCetch
+	rm -rf solbuild
 	rm -rf $(BUILDROOT)
-	rm -f prototype
 
 # On Sparc systems we're having problems with the CSW/Blastwave ruby
 # core dumping when running etch.  The Sunfreeware ruby seems to work.
@@ -94,7 +115,7 @@ solaris: pkginfo depend
 # our library file (etch.rb) into /opt/csw.  We modify etch to use
 # the Sunfreeware ruby in /usr/local/bin, but then tell it to also look
 # in the /opt/csw directory for libraries.
-solaris-sparc: pkginfo depend
+sysvpkg-sparc: pkginfo depend
 	#
 	# Create package file structure in build root
 	#
@@ -114,25 +135,31 @@ solaris-sparc: pkginfo depend
 	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etch.rb
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
+	cp -p dhparams $(BUILDROOT)/etc/etch
 	# Cron job for registration
 	cat etch_cron_wrapper | sed 's,/usr/bin/perl,/opt/csw/bin/perl,' > $(BUILDROOT)/usr/sbin/etch_cron_wrapper
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_cron_wrapper
 	#
 	# Now build the package
 	#
-	echo "i pkginfo=./pkginfo" > prototype
-	echo "i depend=./depend" >> prototype
-	echo "i postinstall=./postinstall" >> prototype
-	echo "i postremove=./postremove" >> prototype
+	rm -rf solbuild
+	mkdir solbuild
+	sed 's/%VER%/$(VER)/' pkginfo > solbuild/pkginfo
+	echo "i pkginfo=./pkginfo" > solbuild/prototype
+	cp depend solbuild/depend
+	echo "i depend=./depend" >> solbuild/prototype
+	cp postinstall solbuild/postinstall
+	echo "i postinstall=./postinstall" >> solbuild/prototype
+	cp postremove solbuild/postremove
+	echo "i postremove=./postremove" >> solbuild/prototype
 	# The tail +2 removes the first line, which is the base directory
 	# and doesn't need to be included in the package.
 	# The first sed just cleans up the directory names
 	# The second sed tell pkgadd to not force our permissions on directories
 	#  The $$ in that sed escapes the $ from make
-	find $(BUILDROOT) | pkgproto | tail +2 | sed "s,$(BUILDROOT),," | sed '/^d/s/[^ ]* [^ ]* [^ ]*$$/? ? ?/' >> prototype
-	pkgmk -r $(BUILDROOT) -d $(PWD)
-	pkgtrans . YPCetch-$(VER)-sparc.pkg YPCetch
-	rm -rf YPCetch
+	find $(BUILDROOT) | pkgproto | tail +2 | sed "s,$(BUILDROOT),," | sed '/^d/s/[^ ]* [^ ]* [^ ]*$$/? ? ?/' >> solbuild/prototype
+	cd solbuild && pkgmk -r $(BUILDROOT) -d $(PWD)/solbuild
+	pkgtrans solbuild ../YPCetch-$(VER)-sparc.pkg YPCetch
+	rm -rf solbuild
 	rm -rf $(BUILDROOT)
-	rm -f prototype
 
