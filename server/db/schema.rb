@@ -14,10 +14,12 @@ ActiveRecord::Schema.define(:version => 20081003164106) do
   create_table "clients", :force => true do |t|
     t.string   "name",       :null => false
     t.integer  "status"
+    t.text     "message"
     t.datetime "created_at"
     t.datetime "updated_at"
   end
 
+  add_index "clients", ["updated_at"], :name => "index_clients_on_updated_at"
   add_index "clients", ["status"], :name => "index_clients_on_status"
   add_index "clients", ["name"], :name => "index_clients_on_name", :unique => true
 
@@ -63,6 +65,7 @@ ActiveRecord::Schema.define(:version => 20081003164106) do
     t.datetime "updated_at"
   end
 
+  add_index "results", ["created_at"], :name => "index_results_on_created_at"
   add_index "results", ["file"], :name => "index_results_on_file"
   add_index "results", ["client_id"], :name => "index_results_on_client_id"
 
