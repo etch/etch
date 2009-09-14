@@ -9,7 +9,7 @@ require 'etchtest'
 require 'tempfile'
 require 'fileutils'
 require 'timeout'
-$: << '../client/trunk'
+$: << '../client'
 require 'etch'
 
 class EtchOutputCaptureTests < Test::Unit::TestCase

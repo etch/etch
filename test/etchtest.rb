@@ -53,7 +53,7 @@ module EtchTests
       puts "Giving the server some time to start up"
       sleep(5)
     else
-      Dir.chdir('../server/trunk')
+      Dir.chdir('../server')
       # FIXME: silence the server (see various failed attempts...)
       # Causes ruby to fork, so we're left with a useless pid
       #exec("./script/server -d -p #{port}")
@@ -81,7 +81,7 @@ module EtchTests
       puts "#"
       sleep 3
     end
-    result = system("ruby ../client/trunk/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --key=keys/testkey #{extra_args}")
+    result = system("ruby ../client/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --key=keys/testkey #{extra_args}")
     if errors_expected
       assert(!result)
     else
