@@ -15,9 +15,6 @@ class ApplicationController < ActionController::Base
   # See environment.rb for the email address(s) to which exceptions are mailed
   include ExceptionNotifiable
 
-  # Pick a unique cookie name to distinguish our session data from others'
-  session :session_key => '_etch_session_id'
-  
   # Verify that any changes are signed if the administrator has
   # enabled authentication
   before_filter :authenticate, :only => [:create, :update, :destroy]
