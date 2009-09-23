@@ -9,7 +9,12 @@ class FilesController < ApplicationController
     response = nil
     begin
       etchserver = Etch::Server.new(params[:facts], params[:tag], params[:debug])
-      response = etchserver.generate(params[:files])
+      # params[:files] is a hash of filename => hash_of_options
+      # The client runs the filename through CGI.escape in case it contains
+      # special characters.  Older versions of Rails automatically decoded the
+      # filename, but as of Rails 2.3 we need to do it ourself.
+      files = params[:files].inject({}) { |h, (file, value)| h[CGI.unescape(file)] = value; h }
+      response = etchserver.generate(files)
       render :text => response
     rescue Exception => e
       logger.error e.message
