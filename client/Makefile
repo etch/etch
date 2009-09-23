@@ -19,6 +19,8 @@ rpm: etch-client.spec
 	mkdir -p $(BUILDROOT)/usr/sbin
 	cp -p etch $(BUILDROOT)/usr/sbin
 	chmod 555 $(BUILDROOT)/usr/sbin/etch
+	cp -p etch_to_trunk $(BUILDROOT)/usr/sbin
+	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
 	cp -p etch.rb $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8/etch.rb
@@ -48,6 +50,8 @@ deb: control
 	mkdir -p $(BUILDROOT)/usr/sbin
 	cp -p etch $(BUILDROOT)/usr/sbin
 	chmod 555 $(BUILDROOT)/usr/sbin/etch
+	cp -p etch_to_trunk $(BUILDROOT)/usr/sbin
+	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/usr/local/lib/site_ruby/1.8
 	cp -p etch.rb $(BUILDROOT)/usr/local/lib/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/usr/local/lib/site_ruby/1.8/etch.rb
@@ -75,6 +79,11 @@ sysvpkg: pkginfo depend
 	cat $(BUILDROOT)/usr/sbin/etch.tmp | sed 's,/usr/bin/ruby,/opt/csw/bin/ruby,' > $(BUILDROOT)/usr/sbin/etch
 	rm $(BUILDROOT)/usr/sbin/etch.tmp
 	chmod 555 $(BUILDROOT)/usr/sbin/etch
+	cp -p etch_to_trunk $(BUILDROOT)/usr/sbin
+	mv $(BUILDROOT)/usr/sbin/etch_to_trunk $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp
+	cat $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp | sed 's,/usr/bin/ruby,/opt/csw/bin/ruby,' > $(BUILDROOT)/usr/sbin/etch_to_trunk
+	rm $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp
+	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
 	cp -p etch.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etch.rb
@@ -115,6 +124,8 @@ sysvpkg: pkginfo depend
 # our library file (etch.rb) into /opt/csw.  We modify etch to use
 # the Sunfreeware ruby in /usr/local/bin, but then tell it to also look
 # in the /opt/csw directory for libraries.
+# I'm going to guess that the smaller utilities like etch_to_trunk won't have
+# problems, so I'm leaving them set to /opt/csw/bin/ruby.
 sysvpkg-sparc: pkginfo depend
 	#
 	# Create package file structure in build root
@@ -130,6 +141,11 @@ sysvpkg-sparc: pkginfo depend
 	cat $(BUILDROOT)/usr/sbin/etch.tmp | awk '/unshift.*__FILE__/ {print "$$:.unshift \"/opt/csw/lib/ruby/site_ruby/1.8\"\n" $$0; next}; {print}' > $(BUILDROOT)/usr/sbin/etch
 	rm $(BUILDROOT)/usr/sbin/etch.tmp
 	chmod 555 $(BUILDROOT)/usr/sbin/etch
+	cp -p etch_to_trunk $(BUILDROOT)/usr/sbin
+	mv $(BUILDROOT)/usr/sbin/etch_to_trunk $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp
+	cat $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp | sed 's,/usr/bin/ruby,/opt/csw/bin/ruby,' > $(BUILDROOT)/usr/sbin/etch_to_trunk
+	rm $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp
+	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
 	cp -p etch.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etch.rb

@@ -1,0 +1,45 @@
+#!/usr/bin/ruby -w
+
+require 'nventory'
+
+@username = ENV['LOGNAME']
+
+if ARGV.length == 0
+  abort "Usage: #{File.basename($0)} <server1> [<server2> <server3>]"
+end
+
+# The etch servers run in UTC
+ENV['TZ'] = 'UTC'
+currentheadtag = Time.now.strftime('trunk-%Y%m%d-%H00')
+
+# Find the requested clients
+nvclient = NVentory::Client.new
+results = nvclient.get_objects('nodes', {}, { 'name' => ARGV }, {}, {})
+ARGV.each do |name|
+  if results.empty? && results[name].nil?
+    abort "No entry found for #{name}"
+  else
+    if !results[name]['config_mgmt_tag'].nil? &&
+       !results[name]['config_mgmt_tag'].empty?
+      puts "Changing #{name} from #{results[name]['config_mgmt_tag']} to #{currentheadtag}"
+    else
+      puts "Setting #{name} to #{currentheadtag}"
+    end
+  end
+end
+
+while true
+  print "Proceed? [y|n] "
+  response = $stdin.gets.chomp
+  if response == 'y'
+    break
+  elsif response == 'n'
+    exit
+  end
+end
+
+# Update the clients
+successcount = nvclient.set_objects('nodes', results, {'config_mgmt_tag' => currentheadtag}, @username)
+
+puts "#{File.basename($0)} operation succeeded for #{successcount} of #{results.size} nodes"
+

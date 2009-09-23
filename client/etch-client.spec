@@ -13,6 +13,7 @@ Etch client
 %files
 %defattr(-,root,root)
 /usr/sbin/etch
+/usr/sbin/etch_to_trunk
 /usr/lib/ruby/site_ruby/1.8/etch.rb
 /etc/etch
 /usr/sbin/etch_cron_wrapper
