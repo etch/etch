@@ -45,6 +45,7 @@ module EtchTests
     FileUtils.rm_rf(repodir)
   end
 
+  UNICORN = false
   def start_server(repodir)
     ENV['etchserverbase'] = repodir
     # Pick a random port in the 3001-6000 range (range somewhat randomly chosen)
@@ -54,13 +55,11 @@ module EtchTests
       sleep(5)
     else
       Dir.chdir('../server')
-      # FIXME: silence the server (see various failed attempts...)
-      # Causes ruby to fork, so we're left with a useless pid
-      #exec("./script/server -d -p #{port}")
-      # Causes ruby to invoke a copy of sh to run the command (to handle
-      # the redirect), which gets in the way of killing things
-      #exec("./script/server -p #{port} > /dev/null")
-      exec("./script/server -p #{port}")
+      if UNICORN
+        exec("unicorn_rails -p #{port}")
+      else
+        exec("./script/server -p #{port}")
+      end
     end
     [port, pid]
   end
