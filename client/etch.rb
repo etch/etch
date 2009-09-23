@@ -29,7 +29,7 @@ module Etch
 end
 
 class Etch::Client
-  VERSION = '1.13'
+  VERSION = '1.14'
   
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
@@ -60,8 +60,14 @@ class Etch::Client
     # FIXME: Read from config file
     ENV['PATH'] = '/bin:/usr/bin:/sbin:/usr/sbin:/opt/csw/bin:/opt/csw/sbin'
     
-    @filesuri = URI.parse(@server + '/files')
-    @resultsuri = URI.parse(@server + '/results')
+    # Make sure the server URL ends in a / so that we can append paths
+    # to it using URI.join
+    if @server !~ %r{/$}
+      @server << '/'
+    end
+    
+    @filesuri   = URI.join(@server, 'files')
+    @resultsuri = URI.join(@server, 'results')
     
     @origbase    = File.join(@varbase, 'orig')
     @historybase = File.join(@varbase, 'history')
@@ -174,7 +180,7 @@ class Etch::Client
           # Send request to server
           #
           
-          puts "Sending request to server #{@filesuri}" if (@debug)
+          puts "Sending request to server #{@filesuri}: #{request.inspect}" if (@debug)
           post = Net::HTTP::Post.new(@filesuri.path)
           post.set_form_data(request)
           sign_post!(post, @key)
