@@ -652,7 +652,45 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory script instructions')
+  end
+  
+  def test_filename_with_special_characters
+    #
+    # Test filename with special characters
+    #
+    testname = 'filename with special characters'
 
+    # + because urlencode and CGI.escape handle it differently, so we want to
+    # catch any possible mismatches where one format is used on encode and the
+    # other on decode.
+    # [] because they have special meaning to the Rails parameter parsing and
+    # we want to make sure that doesn't get confused.
+    specialtargetfile = "#{@targetfile}+[]"
+    FileUtils.mkdir_p("#{@repodir}/source/#{specialtargetfile}")
+    File.open("#{@repodir}/source/#{specialtargetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+      <config>
+        <file>
+          <warning_file/>
+          <source>
+            <plain>source</plain>
+          </source>
+        </file>
+      </config>
+      EOF
+    end
+
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{specialtargetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+
+    # Verify that the file was created properly
+    assert_equal(sourcecontents, get_file_contents(specialtargetfile), testname)
   end
 
   def teardown
