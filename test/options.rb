@@ -26,7 +26,7 @@ class EtchOptionTests < Test::Unit::TestCase
     #puts "Using #{@testbase} as client working directory"
   end
   
-  def test_dryrun
+  def test_killswitch
     #
     # Test killswitch (not really a command-line option, but seems to
     # fit best in this file)
@@ -67,9 +67,9 @@ class EtchOptionTests < Test::Unit::TestCase
     run_etch(@port, @testbase, true)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
-    
-    File.delete("#{@repodir}/killswitch")
-    
+  end
+  
+  def test_dryrun
     #
     # Test --dry-run
     #
