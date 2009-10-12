@@ -106,7 +106,9 @@ class EtchActionTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     assert_equal("exec_once\n", get_file_contents("#{@repodir}/exec_once"), 'exec_once_2nd_check')
-
+  end
+  
+  def test_failed_setup
     #
     # Test a failed setup command to ensure etch aborts
     #
@@ -147,7 +149,9 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed setup')
-
+  end
+  
+  def test_failed_pre
     #
     # Test a failed pre command to ensure etch aborts
     #
@@ -188,7 +192,9 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed pre')
-
+  end
+  
+  def test_failed_test
     #
     # Run a test where the test action fails, ensure that the original
     # target file is restored and any post actions re-run afterwards
@@ -229,9 +235,6 @@ class EtchActionTests < Test::Unit::TestCase
       file.write("Testing a failed test\n")
     end
 
-    # Clean up from previous runs
-    File.delete("#{@repodir}/post") if File.exist?("#{@repodir}/post")
-
     # Run etch
     #puts "Running failed test test"
     run_etch(@port, @testbase)
@@ -239,7 +242,9 @@ class EtchActionTests < Test::Unit::TestCase
     # Verify that the original was restored, and that post was run twice
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed test target')
     assert_equal("post\npost\n", get_file_contents("#{@repodir}/post"), 'failed test post')
-
+  end
+  
+  def test_failed_test_before_post
     #
     # Run a test where the test_before_post action fails, ensure that
     # post is not run
@@ -265,9 +270,6 @@ class EtchActionTests < Test::Unit::TestCase
         </config>
       EOF
     end
-
-    # Clean up from previous runs
-    File.delete("#{@repodir}/post") if File.exist?("#{@repodir}/post")
 
     # Run etch
     #puts "Running failed test_before_post test"
@@ -330,7 +332,57 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Verify that the lack of an original file was restored
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'failed test no original file')
+  end
+  
+  def test_nested_target
+    #
+    # Run a test where a test action is defined and the target file is in a
+    # directory that does not exist yet, thus requiring that we make the
+    # directory before creating the backup (or rather the NOORIG marker in
+    # this case).  We had a bug where that failed, as the code to make the
+    # directory structure was after the code to make the backup.
+    #
+    # I.e. configuration to create /etc/foo/bar, but /etc/foo does not exist. 
+    # The backup that is created when a test is defined (so that we can roll
+    # back if the test fails) is made as /etc/foo/bar.XXXXX, which requires
+    # that /etc/foo exist first.
+    #
     
+    nestedtargetdir = Tempfile.new('etchtest').path
+    File.delete(nestedtargetdir)
+    nestedtargetfile = File.join(nestedtargetdir, 'etchnestedtest')
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{nestedtargetfile}")
+    File.open("#{@repodir}/source/#{nestedtargetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+          <test>
+            <exec>true</exec>
+          </test>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "Testing a nested target\n"
+    File.open("#{@repodir}/source/#{nestedtargetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Run etch
+    #puts "Running nested target with test test"
+    run_etch(@port, @testbase)
+    
+    # Verify that the file was created properly
+    assert_equal(sourcecontents, get_file_contents(nestedtargetfile), 'nested target with test')
+  end
+  
+  def test_action_with_xml_escape
     #
     # Test an action requiring XML escape
     # The XML spec says that < and & must be escaped almost anywhere
