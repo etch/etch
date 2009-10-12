@@ -106,7 +106,19 @@ class EtchOptionTests < Test::Unit::TestCase
 
     assert_equal(origcontents, get_file_contents(@targetfile), '--dry-run')
   end
-
+  
+  def test_help
+    output = nil
+    IO.popen("ruby ../client/etch --help") do |pipe|
+      output = pipe.readlines
+    end
+    # Make sure at least something resembling help output is there
+    assert(output.any? {|line| line.include?('Usage: etch')}, 'help output content')
+    # Make sure it fits on the screen
+    assert(output.all? {|line| line.length <= 80}, 'help output columns')
+    assert(output.size <= 23, 'help output lines')
+  end
+  
   def teardown
     stop_server(@pid)
     remove_repository(@repodir)
