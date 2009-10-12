@@ -179,6 +179,74 @@ class EtchHistoryTests < Test::Unit::TestCase
     assert_equal(origcontents + "\n", get_file_contents(origfile), 'original backup of file via setup')
   end
   
+  def test_delayed_history_setup
+    #
+    # Like the previous test this uses a setup command to put some content
+    # into the target file.  However, the first run of etch is such that there
+    # is no configuration for the file on this particular client, and then a
+    # second run where the client is added to a node group such that the
+    # configuration for the file now applies.  Ensure that the original is not
+    # saved until after the file configuration applies to this host and the
+    # setup command has a chance to run.
+    #
+    # Imagine for example that you have configuration for DNS servers in your
+    # repository, which includes a setup command which installs BIND and then
+    # configuration which operates on the original config file from the BIND
+    # package.  You have a server that is running etch but not configured as
+    # anything particular and you decide to make it a DNS server.  If etch
+    # saved the original file the first time it ran on that box it would have
+    # saved a NOORIG file, and then when you added the box to the dns_servers
+    # node group the setup command would run, install BIND (which would create
+    # the config file), but continue to report an empty original file.
+    #
+    testname = 'delayed history setup'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+          </file>
+        </config>
+      EOF
+    end
+    
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+    
+    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
+    origcontents = "This is the original text for #{testname}"
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <setup>
+            <exec>echo "#{origcontents}" > #{@targetfile}</exec>
+          </setup>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+    
+    assert_equal(origcontents + "\n", get_file_contents(origfile), testname)
+  end
+  
   def test_history_link
     #
     # Ensure original file is backed up when it is a link
