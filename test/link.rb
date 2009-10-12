@@ -18,6 +18,10 @@ class EtchLinkTests < Test::Unit::TestCase
     @targetfile = Tempfile.new('etchtest').path
     #puts "Using #{@targetfile} as target file"
     
+    # Delete the target file so that we're starting with nothing.  Creating
+    # the target file just served to create a unique filename.
+    File.delete(@targetfile)
+    
     # Generate a directory for our test repository
     @repodir = initialize_repository
     @port, @pid = start_server(@repodir)
@@ -47,10 +51,6 @@ class EtchLinkTests < Test::Unit::TestCase
         </config>
       EOF
     end
-
-    # Delete the target file so that we're starting with nothing.  Creating
-    # the target file just served to create a unique filename.
-    File.delete(@targetfile)
 
     # Run etch
     #puts "Running initial link test"
@@ -98,7 +98,8 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    # Remove the file that the link is currently pointing to
+    # Remove the file that the link is currently pointing to (due to the
+    # previous test)
     File.delete(@destfile2)
 
     # Run etch
@@ -106,33 +107,33 @@ class EtchLinkTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'link update from non-existent file')
-
+  end
+  
+  def test_link_to_nonexistent_dest
     #
     # Run a test where we ask etch to create a link to a non-existent
     # destination.  It should fail by design.
     #
-
-    # We removed @destfile2 in the previous test, so that will work for our
-    # test destination
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <link>
-            <dest>#{@destfile2}</dest>
+            <dest>#{@destfile}</dest>
           </link>
         </config>
       EOF
     end
 
+    File.delete(@destfile)
+
     # Run etch
     #puts "Running link to non-existent destination test"
     run_etch(@port, @testbase)
 
-    # Verify that the link was not updated, it should still point to
-    # @destfile
-    assert_equal(@destfile, File.readlink(@targetfile), 'link to non-existent destination')
+    # Verify that the link was not created
+    assert(!File.symlink?(@targetfile), 'link to non-existent destination')
 
     #
     # Then run the same test (link to non-existent destination) with the
@@ -145,7 +146,7 @@ class EtchLinkTests < Test::Unit::TestCase
         <config>
           <link>
             <allow_nonexistent_dest/>
-            <dest>#{@destfile2}</dest>
+            <dest>#{@destfile}</dest>
           </link>
         </config>
       EOF
@@ -156,8 +157,10 @@ class EtchLinkTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     # Verify that the link was updated properly
-    assert_equal(@destfile2, File.readlink(@targetfile), 'link to non-existent destination with override')
-
+    assert_equal(@destfile, File.readlink(@targetfile), 'link to non-existent destination with override')
+  end
+  
+  def test_link_relative
     #
     # Test creating a relative link
     #
@@ -184,7 +187,9 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Verify that the link was updated properly
     assert_equal(reldestfile, File.readlink(@targetfile), 'relative link')
-
+  end
+  
+  def test_link_metadata
     #
     # Test ownership and permissions
     #
@@ -219,7 +224,9 @@ class EtchLinkTests < Test::Unit::TestCase
     # Verify that the link permissions got set correctly
     perms = File.lstat(@targetfile).mode & 07777
     assert_equal(0777, perms, 'link perms')
-    
+  end
+  
+  def test_link_duplicate_dest
     #
     # Test duplicate dest instructions
     #
@@ -236,14 +243,14 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    File.delete(@targetfile)
-
     # Run etch
     #puts "Running duplicate dest instructions test"
     run_etch(@port, @testbase)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'duplicate dest instructions')
-
+  end
+  
+  def test_link_contradictory_dest
     #
     # Test contradictory dest instructions
     #
@@ -259,16 +266,16 @@ class EtchLinkTests < Test::Unit::TestCase
       </config>
       EOF
     end
-
-    File.delete(@targetfile) if File.symlink?(@targetfile)
-
+    
     # Run etch
     #puts "Running contradictory dest instructions test"
     run_etch(@port, @testbase, true)
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory dest instructions')
-
+  end
+  
+  def test_link_duplicate_script
     #
     # Test duplicate script instructions
     #
@@ -285,8 +292,6 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
     
-    File.delete(@targetfile) if File.symlink?(@targetfile)
-
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.puts("@contents << '#{@destfile}'")
     end
@@ -296,7 +301,9 @@ class EtchLinkTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'duplicate script instructions')
-
+  end
+  
+  def test_link_contradictory_script
     #
     # Test contradictory script instructions
     #
@@ -313,8 +320,6 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    File.delete(@targetfile) if File.symlink?(@targetfile)
-
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.puts("@contents << '#{@destfile}'")
     end
@@ -328,7 +333,6 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory script instructions')
-
   end
 
   def teardown
