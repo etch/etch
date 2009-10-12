@@ -5,6 +5,8 @@
 require 'tempfile'
 require 'fileutils'
 
+ENV['RUBYLIB'] = '../server/lib'
+
 module EtchTests
   # Haven't found a Ruby method for creating temporary directories,
   # so create a temporary file and replace it with a directory.

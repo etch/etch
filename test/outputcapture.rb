@@ -10,7 +10,8 @@ require 'tempfile'
 require 'fileutils'
 require 'timeout'
 $: << '../client'
-require 'etch'
+$: << '../server/lib'
+require 'etchclient'
 
 class EtchOutputCaptureTests < Test::Unit::TestCase
   include EtchTests

@@ -2,3 +2,13 @@ To execute all tests run alltests.rb
 
 You can also run the individual .rb test files to test specific areas.
 
+To force a particular XML library set xmllib=libxml or xmllib=rexml in
+your environment before running the tests.
+
+Some of the older files here have all of their tests in one method. Over time
+I'm breaking those up into multiple methods so that it is easier to run a
+specific test when debugging an issue. New test cases should be placed in
+their own test method. It's a bit slower because the server has to be started
+up for each method, but it makes running individual tests for debugging much
+more pleasant.
+

@@ -1,3 +1,11 @@
+FIXME: Seems like we could restructure this so that the server is just started
+as needed (i.e. for the first test that runs) and then the config repo is
+cleaned out and recreated as needed. That should speed up the test runs quite
+a bit, and reduce the occurance of the occasional timing-related failures
+where the server doesn't finish starting up before we unleash the client.
+
+Restructure so that tests can run in local or server mode
+
 directory
   Basic operation
   Owner/group/perms
