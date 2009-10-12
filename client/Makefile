@@ -1,6 +1,6 @@
 BUILDROOT=/var/tmp/etch-client-buildroot
 # Grab the current version from the library
-VER=$(shell ruby -e "$$:.unshift('.'); require 'etch'; puts Etch::Client::VERSION")
+VER=$(shell ruby -e "$$:.unshift('.'); require 'etchclient'; puts Etch::Client::VERSION")
 
 all:
 
@@ -22,8 +22,14 @@ rpm: etch-client.spec
 	cp -p etch_to_trunk $(BUILDROOT)/usr/sbin
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
-	cp -p etch.rb $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
+	cp -p etchclient.rb $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8/etchclient.rb
+	cp -p ../server/lib/etch.rb $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8/etch.rb
+	cp -p ../server/lib/versiontype.rb $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/usr/lib/ruby/site_ruby/1.8/versiontype.rb
+	mkdir -p $(BUILDROOT)/usr/share/man/man8
+	cp -p etch.8 $(BUILDROOT)/usr/share/man/man8
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
 	cp -p dhparams $(BUILDROOT)/etc/etch
@@ -53,8 +59,14 @@ deb: control
 	cp -p etch_to_trunk $(BUILDROOT)/usr/sbin
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/usr/local/lib/site_ruby/1.8
-	cp -p etch.rb $(BUILDROOT)/usr/local/lib/site_ruby/1.8
+	cp -p etchclient.rb $(BUILDROOT)/usr/local/lib/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/usr/local/lib/site_ruby/1.8/etchclient.rb
+	cp -p ../server/lib/etch.rb $(BUILDROOT)/usr/local/lib/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/usr/local/lib/site_ruby/1.8/etch.rb
+	cp -p ../server/lib/versiontype.rb $(BUILDROOT)/usr/local/lib/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/usr/local/lib/site_ruby/1.8/versiontype.rb
+	mkdir -p $(BUILDROOT)/usr/share/man/man8
+	cp -p etch.8 $(BUILDROOT)/usr/share/man/man8
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
 	cp -p dhparams $(BUILDROOT)/etc/etch
@@ -85,8 +97,14 @@ sysvpkg: pkginfo depend
 	rm $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
-	cp -p etch.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
+	cp -p etchclient.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etchclient.rb
+	cp -p ../server/lib/etch.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etch.rb
+	cp -p ../server/lib/versiontype.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/versiontype.rb
+	mkdir -p $(BUILDROOT)/usr/share/man/man8
+	cp -p etch.8 $(BUILDROOT)/usr/share/man/man8
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
 	cp -p dhparams $(BUILDROOT)/etc/etch
@@ -121,7 +139,7 @@ sysvpkg: pkginfo depend
 # core dumping when running etch.  The Sunfreeware ruby seems to work.
 # Sunfreeware doesn't play well with pkg-get, so we create a bit of a
 # hybrid.  We still express all the dependencies against CSW, and put
-# our library file (etch.rb) into /opt/csw.  We modify etch to use
+# our library file (etchclient.rb) into /opt/csw.  We modify etch to use
 # the Sunfreeware ruby in /usr/local/bin, but then tell it to also look
 # in the /opt/csw directory for libraries.
 # I'm going to guess that the smaller utilities like etch_to_trunk won't have
@@ -147,8 +165,14 @@ sysvpkg-sparc: pkginfo depend
 	rm $(BUILDROOT)/usr/sbin/etch_to_trunk.tmp
 	chmod 555 $(BUILDROOT)/usr/sbin/etch_to_trunk
 	mkdir -p $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
-	cp -p etch.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
+	cp -p etchclient.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etchclient.rb
+	cp -p ../server/lib/etch.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
 	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/etch.rb
+	cp -p ../server/lib/versiontype.rb $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8
+	chmod 444 $(BUILDROOT)/opt/csw/lib/ruby/site_ruby/1.8/versiontype.rb
+	mkdir -p $(BUILDROOT)/usr/share/man/man8
+	cp -p etch.8 $(BUILDROOT)/usr/share/man/man8
 	mkdir -p $(BUILDROOT)/etc/etch
 	cp -p ca.pem $(BUILDROOT)/etc/etch
 	cp -p dhparams $(BUILDROOT)/etc/etch

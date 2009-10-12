@@ -1,0 +1,203 @@
+.TH etch 8 "October 2009"
+
+.SH NAME
+
+.B etch
+\- Configuration management for Unix systems
+
+.SH SYNOPSIS
+
+.B etch
+.RB [ --generate-all ]
+.RB [ --dry-run | \-n ]
+.RB [ --damp-run ]
+.RB [ --interactive ]
+.RB [ --full-file ]
+.RB [ --filename-only ]
+.RB [ --disable-force ]
+.RB [ --lock-force ]
+.RB [ --debug ]
+.RB [ --local
+.IR DIR ]
+.RB [ --server
+.IR SERVER ]
+.RB [ --tag
+.IR TAG ]
+.RB [ --test-base
+.IR TESTDIR ]
+.RB [ --key
+.IR PRIVATE_KEY ]
+.RB [ --version ]
+.RB [ --help | \-h ]
+.RI [ "file ..." ]
+
+.SH DESCRIPTION
+
+Etch is a tool for managing the configuration of Unix systems. Etch can manage
+text or binary files, links and directories. The contents of files can be
+supplied from static files or generated on the fly by scripts or templates.
+Permissions and ownership as well as any pre or post commands to run when
+updating the file are configured in simple XML files.
+
+.SH OPTIONS
+.TP
+.B --generate-all
+Request that the server generate and send over all available configuration.
+Can be used instead of specifying specific files to request.
+.TP
+.B --dry-run | \-n
+.B etch
+will not make any changes to the system.  Contents of generated config
+files are displayed instead of being written to disk.
+.TP
+.B --damp-run
+Perform an almost dry run, except that 'setup' entries for files are run.
+Normally all setup/pre/post entries are ignored for a dry run.  However, files
+with setup entries will generally fail to build properly if the setup entry
+hasn't been run.  This allows you to preview the full and correct
+configuration while making minimal changes to the system.
+.TP
+.B --interactive
+Causes
+.B etch
+to pause before making each change and prompt the user for
+confirmation.
+.TP
+.B --full-file
+Normally
+.B etch
+will print a diff to show what changes it will make to a file. This will cause
+.B etch
+to display the full new file contents instead.  Useful if the diff is hard to
+read for a particular file.
+.TP
+.B --filename-only
+Normally
+.B etch
+will print a diff to show what changes it will make to a file. This will cause
+etch to display only the name of file to be changed.  Useful on the initial
+run during your system build process or other times when you want less output.
+.TP
+.B --disable-force
+Ignore the disable_etch file.  Use with caution.  Typically used with
+--interactive or --dry-run to evaluate what would happen if etch were
+re-enabled.
+.TP
+.B --lock-force
+.B Etch
+does per-file internal locking as it runs to prevent problems with
+simultaneous instances of the
+.B etch
+client stepping on each other.
+.B Etch
+automatically cleans up lockfiles over two hours old on the assumption that
+any lockfiles that old were left behind by a previous instance that failed for
+some (hopefully transient) reason. In a large environment you don't want to
+have to run around manually cleaning up lockfiles every time a full disk or
+unavailable package server or other transient failure causes
+.B etch
+to fail
+temporarily. This option forces the removal of any existing lockfiles no
+matter how old. Useful if a buggy configuration or local environmental issue
+caused
+.B etch
+to abort and you want to immediately retry.
+.TP
+.BI --local " DIR"
+Read configuration from a local directory rather than requesting it from
+a server.
+.TP
+.BI --server " SERVER"
+Point
+.B etch
+to an alternate server, specified in the form of a URL.
+.TP
+.BI --tag " TAG"
+Request a specific repository tag from the server.  Tags are directory paths
+relative to /etc/etchserver by default.  Thus examples might be
+.I trunk
+for /etc/etchserver/trunk, or
+.I branches/mytestbranch
+for /etc/etchserver/branches/mytestbranch.
+.TP
+.BI --key " PRIVATE_KEY"
+Use an alternate SSH private key file for signing messages that are sent to
+the server.
+.TP
+.BI --test-base " TESTDIR"
+Use an alternate local working directory instead of /var/etch.  Generally only
+used for allowing the etch test suite to be run as a non-root user.
+.TP
+.B --debug
+Print lots of messages about what etch is doing.
+.TP
+.B --version
+Show the etch client version and exit.
+.TP
+.B --help | \-h
+Display the etch usage message and exit.
+
+.SH FILES
+
+.TP
+.B /etc/etch/ca.pem
+SSL certificate(s) needed to verify the
+.B etch
+server's identity. If
+.B etch
+is using a server with an https:// URL and if this file exists then
+.B etch
+will not proceed if the server's SSL certificate can't be verified against the
+certs in this file.
+.TP
+.B /etc/etch/dhparams
+The Diffie-Hellman parameters used as part of the SSL connection process. Etch
+comes with a set and there's no need to generate your own, but a new set can
+be generated via "openssl dhparam" if desired. If not present the Ruby SSL
+library will warn that it is using its internal default set of parameters.
+.TP
+.B /var/etch/disable_etch
+If this file is present
+.B etch
+will do nothing other than send a message to the
+.B etch
+server that it is disabled. Any text in this file will be included in
+that message to the server and displayed locally. If you are disabling
+.B etch
+always put a note in this file indicating who you are, today's date, and why
+you are disabling
+.B etch
+so that fellow administrators won't have to guess later why
+.B etch
+was disabled. Re-enabling
+.B etch
+after it has been disabled for a long
+time can be time-consuming, as the person doing so must review any potential
+changes that have been queued up and ensure that they won't interfere with the
+current usage of the system. As such be thoughtful about whether disabling
+.B etch
+is necessary, and re-enable it as soon as possible.
+.TP
+.B /var/etch/history
+A revision history of each
+.B etch
+managed file, stored using the RCS revision control system.
+.TP
+.B /var/etch/locks
+Directory used by the
+.B etch
+internal locking mechanism.  See the --lock-force option for more details.
+.TP
+.B /var/etch/orig
+A backup of the original contents of each
+.B etch
+managed file as it was before etch first touched it.
+
+.SH DIAGNOSTICS
+
+See the --debug option and the server logs.
+
+.SH AUTHOR
+
+.B Etch
+is designed and maintained by Jason Heiss

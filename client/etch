@@ -3,11 +3,11 @@
 # Etch configuration file management tool
 ##############################################################################
 
-# Ensure we can find etch.rb
+# Ensure we can find etchclient.rb
 $:.unshift File.dirname(__FILE__)
 
 require 'optparse'
-require 'etch'
+require 'etchclient'
 
 #
 # Parse the command line options
@@ -16,15 +16,15 @@ require 'etch'
 options = {}
 @generateall = nil
 
-opts = OptionParser.new
+opts = OptionParser.new(nil, 24, '  ')
 opts.banner = 'Usage: etch [options] [/path/to/config/file]'
-opts.on('--generate-all', 'Can be used instead of giving a specific file to generate.') do |opt|
+opts.on('--generate-all', 'Request all configuration.') do |opt|
   @generateall = opt
 end
-opts.on('--dry-run', '-n', 'Prints contents of generated files instead of writing them out to disk.') do |opt|
+opts.on('--dry-run', '-n', 'Make no changes.') do |opt|
   options[:dryrun] = opt
 end
-opts.on('--damp-run', "Perform a dry run but run 'setup' entries for files.  Normally all setup/pre/post entries are ignored for a dry run.  However, files with setup entries will generally fail to build if the setup entry hasn't been run.") do |opt|
+opts.on('--damp-run', "Perform a dry run but run 'setup' entries for files.") do |opt|
   # Rather than sprinkle checks of two different variables throught the code, if
   # we're asked to do a damp run then just set the dry run flag to a unique
   # value.  Then we can just check for that specific value at the one place where
@@ -32,41 +32,44 @@ opts.on('--damp-run', "Perform a dry run but run 'setup' entries for files.  Nor
   # entries.
   options[:dryrun] = 'damp'
 end
-opts.on('--interactive', 'Causes etch to pause before making each change and prompt the user for confirmation.') do |opt|
+opts.on('--interactive', 'Prompt for confirmation before each change.') do |opt|
   options[:interactive] = opt
 end
-opts.on('--full-file', 'Normally etch will print a diff to show what changes it will make to a file.  This will cause etch to display the full new file contents instead.') do |opt|
+opts.on('--full-file', 'Display full new file contents instead of a diff.') do |opt|
   options[:fullfile] = opt
 end
-opts.on('--filename-only', 'Similar to the previous option, but in the opposite direction.   Etch will only display the name of file to be changed.') do |opt|
+opts.on('--filename-only', 'Display filename of changed files instead of a diff.') do |opt|
   options[:filenameonly] = opt
 end
 opts.on('--disable-force', 'Ignore the disable_etch file.  Use with caution.') do |opt|
   options[:disableforce] = opt
 end
-opts.on('--lock-force', 'Force the removal of any existing lockfiles.  Normally only lockfile over 2 hours old are removed.') do |opt|
+opts.on('--lock-force', 'Force the removal of any existing lockfiles.') do |opt|
   options[:lockforce] = opt
 end
-opts.on('--debug', 'Print lots of messages about what etch is doing') do |opt|
-  options[:debug] = opt
+opts.on('--local DIR', 'Read configuration from local directory, not server.') do |opt|
+  options[:local] = opt
 end
-opts.on('--server SERVER', 'Point etch to an alternate server') do |opt|
+opts.on('--server SERVER', 'Point etch to an alternate server.') do |opt|
   options[:server] = opt
 end
-opts.on('--tag TAG', 'Request a specific repository tag from the server') do |opt|
+opts.on('--tag TAG', 'Request a specific repository tag from the server.') do |opt|
   options[:tag] = opt
 end
-opts.on('--test-base TESTDIR', 'Use an alternate local working directory (for use by test suite only)') do |opt|
-  options[:varbase] = opt
-end
-opts.on('--key PRIVATE_KEY', 'Use this private key for signing messages that are sent to the server') do |opt|
+opts.on('--key PRIVATE_KEY', 'Use this private key for signing messages to server.') do |opt|
   options[:key] = opt
 end
-opts.on('--version', 'Show etch client version') do |opt|
+opts.on('--test-base TESTDIR', 'Use an alternate local working directory.') do |opt|
+  options[:varbase] = opt
+end
+opts.on('--debug', 'Print lots of messages about what etch is doing.') do |opt|
+  options[:debug] = opt
+end
+opts.on('--version', 'Show etch client version.') do |opt|
   puts Etch::Client::VERSION
   exit
 end
-opts.on_tail("-h", "--help", "Show this message") do
+opts.on_tail('-h', '--help', 'Show this message.') do
   puts opts
   exit
 end
