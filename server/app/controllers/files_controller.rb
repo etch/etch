@@ -19,7 +19,7 @@ class FilesController < ApplicationController
     rescue Exception => e
       logger.error e.message
       logger.info e.backtrace.join("\n") if params[:debug]
-      response = e.message
+      response = e.message + "\n"
       response << e.backtrace.join("\n") if params[:debug]
       render :text => response, :status => :internal_server_error
     end
