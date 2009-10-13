@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# This script makes it easier to run the etch client from the
+# distribution directory structure.  It is not needed when the etch
+# client is packaged and installed.
+
+RUBYLIB=../server/lib
+export RUBYLIB
+
+exec ./etch "$@"
+
