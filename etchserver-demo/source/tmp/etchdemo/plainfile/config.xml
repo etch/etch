@@ -6,8 +6,8 @@
 			group doesn't exist UID 0 and GID 0 will
 			be used as a faillback.
 		  -->
-		<owner>nobody</owner>
-		<group>wheel</group>
+		<owner>demouser</owner>
+		<group>demogroup</group>
 		<source>
 			<plain operatingsystem="!FreeBSD">plainfile</plain>
 			<plain operatingsystem="FreeBSD">plainfile2</plain>
