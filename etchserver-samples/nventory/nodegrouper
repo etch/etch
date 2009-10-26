@@ -13,7 +13,7 @@ name = ARGV[0] or abort "No hostname passed"
 #
 
 nvclient = NVentory::Client.new
-results = nvclient.get_objects('nodes', {}, { 'name' => name }, ['node_groups'])
+results = nvclient.get_objects('nodes', {}, { 'name' => name }, {}, {}, ['node_groups'])
 
 if results.include?(name) && results[name].include?('node_groups')
   results[name]['node_groups'].each do |ng|

@@ -82,7 +82,7 @@ end
 #
 
 nvclient = NVentory::Client.new
-results = nvclient.get_objects('nodes', {}, { 'name' => name }, ['node_groups'])
+results = nvclient.get_objects('nodes', {}, { 'name' => name }, {}, {}, ['node_groups'])
 
 tag = ''
 DEFAULT_HOURS = 4
