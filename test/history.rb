@@ -144,7 +144,13 @@ class EtchHistoryTests < Test::Unit::TestCase
     # simulate a common usage of setup commands to install a package before
     # we backup the original file so that the original file has the default
     # config file contents) and ensure those contents are backed up as the
-    # original file
+    # original file.
+    #
+    # Generate the file contents with a script which incorporates the original
+    # contents so that we also ensure that the client sends us the correct
+    # contents on the first try.  We once had a bug where it took a couple of
+    # tries before we achieved convergence and the client sent the correct
+    # original contents.
     #
     
     origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
@@ -160,7 +166,7 @@ class EtchHistoryTests < Test::Unit::TestCase
           <file>
             <warning_file/>
             <source>
-              <plain>source</plain>
+              <script>source.script</script>
             </source>
           </file>
         </config>
@@ -168,8 +174,9 @@ class EtchHistoryTests < Test::Unit::TestCase
     end
 
     sourcecontents = "This is a test\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
-      file.write(sourcecontents)
+    File.open("#{@repodir}/source/#{@targetfile}/source.script", 'w') do |file|
+      file.puts("@contents << '#{sourcecontents}'")
+      file.puts("@contents << IO.read(@original_file)")
     end
 
     # Run etch
@@ -177,6 +184,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     run_etch(@port, @testbase)
 
     assert_equal(origcontents + "\n", get_file_contents(origfile), 'original backup of file via setup')
+    assert_equal(sourcecontents + origcontents + "\n", get_file_contents(@targetfile), 'contents using original backup of file via setup')
   end
   
   def test_delayed_history_setup
