@@ -4,7 +4,7 @@
 ##############################################################################
 
 # Ensure we can find etchclient.rb
-$:.unshift File.dirname(__FILE__)
+$:.unshift(File.dirname(__FILE__))
 
 require 'optparse'
 require 'etchclient'
@@ -17,7 +17,7 @@ options = {}
 @generateall = nil
 
 opts = OptionParser.new(nil, 24, '  ')
-opts.banner = 'Usage: etch [options] [/path/to/config/file]'
+opts.banner = 'Usage: etch [options] [/path/to/config/file | command] [otherfile ...]'
 opts.on('--generate-all', 'Request all configuration.') do |opt|
   @generateall = opt
 end
@@ -74,11 +74,19 @@ opts.on_tail('-h', '--help', 'Show this message.') do
   exit
 end
 
-# Put any leftover arguments into files_to_generate
-files_to_generate = opts.parse(ARGV)
+leftovers = opts.parse(ARGV)
+files = []
+commands = []
+leftovers.each do |leftover|
+  if leftover[0,1] == File::SEPARATOR
+    files << leftover
+  else
+    commands << leftover
+  end
+end
 
 # Display a usage message if the user did not specify a valid action to perform.
-unless (!files_to_generate.nil? && !files_to_generate.empty?) || @generateall
+if files.empty? && commands.empty? && !@generateall
   puts opts
   exit
 end
@@ -88,6 +96,6 @@ end
 #
 
 etchclient = Etch::Client.new(options)
-status = etchclient.process_until_done(files_to_generate)
+status = etchclient.process_until_done(files, commands)
 exit status
 
