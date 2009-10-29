@@ -11,9 +11,9 @@ require 'fileutils'
 
 class EtchCommandTests < Test::Unit::TestCase
   include EtchTests
-
+  
   def setup
-    # Generate a file to use as our etch target/destination
+    # Generate a file to use as a target in commands
     @targetfile = Tempfile.new('etchtest').path
     #puts "Using #{@targetfile} as target file"
     
@@ -84,7 +84,7 @@ class EtchCommandTests < Test::Unit::TestCase
     #puts "Running '#{testname}' test"
     run_etch(@port, @testbase, true)
   end
-    
+  
   def test_commands_guard_succeeds
     #
     # Guard initially succeeds
@@ -116,7 +116,7 @@ class EtchCommandTests < Test::Unit::TestCase
     # Verify that the file was not touched
     assert_equal(testname, get_file_contents(@targetfile), testname)
   end
-    
+  
   def test_commands_multiple_steps
     #
     # Multiple steps
@@ -199,8 +199,8 @@ class EtchCommandTests < Test::Unit::TestCase
     # Verify that both commands ran, ordering doesn't matter
     assert_equal(['firstcmd', 'secondcmd'], get_file_contents(@targetfile).split("\n").sort, testname)
   end
-    
-  def test_commands_dependency
+  
+  def test_commands_depend
     #
     # Multiple commands with dependency
     #
@@ -244,6 +244,64 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Verify that both commands ran and in the proper order
     assert_equal("firstcmd\nsecondcmd\n", get_file_contents(@targetfile), testname)
+  end
+  
+  def test_commands_dependfile
+    #
+    # Command with dependency on a file
+    #
+    testname = 'command with file dependency'
+    
+    targetfile2 = Tempfile.new('etchtest').path
+    FileUtils.mkdir_p("#{@repodir}/source/#{targetfile2}")
+    File.open("#{@repodir}/source/#{targetfile2}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+          <post>
+            <exec>sleep 3</exec>
+          </post>
+        </config>
+      EOF
+    end
+    
+    FileUtils.mkdir_p("#{@repodir}/commands/etchtest")
+    File.open("#{@repodir}/commands/etchtest/commands.xml", 'w') do |file|
+      file.puts <<-EOF
+        <commands>
+          <dependfile>#{targetfile2}</dependfile>
+          <step>
+            <guard>
+              <exec>grep '#{testname}' #{@targetfile}</exec>
+            </guard>
+            <command>
+              <exec>printf '#{testname}' >> #{@targetfile}</exec>
+            </command>
+          </step>
+        </commands>
+      EOF
+    end
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{targetfile2}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+    
+    # Verify that the command-generated file and the regular file were created
+    # properly
+    assert_equal(testname, get_file_contents(@targetfile), testname + ' command contents')
+    assert_equal(sourcecontents, get_file_contents(targetfile2), testname + ' file contents')
+    # And verify that they were created in the right order
+    assert(File.stat(@targetfile).mtime > File.stat(targetfile2).mtime, testname + ' ordering')
   end
   
   def test_commands_filtering
