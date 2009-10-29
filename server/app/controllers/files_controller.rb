@@ -13,8 +13,15 @@ class FilesController < ApplicationController
       # The client runs the filename through CGI.escape in case it contains
       # special characters.  Older versions of Rails automatically decoded the
       # filename, but as of Rails 2.3 we need to do it ourself.
-      files = params[:files].inject({}) { |h, (file, value)| h[CGI.unescape(file)] = value; h }
-      response = etchserver.generate(files)
+      files = {}
+      if params[:files]
+        files = params[:files].inject({}) { |h, (file, value)| h[CGI.unescape(file)] = value; h }
+      end
+      commands = {}
+      if params[:commands]
+        commands = params[:commands].inject({}) { |h, (command, value)| h[CGI.unescape(command)] = value; h }
+      end
+      response = etchserver.generate(files, commands)
       render :text => response
     rescue Exception => e
       logger.error e.message
