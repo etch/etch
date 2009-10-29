@@ -153,8 +153,9 @@ certs in this file.
 .B /etc/etch/dhparams
 The Diffie-Hellman parameters used as part of the SSL connection process. Etch
 comes with a set and there's no need to generate your own, but a new set can
-be generated via "openssl dhparam" if desired. If not present the Ruby SSL
-library will warn that it is using its internal default set of parameters.
+be generated via "openssl dhparam" if desired. If this file is not present the
+Ruby SSL library will warn that it is using its internal default set of
+parameters.
 .TP
 .B /var/etch/disable_etch
 If this file is present
