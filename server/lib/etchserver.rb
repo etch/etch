@@ -292,7 +292,7 @@ class Etch::Server
     @origbase          = "#{@configbase}/orig"
   end
 
-  def generate(files)
+  def generate(files, commands)
     #
     # Build up a list of files to generate, either from the request or from
     # the source repository if the request is for all files
@@ -352,6 +352,11 @@ class Etch::Server
       if filehash['local_requests']
         request[:files][name][:local_requests] = filehash['local_requests']
       end
+    end
+    
+    commands.each_key do |commandname|
+      request[:commands] = {} if !request[:commands]
+      request[:commands][commandname] = {}
     end
     
     #
@@ -437,6 +442,15 @@ class Etch::Server
         Etch.xmlcopyelem(Etch.xmlroot(command_xml), commands_xml)
       end
       responseroot << commands_xml
+    end
+    if response[:retrycommands]
+      retrycommands_xml = Etch.xmlnewelem('retrycommands')
+      response[:retrycommands].each_key do |commandname|
+        retry_xml = Etch.xmlnewelem('retrycommand')
+        Etch.xmlsettext(retry_xml, commandname)
+        retrycommands_xml << retry_xml
+      end
+      responseroot << retrycommands_xml
     end
     
     # FIXME: clean up XML formatting
