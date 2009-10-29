@@ -1,6 +1,7 @@
-<!ELEMENT commands (depend*, step*)>
+<!ELEMENT commands (depend*, dependfile*, step*)>
 
 <!ELEMENT depend (#PCDATA)>
+<!ELEMENT dependfile (#PCDATA)>
 
 <!ELEMENT step (guard, command)>
 <!ELEMENT guard (exec+)>
