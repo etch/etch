@@ -29,7 +29,6 @@ class EtchDependTests < Test::Unit::TestCase
   end
   
   def test_depends
-
     #
     # Run a basic dependency test
     #
@@ -80,19 +79,22 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial dependency test"
-    run_etch(@port, @testbase, false, '--debug')
+    run_etch(@port, @testbase, false)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'dependency file 1')
     assert_equal(sourcecontents, get_file_contents(@targetfile2), 'dependency file 2')
     # And in the right order
     assert(File.stat(@targetfile).mtime > File.stat(@targetfile2).mtime, 'dependency ordering')
-
+  end
+  
+  def test_depend_request_single
     #
     # Run a dependency test where the user only requests the first
     # file on the command line
     #
-
+    testname = 'depend with single request'
+    
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
@@ -129,8 +131,7 @@ class EtchDependTests < Test::Unit::TestCase
       EOF
     end
 
-    # Vary the source contents so we know the files were updated
-    sourcecontents = "This is a different test\n"
+    sourcecontents = "Test #{testname}\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
@@ -139,7 +140,7 @@ class EtchDependTests < Test::Unit::TestCase
     end
 
     # Run etch
-    #puts "Running single request dependency test"
+    #puts "Running '#{testname}' test"
     run_etch(@port, @testbase, false, @targetfile)
 
     # Verify that the files were created properly
@@ -147,10 +148,13 @@ class EtchDependTests < Test::Unit::TestCase
     assert_equal(sourcecontents, get_file_contents(@targetfile2), 'single request dependency file 2')
     # And in the right order
     assert(File.stat(@targetfile).mtime > File.stat(@targetfile2).mtime, 'single request dependency ordering')
-
+  end
+  
+  def test_circular_dependency
     #
     # Run a circular dependency test
     #
+    testname = 'circular dependency'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -181,26 +185,90 @@ class EtchDependTests < Test::Unit::TestCase
       EOF
     end
 
-    # Vary the source contents so we know the files weren't updated
-    oldsourcecontents = sourcecontents
-    sourcecontents = "This is a circular dependency test\n"
+    sourcecontents = "Test #{testname}\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
     File.open("#{@repodir}/source/#{@targetfile2}/source", 'w') do |file|
       file.write(sourcecontents)
     end
-
+    
+    # Put some text into the original files so that we can make sure they
+    # are not touched.
+    origcontents = "This is the original text\n"
+    [@targetfile, @targetfile2].each do |targetfile|
+      File.delete(targetfile)
+      File.open(targetfile, 'w') do |file|
+        file.write(origcontents)
+      end
+    end
+    
     # Run etch
-    #puts "Running circular test"
+    #puts "Running '#{testname}' test"
     run_etch(@port, @testbase, true, @targetfile)
 
     # Verify that the files weren't modified
-    assert_equal(oldsourcecontents, get_file_contents(@targetfile), 'circular dependency file 1')
-    assert_equal(oldsourcecontents, get_file_contents(@targetfile2), 'circular dependency file 2')
-
+    assert_equal(origcontents, get_file_contents(@targetfile), 'circular dependency file 1')
+    assert_equal(origcontents, get_file_contents(@targetfile2), 'circular dependency file 2')
   end
-
+  
+  def test_command_dependency
+    #
+    # Test a dependency on a command
+    #
+    testname = 'depend on command'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <dependcommand>etchtest</dependcommand>
+          <pre>
+            <exec>sleep 3</exec>
+          </pre>
+          <file>
+            <warning_file></warning_file>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    FileUtils.mkdir_p("#{@repodir}/commands/etchtest")
+    File.open("#{@repodir}/commands/etchtest/commands.xml", 'w') do |file|
+      file.puts <<-EOF
+        <commands>
+          <step>
+            <guard>
+              <exec>grep '#{testname}' #{@targetfile2}</exec>
+            </guard>
+            <command>
+              <exec>printf '#{testname}' >> #{@targetfile2}</exec>
+            </command>
+          </step>
+        </commands>
+      EOF
+    end
+    
+    # Run etch
+    #puts "Running '#{testname}' test"
+    run_etch(@port, @testbase)
+    
+    # Verify that the regular file and the command-generated file were created
+    # properly
+    assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' file contents')
+    assert_equal(testname, get_file_contents(@targetfile2), testname + ' command contents')
+    # And verify that they were created in the right order
+    assert(File.stat(@targetfile).mtime > File.stat(@targetfile2).mtime, testname + ' ordering')
+  end
+  
   def teardown
     stop_server(@pid)
     remove_repository(@repodir)
