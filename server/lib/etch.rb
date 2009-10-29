@@ -43,7 +43,7 @@ class Etch
   # if Logger didn't immediately blow up we'd probably end up with scrambled
   # logs as simultaneous connections tried to write at the same time.  Or
   # maybe that would work, depending on how Ruby and the OS buffer writes to
-  # the file.
+  # the file?
   def initialize(logger, debug_logger)
     @logger = logger
     @dlogger = debug_logger
@@ -178,7 +178,9 @@ class Etch
     @generation_status = {}
     @configs = {}
     @need_orig = {}
-
+    @allcommands = {}
+    @retrycommands = {}
+    
     filelist.each do |file|
       @dlogger.debug "Generating #{file}"
       generate_file(file, request)
@@ -187,8 +189,6 @@ class Etch
     #
     # Generate configuration commands
     #
-    
-    @allcommands = {}
     
     commandnames = []
     if request.empty?
@@ -214,7 +214,8 @@ class Etch
     
     {:configs => @configs,
      :need_orig => @need_orig,
-     :allcommands => @allcommands}
+     :allcommands => @allcommands,
+     :retrycommands => @retrycommands}
   end
 
   #
@@ -234,13 +235,16 @@ class Etch
     end
     parentshash.keys.sort
   end
-
+  
+  # Returns the value of the generation_status variable, see comments in
+  # method for possible values.
   def generate_file(file, request)
     # Skip files we've already generated in response to <depend>
     # statements.
     if @already_generated[file]
       @dlogger.debug "Skipping already generated #{file}"
-      return
+      # Return the status of that previous generation
+      return @generation_status[file]
     end
 
     # Check for circular dependencies, otherwise we're vulnerable
@@ -274,46 +278,43 @@ class Etch
     # As we go through the process of generating the file we'll end up with
     # four possible outcomes:
     # fatal error: raise an exception
-    # failure: we're missing needed data, generally the original file
+    # failure: we're missing needed data for this file or a dependency,
+    #          generally the original file
     # success: we successfully processed a valid configuration
     # unknown: no valid configuration nor errors encountered, probably because
-    #          filtering removed everything from the config.xml file
+    #          filtering removed everything from the config.xml file.  This
+    #          should be considered a successful outcome, it indicates the
+    #          caller/client provided us with all required data and our result
+    #          is that no action needs to be taken.
     # We keep track of which of the failure, success or unknown states we end
     # up in via the generation_status variable.  We initialize it to :unknown.
     # If we encounter either failure or success we set it to false or :success.
     catch :generate_done do
       # Generate any other files that this file depends on
       depends = []
+      proceed = true
       Etch.xmleach(config_xml, '/config/depend') do |depend|
         @dlogger.debug "Generating dependency #{Etch.xmltext(depend)}"
         depends << Etch.xmltext(depend)
-        generate_file(Etch.xmltext(depend), request)
+        r = generate_file(Etch.xmltext(depend), request)
+        proceed = proceed && r
       end
-      # If any dependency failed to generate (due to a need for orig contents
-      # from the client) then we need to unroll the whole dependency tree and
-      # punt it back to the client
-      dependency_status = depends.all? { |depend| @generation_status[depend] }
-      if !dependency_status
-        depends.each do |depend|
-          # Make sure any configuration we're returning is just the basics
-          # needed to supply orig data
-          if @configs[depend]
-            filter_xml_completely!(@configs[depend], ['depend', 'setup'])
-          end
-          # And if we weren't already planning to request orig contents for this
-          # file then stick it into the orig request list so that the client
-          # knows it needs to ask for this file again next time.
-          if !@need_orig.has_key?(depend)
-            @need_orig[depend] = true
-          end
-        end
-        # Lastly make sure that this file gets sent back appropriately
+      # Also generate any commands that this file depends on
+      Etch.xmleach(config_xml, '/config/dependcommand') do |dependcommand|
+        @dlogger.debug "Generating command dependency #{Etch.xmltext(dependcommand)}"
+        r = generate_commands(Etch.xmltext(dependcommand), request)
+        proceed = proceed && r
+      end
+      if !proceed
+        @dlogger.debug "One or more dependencies of #{file} need data from client"
+        # Tell the client to request this file again
         @need_orig[file] = true
+        # Strip this file's config down to the bare necessities
         filter_xml_completely!(config_xml, ['depend', 'setup'])
         generation_status = false
         throw :generate_done
       end
-    
+      
       # Change into the corresponding directory so that the user can
       # refer to source files and scripts by their relative pathnames.
       Dir::chdir "#{@sourcebase}/#{file}"
@@ -346,6 +347,7 @@ class Etch
       if request[:files] && request[:files][file] && request[:files][file][:orig]
         original_file = request[:files][file][:orig]
       else
+        @dlogger.debug "Need original contents of #{file} from client"
         @need_orig[file] = true
         # If there are setup commands defined for this file we need to
         # pass those back along with our request for the original file,
@@ -777,8 +779,11 @@ class Etch
         end
       end
     end
-  
-    if generation_status && generation_status != :unknown &&
+    
+    # In addition to successful configs return configs for files that need
+    # orig data (generation_status==false) because any setup commands might be
+    # needed to create the original file.
+    if generation_status != :unknown &&
        Etch.xmlfindfirst(config_xml, '/config/*')
       # The client needs this attribute to know to which file
       # this chunk of XML refers
@@ -789,8 +794,12 @@ class Etch
     @already_generated[file] = true
     @filestack.delete(file)
     @generation_status[file] = generation_status
+    
+    generation_status
   end
   
+  # Returns the value of the generation_status variable, see comments in
+  # method for possible values.
   def generate_commands(command, request)
     # Skip commands we've already generated in response to <depend>
     # statements.
@@ -826,31 +835,67 @@ class Etch
       raise "Filtered commands.xml for #{command} fails validation"
     end
     
-    # Generate any other files that this file depends on
-    Etch.xmleach(commands_xml, '/commands/depend') do |depend|
-      @dlogger.debug "Generating command dependency #{Etch.xmltext(depend)}"
-      generate_commands(Etch.xmltext(depend), request)
-    end
-    
-    # Change into the corresponding directory so that the user can
-    # refer to source files and scripts by their relative pathnames.
-    Dir::chdir "#{@commandsbase}/#{command}"
-    
-    # Check that the resulting document is consistent after filtering
-    Etch.xmleach(commands_xml, '/commands/step') do |step|
-      guard_exec_elements = Etch.xmlarray(step, 'guard/exec')
-      if check_for_inconsistency(guard_exec_elements)
-        raise "Inconsistent guard 'exec' entries for #{command}"
+    generation_status = :unknown
+    # As we go through the process of generating the command we'll end up with
+    # four possible outcomes:
+    # fatal error: raise an exception
+    # failure: we're missing needed data for this command or a dependency,
+    #          generally the original file for a file this command depends on
+    # success: we successfully processed a valid configuration
+    # unknown: no valid configuration nor errors encountered, probably because
+    #          filtering removed everything from the commands.xml file.  This
+    #          should be considered a successful outcome, it indicates the
+    #          caller/client provided us with all required data and our result
+    #          is that no action needs to be taken.
+    # We keep track of which of the failure, success or unknown states we end
+    # up in via the generation_status variable.  We initialize it to :unknown.
+    # If we encounter either failure or success we set it to false or :success.
+    catch :generate_done do
+      # Generate any other commands that this command depends on
+      proceed = true
+      Etch.xmleach(commands_xml, '/commands/depend') do |depend|
+        @dlogger.debug "Generating command dependency #{Etch.xmltext(depend)}"
+        r = generate_commands(Etch.xmltext(depend), request)
+        proceed = proceed && r
       end
-      command_exec_elements = Etch.xmlarray(step, 'command/exec')
-      if check_for_inconsistency(command_exec_elements)
-        raise "Inconsistent command 'exec' entries for #{command}"
+      # Also generate any files that this command depends on
+      Etch.xmleach(commands_xml, '/commands/dependfile') do |dependfile|
+        @dlogger.debug "Generating file dependency #{Etch.xmltext(dependfile)}"
+        r = generate_file(Etch.xmltext(dependfile), request)
+        proceed = proceed && r
       end
+      if !proceed
+        # Try again next time
+        @retrycommands[command] = true
+        generation_status = false
+        throw :generate_done
+      end
+      
+      # Change into the corresponding directory so that the user can
+      # refer to source files and scripts by their relative pathnames.
+      Dir::chdir "#{@commandsbase}/#{command}"
+      
+      # Check that the resulting document is consistent after filtering
+      Etch.xmleach(commands_xml, '/commands/step') do |step|
+        guard_exec_elements = Etch.xmlarray(step, 'guard/exec')
+        if check_for_inconsistency(guard_exec_elements)
+          raise "Inconsistent guard 'exec' entries for #{command}"
+        end
+        command_exec_elements = Etch.xmlarray(step, 'command/exec')
+        if check_for_inconsistency(command_exec_elements)
+          raise "Inconsistent command 'exec' entries for #{command}"
+        end
+      end
+      
+      # I'm not sure if we'd benefit from further checking the XML for
+      # validity.  For now we declare success if we got this far.
+      generation_status = :success
     end
     
     # If filtering didn't remove all the content then add this to the list of
     # commands to be returned to the client.
-    if Etch.xmlfindfirst(commands_xml, '/commands/*')
+    if generation_status && generation_status != :unknown &&
+       Etch.xmlfindfirst(commands_xml, '/commands/*')
       # Include the commands directory name to aid troubleshooting on the
       # client side.
       Etch.xmlattradd(Etch.xmlroot(commands_xml), 'commandname', command)
@@ -859,6 +904,9 @@ class Etch
     
     @already_generated[command] = true
     @filestack.delete(command)
+    @generation_status[command] = generation_status
+    
+    generation_status
   end
   
   ALWAYS_KEEP = ['depend', 'setup', 'pre', 'test_before_post', 'post', 'test']
@@ -1198,7 +1246,11 @@ class Etch
     when :libxml
       element.remove!
     when :rexml
-      xmldoc.elements.delete(element)
+      if xmldoc.node_type == :document
+        xmldoc.root.elements.delete(element)
+      else
+        xmldoc.elements.delete(element)
+      end
     else
       raise "Unknown @xmllib #{@xmllib}"
     end
