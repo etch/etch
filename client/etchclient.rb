@@ -2,6 +2,13 @@
 # Etch configuration file management tool library
 ##############################################################################
 
+# Ensure we can find etch.rb if run within the development directory structure
+#   This is roughly equivalent to "../server/lib"
+serverlibdir = File.join(File.dirname(File.dirname(File.expand_path(__FILE__))), 'server', 'lib')
+if File.exist?(serverlibdir)
+  $:.unshift(serverlibdir)
+end
+
 begin
   # Try loading facter w/o gems first so that we don't introduce a
   # dependency on gems if it is not needed.
@@ -28,7 +35,7 @@ require 'logger'
 require 'etch'
 
 class Etch::Client
-  VERSION = '1.16'
+  VERSION = '1.18'
   
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
@@ -120,13 +127,14 @@ class Etch::Client
     @lchmod_supported = nil
   end
 
-  def process_until_done(files_to_generate)
+  def process_until_done(files, commands)
     # Our overall status.  Will be reported to the server and used as the
     # return value for this method.  Command-line clients should use it as
     # their exit value.  Zero indicates no errors.
     status = 0
     message = ''
     
+    # Prep http instance
     http = nil
     if !@local
       http = Net::HTTP.new(@filesuri.host, @filesuri.port)
@@ -166,9 +174,9 @@ class Etch::Client
         request = nil
         if @local
           request = {}
-          if files_to_generate && !files_to_generate.empty?
-            files_to_generate.each do |file|
-              request[:files] = {}
+          if files && !files.empty?
+            request[:files] = {}
+            files.each do |file|
               request[:files][file] = {:orig => save_orig(file)}
               local_requests = get_local_requests(file)
               if local_requests
@@ -176,16 +184,29 @@ class Etch::Client
               end
             end
           end
+          if commands && !commands.empty?
+            request[:commands] = {}
+            commands.each do |command|
+              request[:commands][command] = {}
+            end
+          end
         else
           request = get_blank_request
-          if files_to_generate && !files_to_generate.empty?
-            files_to_generate.each do |file|
-              request["files[#{CGI.escape(file)}][sha1sum]"] =
-                get_orig_sum(file)
-              local_requests = get_local_requests(file)
-              if local_requests
-                request["files[#{CGI.escape(file)}][local_requests]"] =
-                  local_requests
+          if (files && !files.empty?) || (commands && !commands.empty?)
+            if files
+              files.each do |file|
+                request["files[#{CGI.escape(file)}][sha1sum]"] =
+                  get_orig_sum(file)
+                local_requests = get_local_requests(file)
+                if local_requests
+                  request["files[#{CGI.escape(file)}][local_requests]"] =
+                    local_requests
+                end
+              end
+            end
+            if commands
+              commands.each do |command|
+                request["commands[#{CGI.escape(command)}]"] = '1'
               end
             end
           else
@@ -210,23 +231,23 @@ class Etch::Client
           # Send request to server
           #
           
-          configs = nil
-          need_sums = nil
-          need_origs = nil
-          allcommands = nil
+          responsedata = {}
           if @local
             results = @etch.generate(@local, @facts, request)
-	    # FIXME: Etch#generate returns parsed XML using whatever XML
-	    # library it happens to use.  In order to avoid re-parsing
-	    # the XML we'd have to use the XML abstraction code from Etch
-	    # everwhere here.
-	    # Until then re-parse the XML using REXML.
-            #configs = results[:configs]
-            configs = {}
-            results[:configs].each {|f,c| configs[f] = REXML::Document.new(c.to_s) }
-            need_sums = {}
-            need_origs = results[:need_orig]
-            allcommands = results[:allcommands]
+            # FIXME: Etch#generate returns parsed XML using whatever XML
+            # library it happens to use.  In order to avoid re-parsing
+            # the XML we'd have to use the XML abstraction code from Etch
+            # everwhere here.
+            # Until then re-parse the XML using REXML.
+            #responsedata[:configs] = results[:configs]
+            responsedata[:configs] = {}
+            results[:configs].each {|f,c| responsedata[:configs][f] = REXML::Document.new(c.to_s) }
+            responsedata[:need_sums] = {}
+            responsedata[:need_origs] = results[:need_orig]
+            #responsedata[:allcommands] = results[:allcommands]
+            responsedata[:allcommands] = {}
+            results[:allcommands].each {|cn,c| responsedata[:allcommands][cn] = REXML::Document.new(c.to_s) }
+            responsedata[:retrycommands] = results[:retrycommands]
           else
             puts "Sending request to server #{@filesuri}: #{request.inspect}" if (@debug)
             post = Net::HTTP::Post.new(@filesuri.path)
@@ -241,31 +262,35 @@ class Etch::Client
             puts "Response from server:\n'#{response.body}'" if (@debug)
             if !response.body.nil? && !response.body.empty?
               response_xml = REXML::Document.new(response.body)
-              configs = {}
+              responsedata[:configs] = {}
               response_xml.elements.each('/files/configs/config') do |config|
                 file = config.attributes['filename']
                 # We have to make a new document so that XPath paths are
                 # referenced relative to the configuration for this
                 # specific file.
-                #configs[file] = REXML::Document.new(response_xml.elements["/files/configs/config[@filename='#{file}']"].to_s)
-                configs[file] = REXML::Document.new(config.to_s)
+                #responsedata[:configs][file] = REXML::Document.new(response_xml.elements["/files/configs/config[@filename='#{file}']"].to_s)
+                responsedata[:configs][file] = REXML::Document.new(config.to_s)
               end
-              need_sums = {}
+              responsedata[:need_sums] = {}
               response_xml.elements.each('/files/need_sums/need_sum') do |ns|
-                need_sums[ns.text] = true
+                responsedata[:need_sums][ns.text] = true
               end
-              need_origs = {}
+              responsedata[:need_origs] = {}
               response_xml.elements.each('/files/need_origs/need_orig') do |no|
-                need_origs[no.text] = true
+                responsedata[:need_origs][no.text] = true
               end
-              allcommands = {}
+              responsedata[:allcommands] = {}
               response_xml.elements.each('/files/allcommands/commands') do |command|
                 commandname = command.attributes['commandname']
                 # We have to make a new document so that XPath paths are
                 # referenced relative to the configuration for this
                 # specific file.
-                #allcommands[commandname] = REXML::Document.new(response_xml.root.elements["/files/allcommands/commands[@commandname='#{commandname}']"].to_s)
-                allcommands[commandname] = REXML::Document.new(command.to_s)
+                #responsedata[:allcommands][commandname] = REXML::Document.new(response_xml.root.elements["/files/allcommands/commands[@commandname='#{commandname}']"].to_s)
+                responsedata[:allcommands][commandname] = REXML::Document.new(command.to_s)
+              end
+              responsedata[:retrycommands] = {}
+              response_xml.elements.each('/files/retrycommands/retrycommand') do |rc|
+                responsedata[:retrycommands][rc.text] = true
               end
             else
               puts "  Response is empty" if (@debug)
@@ -280,7 +305,7 @@ class Etch::Client
           # Prep a clean request hash
           if @local
             request = {}
-            if !need_origs.empty?
+            if !responsedata[:need_origs].empty?
               request[:files] = {}
             end
           else
@@ -296,14 +321,14 @@ class Etch::Client
           reset_already_processed
           # Process configs first, as they may contain setup entries that are
           # needed to create the original files.
-          configs.each_key do |file|
+          responsedata[:configs].each_key do |file|
             puts "Processing config for #{file}" if (@debug)
-            continue_processing = process(file, configs)
+            continue_processing = process_file(file, responsedata)
             if !continue_processing
               throw :stop_processing
             end
           end
-          need_sums.each_key do |need_sum|
+          responsedata[:need_sums].each_key do |need_sum|
             puts "Processing request for sum of #{need_sum}" if (@debug)
             if @local
               # If this happens we screwed something up, the local mode
@@ -324,7 +349,7 @@ class Etch::Client
             end
             need_to_loop = true
           end
-          need_origs.each_key do |need_orig|
+          responsedata[:need_origs].each_key do |need_orig|
             puts "Processing request for contents of #{need_orig}" if (@debug)
             if @local
               request[:files][need_orig] = {:orig => save_orig(need_orig)}
@@ -345,14 +370,23 @@ class Etch::Client
             end
             need_to_loop = true
           end
-         allcommands.each_key do |commandname|
+         responsedata[:allcommands].each_key do |commandname|
             puts "Processing commands #{commandname}" if (@debug)
-            continue_processing = process_commands(commandname, allcommands)
+            continue_processing = process_commands(commandname, responsedata)
             if !continue_processing
               throw :stop_processing
             end
           end
-
+          responsedata[:retrycommands].each_key do |commandname|
+            puts "Processing request to retry command #{commandname}" if (@debug)
+            if @local
+              request[:commands][commandname] = true
+            else
+              request["commands[#{CGI.escape(commandname)}]"] = '1'
+            end
+            need_to_loop = true
+          end
+          
           if !need_to_loop
             break
           end
@@ -431,7 +465,7 @@ class Etch::Client
   # Raises an exception if any fatal error is encountered
   # Returns a boolean, true unless the user indicated in interactive mode
   # that further processing should be halted
-  def process(file, configs)
+  def process_file(file, responsedata)
     continue_processing = true
     save_results = true
     exception = nil
@@ -439,7 +473,7 @@ class Etch::Client
     # We may not have configuration for this file, if it does not apply
     # to this host.  The server takes care of detecting any errors that
     # might involve, so here we can just silently return.
-    config = configs[file]
+    config = responsedata[:configs][file]
     if !config
       puts "No configuration for #{file}, skipping" if (@debug)
       return continue_processing
@@ -486,10 +520,16 @@ class Etch::Client
         
         # Process any other files that this file depends on
         config.elements.each('/config/depend') do |depend|
-          puts "Generating dependency #{depend.text}" if (@debug)
-          process(depend.text, configs)
+          puts "Processing dependency #{depend.text}" if (@debug)
+          process_file(depend.text, responsedata)
         end
-
+        
+        # Process any commands that this file depends on
+        config.elements.each('/config/dependcommand') do |dependcommand|
+          puts "Processing command dependency #{dependcommand.text}" if (@debug)
+          process_commands(dependcommand.text, responsedata)
+        end
+        
         # See what type of action the user has requested
 
         # Check to see if the user has requested that we revert back to the
@@ -1342,11 +1382,20 @@ class Etch::Client
   # Raises an exception if any fatal error is encountered
   # Returns a boolean, true unless the user indicated in interactive mode
   # that further processing should be halted
-  def process_commands(commandname, allcommands)
+  def process_commands(commandname, responsedata)
     continue_processing = true
     save_results = true
     exception = nil
     
+    # We may not have configuration for this file, if it does not apply
+    # to this host.  The server takes care of detecting any errors that
+    # might involve, so here we can just silently return.
+    command = responsedata[:allcommands][commandname]
+    if !command
+      puts "No configuration for command #{commandname}, skipping" if (@debug)
+      return continue_processing
+    end
+        
     # Skip commands we've already processed in response to <depend>
     # statements.
     if @already_processed.has_key?(commandname)
@@ -1386,12 +1435,16 @@ class Etch::Client
         # This needs to be after the circular dependency check
         lock_file(commandname)
         
-        command = allcommands[commandname]
-        
         # Process any other commands that this command depends on
         command.elements.each('/commands/depend') do |depend|
-          puts "Generating command dependency #{depend.text}" if (@debug)
-          process_commands(depend.text, allcommands)
+          puts "Processing command dependency #{depend.text}" if (@debug)
+          process_commands(depend.text, responsedata)
+        end
+        
+        # Process any files that this command depends on
+        command.elements.each('/commands/dependfile') do |dependfile|
+          puts "Processing file dependency #{dependfile.text}" if (@debug)
+          process_file(dependfile.text, responsedata)
         end
         
         # Perform each step
@@ -1502,7 +1555,8 @@ class Etch::Client
     orig_contents = nil
     # We only send back the actual original file contents if the original is
     # a regular file, otherwise we send back an empty string.
-    if origpath =~ /\.ORIG$/ && File.file?(origpath) && !File.symlink?(origpath)
+    if (origpath =~ /\.ORIG$/ || origpath =~ /\.TMP$/) &&
+       File.file?(origpath) && !File.symlink?(origpath)
       orig_contents = IO.read(origpath)
     else
       orig_contents = ''
