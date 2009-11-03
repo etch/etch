@@ -4,8 +4,8 @@
 <!ELEMENT dependfile (#PCDATA)>
 
 <!ELEMENT step (guard, command)>
-<!ELEMENT guard (exec+)>
-<!ELEMENT command (exec+)>
+<!ELEMENT guard (exec*)>
+<!ELEMENT command (exec*)>
 
 <!ELEMENT exec (#PCDATA)>
 
