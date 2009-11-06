@@ -80,7 +80,7 @@ module EtchTests
       puts "#"
       puts "# Errors expected here"
       puts "#"
-      sleep 3
+      #sleep 3
     end
     result = system("ruby ../client/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --key=keys/testkey #{extra_args}")
     if errors_expected
