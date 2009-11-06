@@ -1339,7 +1339,13 @@ class EtchExternalSource
     # The binding arg ties the template's namespace to this point in the
     # code, thus ensuring that all of the variables above (@file, etc.)
     # are visible to the template code.
-    erb.result(binding)
+    begin
+      erb.result(binding)
+    rescue Exception => e
+      # Help the user figure out where the exception occurred, otherwise they
+      # just get told it happened here, which isn't very helpful.
+      raise e.exception("Exception while processing template #{template} for file #{@file}:\n" + e.message)
+    end
   end
 
   # This method runs a etch script (as specified via a <script> entry
