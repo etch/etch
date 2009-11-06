@@ -606,7 +606,7 @@ class Etch::Client
 
           set_file_contents = false
           if newcontents
-            set_file_contents = compare_file_contents(file, newcontents)
+            set_file_contents = !compare_file_contents(file, newcontents)
           end
           set_permissions = nil
           set_ownership = nil
@@ -618,8 +618,8 @@ class Etch::Client
             set_permissions = true
             set_ownership = true
           else
-            set_permissions = compare_permissions(file, perms)
-            set_ownership = compare_ownership(file, uid, gid)
+            set_permissions = !compare_permissions(file, perms)
+            set_ownership = !compare_ownership(file, uid, gid)
           end
 
           # Proceed if:
@@ -783,8 +783,8 @@ class Etch::Client
           
                 # Check the permissions and ownership now to ensure they
                 # end up set properly
-                set_permissions = compare_permissions(file, perms)
-                set_ownership = compare_ownership(file, uid, gid)
+                set_permissions = !compare_permissions(file, perms)
+                set_ownership = !compare_ownership(file, uid, gid)
               end
             end
 
@@ -905,7 +905,7 @@ class Etch::Client
             if set_link_destination && !File.symlink?(file)
               set_permissions = true
             else
-              set_permissions = compare_permissions(file, perms)
+              set_permissions = !compare_permissions(file, perms)
             end
           end
           set_ownership = false
@@ -913,7 +913,7 @@ class Etch::Client
             if set_link_destination && !File.symlink?(file)
               set_ownership = true
             else
-              set_ownership = compare_ownership(file, uid, gid)
+              set_ownership = !compare_ownership(file, uid, gid)
             end
           end
 
@@ -1021,10 +1021,10 @@ class Etch::Client
               # Check the permissions and ownership now to ensure they
               # end up set properly
               if @lchmod_supported
-                set_permissions = compare_permissions(file, perms)
+                set_permissions = !compare_permissions(file, perms)
               end
               if @lchown_supported
-                set_ownership = compare_ownership(file, uid, gid)
+                set_ownership = !compare_ownership(file, uid, gid)
               end
             end
 
@@ -1107,8 +1107,8 @@ class Etch::Client
             set_permissions = true
             set_ownership = true
           else
-            set_permissions = compare_permissions(file, perms)
-            set_ownership = compare_ownership(file, uid, gid)
+            set_permissions = !compare_permissions(file, perms)
+            set_ownership = !compare_ownership(file, uid, gid)
           end
 
           # Proceed if:
@@ -1187,8 +1187,8 @@ class Etch::Client
 
               # Check the permissions and ownership now to ensure they
               # end up set properly
-              set_permissions = compare_permissions(file, perms)
-              set_ownership = compare_ownership(file, uid, gid)
+              set_permissions = !compare_permissions(file, perms)
+              set_ownership = !compare_ownership(file, uid, gid)
             end
 
             # Ensure the permissions are set properly
@@ -1512,24 +1512,18 @@ class Etch::Client
     continue_processing
   end
   
-  # Returns true if the new contents are different from the current file,
-  # or if the file does not currently exist.
+  # Returns true if the new contents are the same as the current file,
+  # false if the contents differ or if the file does not currently exist.
   def compare_file_contents(file, newcontents)
-    r = false
-
-    # If the file currently exists and is a regular file, check to see
-    # if the new contents are different.
+    # If the file currently exists and is a regular file then check to see
+    # if the new contents are the same.
     if File.file?(file) && !File.symlink?(file)
       contents = IO.read(file)
-      if newcontents != contents
-        r = true
+      if newcontents == contents
+        return true
       end
-    else
-      # The file doesn't currently exist or isn't a regular file
-      r = true
     end
-
-    r
+    false
   end
 
   # Returns true if the given file is a symlink which points to the given
@@ -1602,14 +1596,7 @@ class Etch::Client
         puts "Making directory tree #{origdir}"
         FileUtils.mkpath(origdir) if (!@dryrun)
       end
-
-      # If we're going to be using a temporary file clean up any
-      # existing one so we don't have to worry about overwriting it.
-      if save_directory_contents.nil? &&
-         (File.exist?(tmporigpath) || File.symlink?(tmporigpath))
-        remove_file(tmporigpath)
-      end
-
+      
       if File.directory?(file) && !File.symlink?(file)
         # The original "file" is a directory
         if save_directory_contents
@@ -1635,8 +1622,11 @@ class Etch::Client
           # (i.e. save_directory_contents is nil) then just save a
           # placeholder until we do get a definitive directive.
           origpath = tmporigpath
-          puts "Creating temporary original placeholder #{origpath} for directory #{file}"
-          File.open(origpath, 'w') { |file| } if (!@dryrun)
+          if !File.directory?(tmporigpath) || File.symlink?(tmporigpath)
+            puts "Creating temporary original placeholder #{tmporigpath} for directory #{file}"
+            remove_file(tmporigpath) if (!@dryrun)
+            Dir.mkdir(tmporigpath) if (!@dryrun)
+          end
           first_update = false
         else
           # Just create a directory in the originals repository with
@@ -1653,28 +1643,42 @@ class Etch::Client
         end
       elsif File.exist?(file) || File.symlink?(file)
         # The original file exists, and is not a directory
+        proceed = true
         if save_directory_contents.nil?
           origpath = tmporigpath
-          puts "Saving temporary copy of original file:  #{file} -> #{origpath}"
+          if File.exist?(tmporigpath) && !File.symlink?(tmporigpath) && compare_file_contents(tmporigpath, File.read(file))
+            proceed = false
+          else
+            puts "Saving temporary copy of original file:  #{file} -> #{origpath}"
+          end
         else
           origpath = "#{origpathbase}.ORIG"
           puts "Saving original file:  #{file} -> #{origpath}"
         end
-        filedir = File.dirname(file)
-        filebase = File.basename(file)
-        recursive_copy_and_rename(filedir, filebase, origpath) if (!@dryrun)
+        if proceed
+          filedir = File.dirname(file)
+          filebase = File.basename(file)
+          recursive_copy_and_rename(filedir, filebase, origpath) if (!@dryrun)
+        end
       else
         # If the original doesn't exist, we need to flag that so
         # that we don't try to save our generated file as an
         # original on future runs
+        proceed = true
         if save_directory_contents.nil?
           origpath = tmporigpath
-          puts "Original file #{file} doesn't exist, saving that state temporarily as #{origpath}"
+          if File.exist?(tmporigpath) && !File.symlink?(tmporigpath) && File.stat(tmporigpath).zero?
+            proceed = false
+          else
+            puts "Original file #{file} doesn't exist, saving that state temporarily as #{tmporigpath}"
+          end
         else
           origpath = "#{origpathbase}.NOORIG"
           puts "Original file #{file} doesn't exist, saving that state permanently as #{origpath}"
         end
-        File.open(origpath, 'w') { |file| } if (!@dryrun)
+        if proceed
+          File.open(origpath, 'w') { |file| } if (!@dryrun)
+        end
       end
 
       @first_update[file] = first_update
@@ -2133,36 +2137,30 @@ class Etch::Client
     gid.to_i
   end
 
-  # Returns false if the permissions of the given file match the given
-  # permissions, true otherwise.
+  # Returns true if the permissions of the given file match the given
+  # permissions, false otherwise.
   def compare_permissions(file, perms)
-    if ! File.exist?(file)
-      return true
+    if File.exist?(file)
+      st = File.lstat(file)
+      # Mask off the file type
+      fileperms = st.mode & 07777
+      if perms == fileperms
+        return true
+      end
     end
-
-    st = File.lstat(file)
-    # Mask off the file type
-    fileperms = st.mode & 07777
-    if perms == fileperms
-      return false
-    else
-      return true
-    end
+    false
   end
 
-  # Returns false if the ownership of the given file match the given UID
-  # and GID, true otherwise.
+  # Returns true if the ownership of the given file match the given UID
+  # and GID, false otherwise.
   def compare_ownership(file, uid, gid)
-    if ! File.exist?(file)
-      return true
+    if File.exist?(file)
+      st = File.lstat(file)
+      if st.uid == uid && st.gid == gid
+        return true
+      end
     end
-
-    st = File.lstat(file)
-    if st.uid == uid && st.gid == gid
-      return false
-    else
-      return true
-    end
+    false
   end
 
   def get_user_confirmation
