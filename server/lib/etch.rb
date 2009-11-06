@@ -305,12 +305,43 @@ class Etch
         r = generate_commands(Etch.xmltext(dependcommand), request)
         proceed = proceed && r
       end
+      
       if !proceed
         @dlogger.debug "One or more dependencies of #{file} need data from client"
+      end
+      
+      # Make sure we have the original contents for this file
+      original_file = nil
+      if request[:files] && request[:files][file] && request[:files][file][:orig]
+        original_file = request[:files][file][:orig]
+      else
+        @dlogger.debug "Need original contents of #{file} from client"
+        proceed = false
+      end
+      
+      if !proceed
+        # If any file dependency failed to generate (due to a need for orig
+        # contents from the client) then we need to tell the client to request
+        # all of the files in the dependency tree again.
+        # 
+        # For example, we have afile which depends on bfile and cfile.  The
+        # user requests afile and bfile on the command line.  The client sends
+        # sums for afile and bfile.  The server sees the need for cfile's sum, so
+        # it sends back contents for bfile and a sum request for cfile and afile
+        # (since afile depends on bfile).  The client sends sums for afile and
+        # cfile.  The server sends back contents for cfile, and a sum request for
+        # bfile and afile.  This repeats forever as the server isn't smart enough
+        # to ask for everything it needs and the client isn't smart enough to send
+        # everything.
+        depends.each { |depend| @need_orig[depend] = true }
+        
         # Tell the client to request this file again
         @need_orig[file] = true
+        
         # Strip this file's config down to the bare necessities
         filter_xml_completely!(config_xml, ['depend', 'setup'])
+        
+        # And hit the eject button
         generation_status = false
         throw :generate_done
       end
@@ -340,24 +371,6 @@ class Etch
             raise "Server setup command #{Etch.xmltext(cmd)} for file #{file} exited with non-zero value"
           end
         end
-      end
-  
-      # Make sure we have the original contents for this file
-      original_file = nil
-      if request[:files] && request[:files][file] && request[:files][file][:orig]
-        original_file = request[:files][file][:orig]
-      else
-        @dlogger.debug "Need original contents of #{file} from client"
-        @need_orig[file] = true
-        # If there are setup commands defined for this file we need to
-        # pass those back along with our request for the original file,
-        # as the setup commands may be needed to create the original
-        # file on the node.
-        filter_xml_completely!(config_xml, ['depend', 'setup'])
-        # Nothing more can be done until we have the original file from
-        # the client
-        generation_status = false
-        throw :generate_done
       end
     
       # Pull out any local requests
@@ -852,6 +865,7 @@ class Etch
     # If we encounter either failure or success we set it to false or :success.
     catch :generate_done do
       # Generate any other commands that this command depends on
+      dependfiles = []
       proceed = true
       Etch.xmleach(commands_xml, '/commands/depend') do |depend|
         @dlogger.debug "Generating command dependency #{Etch.xmltext(depend)}"
@@ -861,10 +875,17 @@ class Etch
       # Also generate any files that this command depends on
       Etch.xmleach(commands_xml, '/commands/dependfile') do |dependfile|
         @dlogger.debug "Generating file dependency #{Etch.xmltext(dependfile)}"
+        dependfiles << Etch.xmltext(dependfile)
         r = generate_file(Etch.xmltext(dependfile), request)
         proceed = proceed && r
       end
       if !proceed
+        @dlogger.debug "One or more dependencies of #{command} need data from client"
+        # If any file dependency failed to generate (due to a need for orig
+        # contents from the client) then we need to tell the client to request
+        # all of the files in the dependency tree again.  See the big comment
+        # in generate_file for further explanation.
+        dependfiles.each { |dependfile| @need_orig[dependfile] = true }
         # Try again next time
         @retrycommands[command] = true
         generation_status = false
