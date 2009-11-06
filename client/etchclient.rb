@@ -35,7 +35,7 @@ require 'logger'
 require 'etch'
 
 class Etch::Client
-  VERSION = '1.18'
+  VERSION = '3.10'
   
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
