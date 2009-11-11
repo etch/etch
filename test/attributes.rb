@@ -8,6 +8,7 @@ require 'test/unit'
 require 'etchtest'
 require 'tempfile'
 require 'fileutils'
+require 'rubygems'  # Might be needed to find facter
 require 'facter'
 
 class EtchAttributeTests < Test::Unit::TestCase
