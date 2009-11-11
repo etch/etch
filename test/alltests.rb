@@ -1,5 +1,8 @@
 #!/usr/bin/ruby -w
 
+# Some of the tests involve DTD validation.  For that we need LibXML.
+ENV['xmllib'] = 'libxml'
+
 #
 # Run all of the etch test cases
 #
