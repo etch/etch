@@ -308,6 +308,9 @@ class Etch::Client
             if !responsedata[:need_origs].empty?
               request[:files] = {}
             end
+            if !responsedata[:retrycommands].empty?
+              request[:commands] = {}
+            end
           else
             request = get_blank_request
           end
@@ -2038,7 +2041,9 @@ class Etch::Client
         end
       end
 
-      r = system(exec)
+      # Explicitly invoke using /bin/sh so that syntax like
+      # "FOO=bar myprogram" works.
+      r = system('/bin/sh', '-c', exec)
 
       if exectype == 'post' || exectype == 'command'
         if etch_priority != 0

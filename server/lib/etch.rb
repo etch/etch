@@ -366,7 +366,9 @@ class Etch
         @dlogger.debug "Processing server setup commands"
         Etch.xmleach(config_xml, '/config/server_setup/exec') do |cmd|
           @dlogger.debug "  Executing #{Etch.xmltext(cmd)}"
-          success = system(Etch.xmltext(cmd))
+          # Explicitly invoke using /bin/sh so that syntax like
+          # "FOO=bar myprogram" works.
+          success = system('/bin/sh', '-c', Etch.xmltext(cmd))
           if !success
             raise "Server setup command #{Etch.xmltext(cmd)} for file #{file} exited with non-zero value"
           end
@@ -897,16 +899,33 @@ class Etch
       Dir::chdir "#{@commandsbase}/#{command}"
       
       # Check that the resulting document is consistent after filtering
+      remove = []
       Etch.xmleach(commands_xml, '/commands/step') do |step|
         guard_exec_elements = Etch.xmlarray(step, 'guard/exec')
         if check_for_inconsistency(guard_exec_elements)
-          raise "Inconsistent guard 'exec' entries for #{command}"
+          raise "Inconsistent guard 'exec' entries for #{command}: " +
+            guard_exec_elements.collect {|elem| Etch.xmltext(elem)}.join(',')
         end
         command_exec_elements = Etch.xmlarray(step, 'command/exec')
         if check_for_inconsistency(command_exec_elements)
-          raise "Inconsistent command 'exec' entries for #{command}"
+          raise "Inconsistent command 'exec' entries for #{command}: " +
+            command_exec_elements.collect {|elem| Etch.xmltext(elem)}.join(',')
+        end
+	# If filtering has removed both the guard and command elements
+	# we can remove this step.
+        if guard_exec_elements.empty? && command_exec_elements.empty?
+          remove << step
+	# If filtering has removed the guard but not the command or vice
+	# versa that's an error.
+        elsif guard_exec_elements.empty?
+          raise "Filtering removed guard, but left command: " +
+            Etch.xmltext(command_exec_elements.first)
+        elsif command_exec_elements.empty?
+          raise "Filtering removed command, but left guard: " +
+            Etch.xmltext(guard_exec_elements.first)
         end
       end
+      remove.each { |elem| Etch.xmlremove(commands_xml, elem) }
       
       # I'm not sure if we'd benefit from further checking the XML for
       # validity.  For now we declare success if we got this far.
@@ -1050,7 +1069,7 @@ class Etch
   # contain the same value.  Returns true if there is inconsistency.
   def check_for_inconsistency(elements)
     elements_as_text = elements.collect { |elem| Etch.xmltext(elem) }
-    if elements_as_text.uniq.length != 1
+    if elements_as_text.uniq.length > 1
       return true
     else
       return false
