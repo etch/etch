@@ -423,6 +423,49 @@ class EtchActionTests < Test::Unit::TestCase
     assert_equal("post\n", get_file_contents("#{@repodir}/post_with_escape"), 'post with escape')
   end
 
+  def test_action_with_env
+    #
+    # Test an action involving passing an environment variable
+    #
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+          <post>
+            <exec>TESTVAR=testvalue #{@repodir}/post_with_env</exec>
+          </post>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "This is a test of a post with an environment variable\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    File.open("#{@repodir}/post_with_env", 'w') do |file|
+      file.write <<EOF
+#!/bin/sh
+echo $TESTVAR >> #{@repodir}/post_with_env_output
+EOF
+    end
+    File.chmod(0755, "#{@repodir}/post_with_env")
+    
+    # Run etch
+    #puts "Running environment variable test"
+    run_etch(@port, @testbase)
+    
+    # Verify that the action was executed
+    assert_equal("testvalue\n", get_file_contents("#{@repodir}/post_with_env_output"), 'post with environment variable')
+  end
+
   def teardown
     stop_server(@pid)
     remove_repository(@repodir)
