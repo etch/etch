@@ -44,7 +44,7 @@ PortGroup           ruby 1.0
 use_configure       no
 build               {}
 test.run            no
-destroot.cmd        rake
+destroot.cmd        cd client && rake
 destroot.target     install\[${destroot}\]
 destroot.destdir    ""
 
