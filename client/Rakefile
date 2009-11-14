@@ -210,7 +210,7 @@ task :deb do
   rm_rf(BUILDROOT)
 end
 
-desc 'Build etch client SysV packages for Solaris"
+desc 'Build etch client SysV packages for Solaris'
 task :solaris => [:sysvpkg, :sysvpkgsparc]
 desc 'Build an etch client SysV package'
 task :sysvpkg do
