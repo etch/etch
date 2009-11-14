@@ -1,6 +1,6 @@
 Name: etch-client
 Summary: Etch client
-Version: VER
+Version: %VER%
 Release: 1
 Group: Applications/System
 License: MIT

@@ -1,5 +1,5 @@
 Package: etch-client
-Version: VER-1
+Version: %VER%-1
 Maintainer: etch-users@lists.sourceforge.net
 Architecture: all
 Depends: ruby facter rcs
