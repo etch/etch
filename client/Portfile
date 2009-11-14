@@ -34,13 +34,6 @@ depends_run         port:ruby \
 
 PortGroup           ruby 1.0
 
-# fetch
-# extract
-# patch
-# configure
-# build
-# destroot
-
 use_configure       no
 build               {}
 test.run            no
