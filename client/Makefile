@@ -1,3 +1,5 @@
+# Deprecated, see Rakefile
+
 BUILDROOT=/var/tmp/etch-client-buildroot
 # Grab the current version from the library
 VER=$(shell ruby -e "$$:.unshift('.'); require 'etchclient'; puts Etch::Client::VERSION")
@@ -10,7 +12,6 @@ redhatprep:
 	rpm --quiet -q ruby || sudo yum install ruby
 	# And the package which contains the rpmbuild command
 	rpm --quiet -q rpm-build || sudo yum install rpm-build
-TMPSPEC = etch-client-temp.spec
 rpm: etch-client.spec
 	#
 	# Create package file structure in build root
