@@ -1,0 +1,16 @@
+require 'rake/gempackagetask'
+spec = Gem::Specification.new do |s|
+  s.name	= 'etch'
+  s.summary	= 'Etch system configuration management client'
+  s.add_dependency('facter')
+  s.version = '%VER%'
+  s.author = 'Jason Heiss'
+  s.email = 'etch-users@lists.sourceforge.net'
+  s.homepage = 'http://etch.sourceforge.net'
+  s.platform = Gem::Platform::RUBY
+  s.required_ruby_version = '>=1.8'
+  s.files	= Dir['**/**']
+  s.executables = [ 'etch', 'etch_to_trunk', 'etch_cron_wrapper' ]
+end
+Rake::GemPackageTask.new(spec).define
+
