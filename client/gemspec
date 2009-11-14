@@ -7,6 +7,7 @@ spec = Gem::Specification.new do |s|
   s.author = 'Jason Heiss'
   s.email = 'etch-users@lists.sourceforge.net'
   s.homepage = 'http://etch.sourceforge.net'
+  s.rubyforge_project = 'etchsyscm'
   s.platform = Gem::Platform::RUBY
   s.required_ruby_version = '>=1.8'
   s.files	= Dir['**/**']
