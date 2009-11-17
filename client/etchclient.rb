@@ -41,7 +41,7 @@ class Etch::Client
   CONFIRM_SKIP = 2
   CONFIRM_QUIT = 3
   PRIVATE_KEY_PATHS = ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh_host_rsa_key"]
-  CONFIGDIR = '/etc/etch'
+  CONFIGDIR = '/etc'
   
   # We need these in relation to the output capturing
   ORIG_STDOUT = STDOUT.dup
@@ -141,17 +141,17 @@ class Etch::Client
       http = Net::HTTP.new(@filesuri.host, @filesuri.port)
       if @filesuri.scheme == "https"
         # Eliminate the OpenSSL "using default DH parameters" warning
-        if File.exist?(File.join(CONFIGDIR, 'dhparams'))
-          dh = OpenSSL::PKey::DH.new(IO.read(File.join(CONFIGDIR, 'dhparams')))
+        if File.exist?(File.join(CONFIGDIR, 'etch', 'dhparams'))
+          dh = OpenSSL::PKey::DH.new(IO.read(File.join(CONFIGDIR, 'etch', 'dhparams')))
           Net::HTTP.ssl_context_accessor(:tmp_dh_callback)
           http.tmp_dh_callback = proc { dh }
         end
         http.use_ssl = true
-        if File.exist?(File.join(CONFIGDIR, 'ca.pem'))
-          http.ca_file = File.join(CONFIGDIR, 'ca.pem')
+        if File.exist?(File.join(CONFIGDIR, 'etch', 'ca.pem'))
+          http.ca_file = File.join(CONFIGDIR, 'etch', 'ca.pem')
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-        elsif File.directory?(File.join(CONFIGDIR, 'ca'))
-          http.ca_path = File.join(CONFIGDIR, 'ca')
+        elsif File.directory?(File.join(CONFIGDIR, 'etch', 'ca'))
+          http.ca_path = File.join(CONFIGDIR, 'etch', 'ca')
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER
         end
       end

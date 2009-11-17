@@ -79,18 +79,28 @@ def copy_etch_files(destdir, options={})
   chmod(0444, File.join(man8dir, 'etch.8'))
   
   etcdir = nil
+  # Start by calculating the real etc directory that will be used when the
+  # package is installed.  We need to substitute that path into the library
+  # later.
   realetcdir = nil
   if options[:etcdir]
     realetcdir = options[:etcdir]
   else
     realetcdir = '/etc'
   end
+  # Then compose the etc directory to copy files to
   etcdir = File.join(destdir, realetcdir)
-  mkdir_p(etcdir)
-  etcfiles = ['ca.pem', 'dhparams']
-  etcfiles.each do |etcfile|
-    cp(etcfile, etcdir, :preserve => true)
-    chmod(0644, File.join(etcdir, etcfile))
+  # FIXME: Need to add support for etch.conf to the code
+  #mkdir_p(etcdir)
+  #cp('etch.conf', etcdir, :preserve => true)
+  #chmod(0644, File.join(etcdir, 'etch.conf'))
+  # All of the supporting config files go into a subdirectory
+  etcetchdir = File.join(etcdir, 'etch')
+  mkdir_p(etcetchdir)
+  etcetchfiles = ['ca.pem', 'dhparams']
+  etcetchfiles.each do |etcetchfile|
+    cp(etcetchfile, etcetchdir, :preserve => true)
+    chmod(0644, File.join(etcetchdir, etcetchfile))
   end
   
   if options[:crondir]
@@ -391,7 +401,7 @@ end
 desc 'Fetch tarball from sourceforge'
 task :fetch do
   if !File.exist?(TARBALL)
-    url = "http://downloads.sourceforge.net/project/etch/etch/#{ETCHVER}/#{TARBALLFILE}?use_mirror=autoselect"
+    url = "http://downloads.sourceforge.net/project/etch/etch/#{ETCHVER}/#{TARBALLFILE}"
     puts "Fetching tarball from #{url}"
     open(url) do |df|
       open(TARBALL, 'w') do |lf|
