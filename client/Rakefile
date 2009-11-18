@@ -281,7 +281,7 @@ task :sysvpkg do
   #
   
   system("cd solbuild && pkgmk -r #{BUILDROOT} -d $PWD/solbuild")
-  system("pkgtrans solbuild ../YPCetch-#{ETCHVER}.pkg YPCetch")
+  system("pkgtrans solbuild ../OSSetch-#{ETCHVER}.pkg OSSetch")
   
   #
   # Cleanup
@@ -370,7 +370,7 @@ task :sysvpkgsparc do
   #
   
   system("cd solbuild && pkgmk -r #{BUILDROOT} -d $PWD/solbuild")
-  system("pkgtrans solbuild ../YPCetch-#{ETCHVER}-sparc.pkg YPCetch")
+  system("pkgtrans solbuild ../OSSetch-#{ETCHVER}-sparc.pkg OSSetch")
   
   #
   # Cleanup
