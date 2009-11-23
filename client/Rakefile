@@ -9,98 +9,90 @@ TARBALL = File.expand_path(TARBALLFILE)
 
 BUILDROOT = '/var/tmp/etch-client-buildroot'
 
-# Copies the etch client files to destdir.  Appropriate subdirectories will be
-# composed unless specified via options.
+# Copies the etch client files to destdir.  If any of the dir options
+# are not specified the files that would go in that directory will not
+# be copied.
 # options:
 # :bindir
 # :libdir
 # :etcdir
 # :mandir
-# :crondir (note no default here, crontab will not be copied if not specified)
+# :crondir
 # :ruby (#! lines in scripts will be changed to specified ruby)
-# :installbase (base directory where files will end up)
 def copy_etch_files(destdir, options={})
-  bindir = nil
   if options[:bindir]
     bindir = File.join(destdir, options[:bindir])
-  else
-    bindir = File.join(destdir, 'bin')
-  end
-  mkdir_p(bindir)
-  binapps = ['etch', 'etch_to_trunk', 'etch_cron_wrapper']
-  binapps.each do |binapp|
-    if options[:ruby]
-      # Change #! line
-      File.open(File.join(bindir, binapp), 'w') do |newfile|
-        File.open(binapp) do |oldfile|
-          # Modify the first line
-          firstline = oldfile.gets
-          # Preserve any options.  I.e. #!/usr/bin/ruby -w
-          shebang, shebangopts = firstline.split(' ', 2)
-          newfile.puts "#!#{options[:ruby]} #{shebangopts}"
-          # Then dump in the rest of the file
-          newfile.write(oldfile.read)
+    mkdir_p(bindir)
+    binapps = ['etch', 'etch_to_trunk', 'etch_cron_wrapper']
+    binapps.each do |binapp|
+      if options[:ruby]
+        # Change #! line
+        File.open(File.join(bindir, binapp), 'w') do |newfile|
+          File.open(binapp) do |oldfile|
+            # Modify the first line
+            firstline = oldfile.gets
+            # Preserve any options.  I.e. #!/usr/bin/ruby -w
+            shebang, shebangopts = firstline.split(' ', 2)
+            newfile.puts "#!#{options[:ruby]} #{shebangopts}"
+            # Then dump in the rest of the file
+            newfile.write(oldfile.read)
+          end
         end
+      else
+        cp(binapp, bindir, :preserve => true)
       end
-    else
-      cp(binapp, bindir, :preserve => true)
+      chmod(0555, File.join(bindir, binapp))
     end
-    chmod(0555, File.join(bindir, binapp))
   end
   
-  libdir = nil
   if options[:libdir]
     libdir = File.join(destdir, options[:libdir])
-  else
-    libdir = File.join(destdir, 'lib')
-  end
-  mkdir_p(libdir)
-  clientlibs = ['etchclient.rb']
-  clientlibs.each do |clientlib|
-    cp(clientlib, libdir, :preserve => true)
-  end
-  serverlibs = ['etch.rb', 'versiontype.rb']
-  serverlibs.each do |serverlib|
-    cp(File.join('..', 'server', 'lib', serverlib), libdir, :preserve => true)
-  end
-  clientlibs + serverlibs.each do |lib|
-    chmod(0444, File.join(libdir, lib))
+    mkdir_p(libdir)
+    
+    # Substitute ETCHVER into etchclient.rb
+    # Substitute proper path into CONFIGDIR in etchclient.rb if appropriate
+    File.open(File.join(libdir, 'etchclient.rb.new'), 'w') do |newfile|
+      IO.foreach(File.join(libdir, 'etchclient.rb')) do |line|
+        if line =~ /^\s*VERSION/
+          line.sub!(/=.*/, "= '#{ETCHVER}'")
+        end
+        if options[:etcdir] && line =~ /^\s*CONFIGDIR/
+          line.sub!(/=.*/, "= #{options[:etcdir]}")
+        end
+        newfile.write(line)
+      end
+    end
+    chmod(0444, File.join(libdir, 'etchclient.rb'))
+    
+    serverlibs = ['etch.rb', 'versiontype.rb']
+    serverlibs.each do |serverlib|
+      cp(File.join('..', 'server', 'lib', serverlib), libdir, :preserve => true)
+      chmod(0444, File.join(libdir, serverlib))
+    end
   end
   
-  mandir = nil
   if options[:mandir]
     mandir = File.join(destdir, options[:mandir])
-  else
-    mandir = File.join(destdir, 'man')
+    man8dir = File.join(mandir, 'man8')
+    mkdir_p(man8dir)
+    cp('etch.8', man8dir, :preserve => true)
+    chmod(0444, File.join(man8dir, 'etch.8'))
   end
-  man8dir = File.join(mandir, 'man8')
-  mkdir_p(man8dir)
-  cp('etch.8', man8dir, :preserve => true)
-  chmod(0444, File.join(man8dir, 'etch.8'))
   
-  etcdir = nil
-  # Start by calculating the real etc directory that will be used when the
-  # package is installed.  We need to substitute that path into the library
-  # later.
-  realetcdir = nil
   if options[:etcdir]
-    realetcdir = options[:etcdir]
-  else
-    realetcdir = '/etc'
-  end
-  # Then compose the etc directory to copy files to
-  etcdir = File.join(destdir, realetcdir)
-  # FIXME: Need to add support for etch.conf to the code
-  #mkdir_p(etcdir)
-  #cp('etch.conf', etcdir, :preserve => true)
-  #chmod(0644, File.join(etcdir, 'etch.conf'))
-  # All of the supporting config files go into a subdirectory
-  etcetchdir = File.join(etcdir, 'etch')
-  mkdir_p(etcetchdir)
-  etcetchfiles = ['ca.pem', 'dhparams']
-  etcetchfiles.each do |etcetchfile|
-    cp(etcetchfile, etcetchdir, :preserve => true)
-    chmod(0644, File.join(etcetchdir, etcetchfile))
+    etcdir = File.join(destdir, options[:etcdir])
+    # FIXME: Need to add support for etch.conf to the code
+    #mkdir_p(etcdir)
+    #cp('etch.conf', etcdir, :preserve => true)
+    #chmod(0644, File.join(etcdir, 'etch.conf'))
+    # All of the supporting config files go into a subdirectory
+    etcetchdir = File.join(etcdir, 'etch')
+    mkdir_p(etcetchdir)
+    etcetchfiles = ['ca.pem', 'dhparams']
+    etcetchfiles.each do |etcetchfile|
+      cp(etcetchfile, etcetchdir, :preserve => true)
+      chmod(0644, File.join(etcetchdir, etcetchfile))
+    end
   end
   
   if options[:crondir]
@@ -111,24 +103,6 @@ def copy_etch_files(destdir, options={})
     cp('etch_cron', File.join(crondir, 'etch'), :preserve => true)
     chmod(0444, File.join(crondir, 'etch'))
   end
-
-  # Substitute ETCHVER into etchclient.rb
-  # Substitute proper path into CONFIGDIR in etchclient.rb if appropriate
-  newetchclient = File.join(libdir, 'etchclient.rb.new')
-  etchclient = File.join(libdir, 'etchclient.rb')
-  File.open(newetchclient, 'w') do |newfile|
-    IO.foreach(etchclient) do |line|
-      if line =~ /^\s*VERSION/
-        line.sub!(/=.*/, "= '#{ETCHVER}'")
-      end
-      if options[:installbase] && line =~ /^\s*CONFIGDIR/
-        line.sub!(/=.*/, "= #{realetcdir}")
-      end
-      newfile.write(line)
-    end
-  end
-  mv(newetchclient, etchclient)
-  chmod(0444, etchclient)
 end
 
 desc 'Build an etch client RPM on a Red Hat box'
@@ -149,11 +123,10 @@ task :rpm do
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('usr', 'lib', 'ruby', 'site_ruby', '1.8')
   mandir = File.join('usr', 'share', 'man')
-  etcdir = File.join('etc', 'etch')
+  etcdir = '/etc'
   crondir = File.join('etc', 'cron.d')
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
-                  :mandir => mandir, :etcdir => etcdir, :crondir => crondir,
-                  :installbase => '/')
+                  :mandir => mandir, :etcdir => etcdir, :crondir => crondir)
   
   #
   # Prep spec file
@@ -198,11 +171,10 @@ task :deb do
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('usr', 'local', 'lib', 'site_ruby', '1.8')
   mandir = File.join('usr', 'share', 'man')
-  etcdir = File.join('etc', 'etch')
+  etcdir = '/etc'
   crondir = File.join('etc', 'cron.d')
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
-                  :mandir => mandir, :etcdir => etcdir, :crondir => crondir,
-                  :installbase => '/')
+                  :mandir => mandir, :etcdir => etcdir, :crondir => crondir)
   
   #
   # Set permissions
@@ -236,10 +208,10 @@ task :sysvpkg do
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('opt', 'csw', 'lib', 'ruby', 'site_ruby', '1.8')
   mandir = File.join('usr', 'share', 'man')
-  etcdir = File.join('etc', 'etch')
+  etcdir = '/etc'
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
                   :mandir => mandir, :etcdir => etcdir,
-                  :ruby => '/opt/csw/bin/ruby', :installbase => '/')
+                  :ruby => '/opt/csw/bin/ruby')
   
   #
   # Prep packaging files
@@ -257,9 +229,9 @@ task :sysvpkg do
     prototype.puts("i pkginfo=./pkginfo")
     cp('depend', 'solbuild/depend')
     prototype.puts("i depend=./depend")
-    cp('postinstall', 'solbuild/postinstall')
+    cp('postinstall.solaris', 'solbuild/postinstall')
     prototype.puts("i postinstall=./postinstall")
-    cp('postremove', 'solbuild/postremove')
+    cp('postremove.solaris', 'solbuild/postremove')
     prototype.puts("i postremove=./postremove")
     # The tail +2 removes the first line, which is the base directory
     # and doesn't need to be included in the package.
@@ -310,10 +282,10 @@ task :sysvpkgsparc do
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('opt', 'csw', 'lib', 'ruby', 'site_ruby', '1.8')
   mandir = File.join('usr', 'share', 'man')
-  etcdir = File.join('etc', 'etch')
+  etcdir = '/etc'
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
                   :mandir => mandir, :etcdir => etcdir,
-                  :ruby => '/usr/local/bin/ruby', :installbase => '/')
+                  :ruby => '/usr/local/bin/ruby')
   
   # Since we're using the Sunfreeware ruby but CSW libraries we need to add
   # the CSW ruby library directory to the search path
@@ -346,9 +318,9 @@ task :sysvpkgsparc do
     prototype.puts("i pkginfo=./pkginfo")
     cp('depend', 'solbuild/depend')
     prototype.puts("i depend=./depend")
-    cp('postinstall', 'solbuild/postinstall')
+    cp('postinstall.solaris', 'solbuild/postinstall')
     prototype.puts("i postinstall=./postinstall")
-    cp('postremove', 'solbuild/postremove')
+    cp('postremove.solaris', 'solbuild/postremove')
     prototype.puts("i postremove=./postremove")
     # The tail +2 removes the first line, which is the base directory
     # and doesn't need to be included in the package.
@@ -394,8 +366,7 @@ task :install, :destdir do |t, args|
                   :mandir => Config::CONFIG['mandir'],
                   :etcdir => Config::CONFIG['sysconfdir'],
                   # Can't find a better way to get the path to the current ruby
-                  :ruby => File.join(Config::CONFIG['bindir'], Config::CONFIG['ruby_install_name']),
-                  :installbase => '/')
+                  :ruby => File.join(Config::CONFIG['bindir'], Config::CONFIG['ruby_install_name']))
 end
 
 desc 'Fetch tarball from sourceforge'
@@ -437,10 +408,12 @@ task :gem do
   #
   
   rm_rf(BUILDROOT)
-  copy_etch_files(BUILDROOT)
+  copy_tpkg_files(BUILDROOT,
+                  :bindir => 'bin',
+                  :libdir => 'lib')
   
   #
-  # Prep gemspec
+  # Prep gemspec (renaming to Rakefile in the process)
   #
   File.open(File.join(BUILDROOT, 'Rakefile'), 'w') do |gemspec|
     IO.foreach('gemspec') do |line|
