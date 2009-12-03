@@ -4,10 +4,7 @@
 # Test etch's handling of node groups and the node group hierarchy
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchNodeGroupTests < Test::Unit::TestCase
   include EtchTests
@@ -20,7 +17,7 @@ class EtchNodeGroupTests < Test::Unit::TestCase
     # Generate a directory for our test repository
     #  Specify that the node should be put into 'testgroup' in nodes.xml
     @repodir = initialize_repository(['testgroup'])
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -54,7 +51,7 @@ class EtchNodeGroupTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -95,7 +92,7 @@ class EtchNodeGroupTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -136,7 +133,7 @@ echo "grouper_group2"
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -180,14 +177,13 @@ echo "grouper_group2"
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
 
     # Verify that the file wasn't modified
     assert_equal(oldsourcecontents, get_file_contents(@targetfile), testname)
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

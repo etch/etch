@@ -5,10 +5,7 @@
 # history files
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchHistoryTests < Test::Unit::TestCase
   include EtchTests
@@ -20,7 +17,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -64,7 +61,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial history test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(origcontents, get_file_contents(origfile), 'original backup of file')
     system("cd #{historydir} && co -q -f -r1.1 #{historyfile}")
@@ -87,7 +84,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running update test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(origcontents, get_file_contents(origfile), 'original backup of file unchanged')
     assert_equal(updatedsourcecontents, get_file_contents(historyfile), 'history log of file updated')
@@ -117,7 +114,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running revert test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'original contents reverted')
 
@@ -133,7 +130,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running revert test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(updatedorigcontents, get_file_contents(@targetfile), 'Updated original contents unchanged')
   end
@@ -181,7 +178,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history setup test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(origcontents + "\n", get_file_contents(origfile), 'original backup of file via setup')
     assert_equal(sourcecontents + origcontents + "\n", get_file_contents(@targetfile), 'contents using original backup of file via setup')
@@ -221,7 +218,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
     origcontents = "This is the original text for #{testname}"
@@ -250,7 +247,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     assert_equal(origcontents + "\n", get_file_contents(origfile), testname)
   end
@@ -292,7 +289,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history link test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(@destfile, File.readlink(origfile), 'original backup of link')
     system("cd #{historydir} && co -q -f -r1.1 #{historyfile}")
@@ -342,7 +339,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history directory test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert(File.directory?(origfile), 'original backup of directory')
     # Verify that etch backed up the original directory properly
@@ -393,7 +390,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history directory contents test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # In this case, because we converted a directory to something else the
     # original will be a tarball of the directory
@@ -404,7 +401,6 @@ class EtchHistoryTests < Test::Unit::TestCase
   end
 
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

@@ -4,10 +4,7 @@
 # Test etch's handling of attribute filtering in config.xml files
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 require 'rubygems'  # Might be needed to find facter
 require 'facter'
 
@@ -21,7 +18,7 @@ class EtchAttributeTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -63,7 +60,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -94,7 +91,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -139,7 +136,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -178,7 +175,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -209,7 +206,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -255,7 +252,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -294,7 +291,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -325,7 +322,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -364,7 +361,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -403,7 +400,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -434,7 +431,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -473,7 +470,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -514,7 +511,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -553,7 +550,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -589,7 +586,7 @@ class EtchAttributeTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -620,7 +617,7 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -628,7 +625,6 @@ class EtchAttributeTests < Test::Unit::TestCase
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

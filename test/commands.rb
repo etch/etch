@@ -4,10 +4,7 @@
 # Test etch's handling of configuration commands
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchCommandTests < Test::Unit::TestCase
   include EtchTests
@@ -19,7 +16,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -50,7 +47,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     assert_equal(testname, get_file_contents(@targetfile), testname)
@@ -82,7 +79,7 @@ class EtchCommandTests < Test::Unit::TestCase
     # The assertion here is handled by run_etch as we're passing it an
     # argument indicating that we expect failure.
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
   end
   
   def test_commands_guard_succeeds
@@ -111,7 +108,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was not touched
     assert_equal(testname, get_file_contents(@targetfile), testname)
@@ -149,7 +146,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that both steps ran and in the proper order
     assert_equal("firststep\nsecondstep\n", get_file_contents(@targetfile), testname)
@@ -194,7 +191,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that both commands ran, ordering doesn't matter
     assert_equal(['firstcmd', 'secondcmd'], get_file_contents(@targetfile).split("\n").sort, testname)
@@ -240,7 +237,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that both commands ran and in the proper order
     assert_equal("firstcmd\nsecondcmd\n", get_file_contents(@targetfile), testname)
@@ -294,7 +291,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the command-generated file and the regular file were created
     # properly
@@ -339,7 +336,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that only the desired step executed
     assert_equal("notingroup\n", get_file_contents(@targetfile), testname)
@@ -366,11 +363,10 @@ class EtchCommandTests < Test::Unit::TestCase
     # The assertion here is handled by run_etch as we're passing it an
     # argument indicating that we expect failure.
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

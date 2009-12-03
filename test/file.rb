@@ -4,10 +4,7 @@
 # Test etch's handling of creating and updating regular files
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchFileTests < Test::Unit::TestCase
   include EtchTests
@@ -19,7 +16,7 @@ class EtchFileTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -52,7 +49,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -89,7 +86,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -130,7 +127,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running different warning file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -167,7 +164,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running no warning file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'no warning file')
@@ -197,7 +194,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running different line comment test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -236,7 +233,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running comment open/close test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = "/*\n"
@@ -276,7 +273,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running warning on second line test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = sourcecontents_firstline
@@ -314,7 +311,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running no space around warning test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -347,7 +344,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file ownership and permissions test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file ownership got set correctly
     #  Most systems don't support give-away chown, so this test won't work
@@ -383,7 +380,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file ownership w/ bogus owner/group names"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the ownership defaulted to UID/GID 0
     #  Most systems don't support give-away chown, so this test won't work
@@ -419,7 +416,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running always_manage_metadata test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file permissions got set correctly
     perms = File.stat(@targetfile).mode & 07777
@@ -459,7 +456,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running duplicate plain instructions test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate plain instructions')
@@ -498,7 +495,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running contradictory plain instructions test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory plain instructions')
@@ -534,7 +531,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running duplicate template instructions test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate template instructions')
@@ -573,7 +570,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running contradictory template instructions test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory template instructions')
@@ -609,7 +606,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running duplicate script instructions test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate script instructions')
@@ -648,7 +645,7 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running contradictory script instructions test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory script instructions')
@@ -687,14 +684,13 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(specialtargetfile), testname)
   end
 
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

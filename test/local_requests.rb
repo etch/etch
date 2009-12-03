@@ -4,10 +4,7 @@
 # Test etch's handling of local requests
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchLocalRequestsTests < Test::Unit::TestCase
   include EtchTests
@@ -19,7 +16,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -71,7 +68,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -123,7 +120,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     # Our whitespace in the heredoc above gets added to the generated file, so
@@ -133,7 +130,6 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

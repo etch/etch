@@ -5,10 +5,7 @@
 # creation of links and directories, and control the deletion of files
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchScriptTests < Test::Unit::TestCase
   include EtchTests
@@ -20,7 +17,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
 
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -63,7 +60,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running script with syntax error test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with syntax error size comparison')
@@ -96,7 +93,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running script with no output"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with no output size comparison')
@@ -126,7 +123,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file script test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -167,7 +164,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file source script test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -207,7 +204,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file source script test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -243,7 +240,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link script test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the link was created properly
     assert_equal(@destfile, File.readlink(@targetfile), 'link script')
@@ -274,7 +271,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link script with no output"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_readlink, File.readlink(@targetfile), 'link script with no output readlink comparison')
@@ -301,7 +298,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running directory script test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the directory was created
     assert(File.directory?(@targetfile), 'directory script')
@@ -336,7 +333,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running directory script with no output"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'directory script with no output size comparison')
@@ -364,7 +361,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running delete script test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was removed
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'delete script')
@@ -401,7 +398,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running delete script with no output"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'delete script with no output size comparison')
@@ -409,7 +406,6 @@ class EtchScriptTests < Test::Unit::TestCase
   end
 
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

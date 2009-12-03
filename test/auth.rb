@@ -4,10 +4,7 @@
 # Test etch's handling of client authentication
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 require 'net/http'
 require 'rexml/document'
 require 'facter'
@@ -22,7 +19,10 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    # These tests set an etchserver.conf.  The server only reads that file
+    # once and caches the settings, so we need to start up new server
+    # instances for these tests rather than reusing the global test server.
+    @server = start_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -30,7 +30,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Make sure the server will initially think this is a new client
     hostname = Facter['fqdn'].value
-    Net::HTTP.start('localhost', @port) do |http|
+    Net::HTTP.start('localhost', @server[:port]) do |http|
       # Find our client id
       response = http.get("/clients.xml?name=#{hostname}")
       if !response.kind_of?(Net::HTTPSuccess)
@@ -84,7 +84,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -115,7 +115,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -154,7 +154,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch with the wrong key to force a bad signature
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, true, '--key=keys/testkey2')
+    run_etch(@server, @testbase, true, "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}")
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -200,7 +200,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -212,9 +212,9 @@ class EtchAuthTests < Test::Unit::TestCase
     puts "# Starting a second copy of the server and adding this client to the database"
     sleep 3
     repodir2 = initialize_repository
-    port2, pid2 = start_server(repodir2)
-    run_etch(port2, @testbase)
-    stop_server(pid2)
+    server2 = start_server(repodir2)
+    run_etch(server2, @testbase)
+    stop_server(server2)
     remove_repository(repodir2)
     
     #
@@ -243,14 +243,14 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
   end
   
   def teardown
-    stop_server(@pid)
+    stop_server(@server)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

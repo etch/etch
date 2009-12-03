@@ -4,10 +4,7 @@
 # Test command line options to etch client
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchOptionTests < Test::Unit::TestCase
   include EtchTests
@@ -19,7 +16,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -64,7 +61,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running killswitch test"
-    run_etch(@port, @testbase, true)
+    run_etch(@server, @testbase, true)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
   end
@@ -102,14 +99,14 @@ class EtchOptionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running --dry-run test"
-    run_etch(@port, @testbase, false, '--dry-run')
+    run_etch(@server, @testbase, false, '--dry-run')
 
     assert_equal(origcontents, get_file_contents(@targetfile), '--dry-run')
   end
   
   def test_help
     output = nil
-    IO.popen("ruby ../client/etch --help") do |pipe|
+    IO.popen("ruby #{CLIENTDIR}/etch --help") do |pipe|
       output = pipe.readlines
     end
     # Make sure at least something resembling help output is there
@@ -235,7 +232,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, false, "#{@targetfile} #{targetfile2} etchtest1 etchtest2")
+    run_etch(@server, @testbase, false, "#{@targetfile} #{targetfile2} etchtest1 etchtest2")
     
     # Verify that only the requested files were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' file 1')
@@ -322,7 +319,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, false, "#{@targetfile} #{targetfile2}")
+    run_etch(@server, @testbase, false, "#{@targetfile} #{targetfile2}")
     
     # Verify that all were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' filesonly file 1')
@@ -416,7 +413,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, false, "etchtest1 #{targetfile2}")
+    run_etch(@server, @testbase, false, "etchtest1 #{targetfile2}")
     
     # Verify that all were created
     assert_equal(origcontents + testname, get_file_contents(cmdtargetfile1), testname + ' cmdandfile cmd 1')
@@ -425,7 +422,6 @@ class EtchOptionTests < Test::Unit::TestCase
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

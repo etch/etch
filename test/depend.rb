@@ -4,10 +4,7 @@
 # Test etch's handling of dependencies
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchDependTests < Test::Unit::TestCase
   include EtchTests
@@ -21,7 +18,7 @@ class EtchDependTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -79,7 +76,7 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial dependency test"
-    run_etch(@port, @testbase, false)
+    run_etch(@server, @testbase, false)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'dependency file 1')
@@ -141,7 +138,7 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, false, @targetfile)
+    run_etch(@server, @testbase, false, @targetfile)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'single request dependency file 1')
@@ -205,7 +202,7 @@ class EtchDependTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase, true, @targetfile)
+    run_etch(@server, @testbase, true, @targetfile)
 
     # Verify that the files weren't modified
     assert_equal(origcontents, get_file_contents(@targetfile), 'circular dependency file 1')
@@ -259,7 +256,7 @@ class EtchDependTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Verify that the regular file and the command-generated file were created
     # properly
@@ -270,7 +267,6 @@ class EtchDependTests < Test::Unit::TestCase
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

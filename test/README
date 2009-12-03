@@ -1,6 +1,7 @@
-To execute all tests run alltests.rb
-
-You can also run the individual .rb test files to test specific areas.
+To execute all tests run "rake test".
+To execute the tests in a specific file run "rake test TEST=test/file.rb".
+To execute a specific test method run
+  "rake test TEST=test/file.rb TESTOPTS='--name=test_files'"
 
 To force a particular XML library set xmllib=libxml or xmllib=rexml in
 your environment before running the tests.

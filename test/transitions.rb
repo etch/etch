@@ -5,10 +5,7 @@
 # file, etc.)
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 
 class EtchTransitionTests < Test::Unit::TestCase
   include EtchTests
@@ -20,7 +17,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
 
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -61,7 +58,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file to link test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'file to link')
 
@@ -86,7 +83,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file to directory test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert(File.directory?(@targetfile), 'file to directory')
   end
@@ -121,7 +118,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link to file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link to file')
@@ -160,7 +157,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link w/ same contents to file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link w/ same contents to file')
@@ -186,7 +183,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link to directory test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert(File.directory?(@targetfile), 'link to directory')
   end
@@ -222,7 +219,7 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running directory to file test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'directory to file')
@@ -249,13 +246,12 @@ class EtchTransitionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running directory to link test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'directory to link')
   end
 
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)

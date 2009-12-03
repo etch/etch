@@ -4,13 +4,10 @@
 # Test output capturing
 #
 
-require 'test/unit'
-require 'etchtest'
-require 'tempfile'
-require 'fileutils'
+require File.join(File.dirname(__FILE__), 'etchtest')
 require 'timeout'
-$: << '../client'
-$: << '../server/lib'
+$: << EtchTests::CLIENTDIR
+$: << File.join(EtchTests::SERVERDIR, 'lib')
 require 'etchclient'
 
 class EtchOutputCaptureTests < Test::Unit::TestCase
@@ -23,7 +20,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
     # Generate a directory for our test repository
     @repodir = initialize_repository
-    @port, @pid = start_server(@repodir)
+    @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
@@ -69,13 +66,13 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@port, @testbase)
+    run_etch(@server, @testbase)
     
     # Fetch the latest result for this client from the server and verify that
     # it contains the output from the post command.
     hostname = Facter['fqdn'].value
     latest_result_message = ''
-    Net::HTTP.start('localhost', @port) do |http|
+    Net::HTTP.start('localhost', @server[:port]) do |http|
       response = http.get("/results.xml?clients.name=#{hostname}&sort=created_at_reverse")
       if !response.kind_of?(Net::HTTPSuccess)
         response.error!
@@ -125,7 +122,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
         # NOTE: This test is not normally run because the timeout is so long. 
         # Uncomment this run_etch line to run this test.
         #
-        #run_etch(@port, @testbase)
+        #run_etch(@server, @testbase)
       end
     rescue Timeout::Error
       flunk('output capturing did not time out as expected')
@@ -133,7 +130,6 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
   end
   
   def teardown
-    stop_server(@pid)
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
     FileUtils.rm_rf(@targetfile)
