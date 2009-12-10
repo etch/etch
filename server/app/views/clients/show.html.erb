@@ -58,7 +58,8 @@
 
 <p class="metadata">
   <strong>Created at:</strong> <%= h(@client.created_at) %><br />
-  <strong>Updated at:</strong> <%= h(@client.updated_at) %>
+  <strong>Updated at:</strong> <%= h(@client.updated_at) %><br />
+  <%= link_to 'Delete', client_path(@client), :confirm => 'Are you sure?', :method => :delete %></p>
 </p>
 
 </div> 
