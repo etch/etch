@@ -47,6 +47,12 @@ class ClientsController < ApplicationController
       elsif key == 'name_substring'
         conditions_query << "name LIKE ?"
         conditions_values << '%' + value + '%'
+      elsif key == 'updated_since'
+        conditions_query << "updated_at >= ?"
+        conditions_values << value.to_i.hours.ago
+      elsif key == 'not_updated_since'
+        conditions_query << "updated_at < ?"
+        conditions_values << value.to_i.hours.ago
       elsif allowed_queries.include?(key)
         conditions_query << "#{key} = ?"
         conditions_values << value
