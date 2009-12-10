@@ -1,5 +1,9 @@
 #!/usr/bin/ruby -w
 
+# The etch:dbclean rake task is a simpler way of accomplishing the same goal
+# as this script.  Consider this script an example of how to program against
+# the REST API.
+
 # This script can be used as a cron job to clean stale clients out of
 # the database.  It takes one required parameter, a number of hours.
 # Clients which have not checked in within that many hours will be
