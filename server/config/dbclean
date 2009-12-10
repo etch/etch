@@ -1,0 +1,106 @@
+#!/usr/bin/ruby -w
+
+# This script can be used as a cron job to clean stale clients out of
+# the database.  It takes one required parameter, a number of hours.
+# Clients which have not checked in within that many hours will be
+# deleted.  I.e. if run as "dbclean 168" then clients which haven't
+# updated in the last week (7 * 24 hours) will be deleted.
+
+require 'net/https'
+require 'rexml/document'
+require 'optparse'
+
+#
+# Parse the command line options
+#
+
+options = {}
+options[:server] = 'https://etch'
+
+opts = OptionParser.new(nil, 24, '  ')
+opts.banner = 'Usage: dbclean [options] hours'
+opts.on('--dry-run', '-n', 'Make no changes.') do |opt|
+  options[:dryrun] = opt
+end
+opts.on('--interactive', 'Prompt for confirmation before each change.') do |opt|
+  options[:interactive] = opt
+end
+opts.on('--server SERVER', 'Point to an alternate etch server.') do |opt|
+  options[:server] = opt
+end
+opts.on('--debug', 'Print lots of messages about what etch is doing.') do |opt|
+  options[:debug] = opt
+end
+opts.on_tail('-h', '--help', 'Show this message.') do
+  puts opts
+  exit
+end
+
+leftovers = opts.parse(ARGV)
+hours = leftovers.shift
+
+# Display a usage message if the user did not specify hours or specified
+# something that isn't numeric
+if !hours || hours.to_i == 0
+  puts opts
+  exit
+end
+
+# Make sure the server URL ends in a / so that we can append paths
+# to it using URI.join
+if options[:server] !~ %r{/$}
+  options[:server] << '/'
+end
+
+#
+# Do stuff
+#
+
+clientsuri = URI.join(options[:server], "clients.xml?not_updated_since=#{hours}")
+
+http = Net::HTTP.new(clientsuri.host, clientsuri.port)
+if clientsuri.scheme == "https"
+  # Eliminate the OpenSSL "using default DH parameters" warning
+  if File.exist?(File.join('etc', 'etch', 'dhparams'))
+    dh = OpenSSL::PKey::DH.new(IO.read(File.join('etc', 'etch', 'dhparams')))
+    Net::HTTP.ssl_context_accessor(:tmp_dh_callback)
+    http.tmp_dh_callback = proc { dh }
+  end
+  http.use_ssl = true
+  if File.exist?(File.join('etc', 'etch', 'ca.pem'))
+    http.ca_file = File.join('etc', 'etch', 'ca.pem')
+    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  elsif File.directory?(File.join('etc', 'etch', 'ca'))
+    http.ca_path = File.join('etc', 'etch', 'ca')
+    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  end
+end
+http.start
+
+puts "GET #{clientsuri}" if (options[:debug])
+response = http.get(clientsuri.request_uri)
+if !response.kind_of?(Net::HTTPSuccess)
+  $stderr.puts response.body
+  # error! raises an exception
+  response.error!
+end
+puts "Response from server:\n'#{response.body}'" if (options[:debug])
+if !response.body.nil? && !response.body.empty?
+  response_xml = REXML::Document.new(response.body)
+  response_xml.elements.each('/clients/client') do |client|
+    if options[:interactive]
+      # FIXME
+    end
+    clienturi = URI.join(options[:server], "clients/#{client.elements['id'].text}.xml")
+    puts "DELETE #{clienturi}" if (options[:debug])
+    if !options[:dryrun]
+      delresponse = http.delete(clienturi.request_uri)
+      if !delresponse.kind_of?(Net::HTTPSuccess)
+        $stderr.puts response.body
+        # error! raises an exception
+        response.error!
+      end
+    end
+  end
+end
+
