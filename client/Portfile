@@ -2,6 +2,7 @@
 # $Id$
 
 PortSystem          1.0
+PortGroup           ruby 1.0
 
 name                etch
 version             %VER%
@@ -29,15 +30,12 @@ checksums           md5     %MD5% \
                     rmd160  %RMD160%
 
 depends_build       port:rb-rake
-depends_run         port:ruby \
-                    port:facter
+depends_run         port:facter
 
-PortGroup           ruby 1.0
-
+worksrcdir          ${worksrcdir}/client
 use_configure       no
 build               {}
-test.run            no
-destroot.cmd        cd client && rake
+destroot.cmd        ${prefix}/bin/rake
 destroot.target     install\[${destroot}\]
-destroot.destdir    ""
+destroot.destdir
 
