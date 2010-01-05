@@ -8,8 +8,8 @@ require 'fileutils'
 
 module EtchTests
   # Roughly ../server and ../client
-  SERVERDIR = "#{File.dirname(File.dirname(__FILE__))}/server"
-  CLIENTDIR = "#{File.dirname(File.dirname(__FILE__))}/client"
+  SERVERDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/server"
+  CLIENTDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/client"
   
   # Haven't found a Ruby method for creating temporary directories,
   # so create a temporary file and replace it with a directory.
