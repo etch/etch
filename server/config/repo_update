@@ -3,13 +3,17 @@
 require 'fileutils'
 require 'tempfile'
 
-Dir.mkdir('/etc/etchserver') if !File.directory?('/etc/etchserver')
-Dir.mkdir('/etc/etchserver/orig') if !File.directory?('/etc/etchserver/orig')
+if !File.directory('/etc/etchserver/trunk')
+  abort "Please check out an etch config repo in /etc/etchserver/trunk"
+end
+
+FileUtils.mkdir_p('/etc/etchserver/orig')
 FileUtils.chown('nobody', nil, '/etc/etchserver/orig')
 Dir.chdir('/etc/etchserver')
 system('svn update --quiet')
 
 # Create hourly tag
+FileUtils.mkdir_p('/etc/etchserver/tags')
 currenttag = Time.now.strftime('etchautotag-%Y%m%d-%H00')
 tagdir = File.join('tags', currenttag)
 if !File.directory?(tagdir)
