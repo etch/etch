@@ -5,7 +5,7 @@ Release: 1
 Group: Applications/System
 License: MIT
 buildarch: noarch
-Requires: ruby, facter, rcs, crontabs
+Requires: ruby, facter, crontabs
 BuildRoot: %{_builddir}/%{name}-buildroot
 %description
 Etch client

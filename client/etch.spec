@@ -10,7 +10,7 @@ Source0:	http://downloads.sourceforge.net/project/etch/etch/%{version}/etch-%{ve
 BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires:	rubygem-rake
-Requires:	ruby(abi) = 1.8, facter, rcs
+Requires:	ruby(abi) = 1.8, facter
 
 # Per http://fedoraproject.org/wiki/Packaging:Ruby
 %{!?ruby_sitelib: %global ruby_sitelib %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')}
