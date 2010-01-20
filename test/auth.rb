@@ -193,7 +193,6 @@ class EtchAuthTests < Test::Unit::TestCase
     # Put some text into the original file so that we can make sure it
     # is not touched.
     origcontents = "This is the original text\n"
-    File.delete(@targetfile)
     File.open(@targetfile, 'w') do |file|
       file.write(origcontents)
     end
