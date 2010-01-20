@@ -9,6 +9,4 @@ Rake::TestTask.new do |t|
   end
   
   t.verbose = true
-  #t.pattern = 'test/*.rb'
-  t.test_files = Dir.glob('test/*.rb').reject {|test| test =~ /etchtest.rb/}
 end
