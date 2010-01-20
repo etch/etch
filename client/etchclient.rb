@@ -1771,7 +1771,9 @@ class Etch::Client
     newcurrent = current+'.new'
     if File.file?(file) && !File.symlink?(file)
       puts "Updating history log:  #{file} -> #{current}"
-      remove_file(newcurrent)
+      if File.exist?(newcurrent)
+        remove_file(newcurrent)
+      end
       FileUtils.copy(file, newcurrent) if (!@dryrun)
     else
       puts "Updating history log with 'ls -ld' output:  #{file} -> #{current}"
