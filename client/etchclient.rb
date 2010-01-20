@@ -403,7 +403,9 @@ class Etch::Client
       rescue Exception => e
         status = 1
         $stderr.puts e.message
+        message << e.message
         $stderr.puts e.backtrace.join("\n") if @debug
+        message << e.backtrace.join("\n") if @debug
       end  # begin/rescue
     end  # catch
     
@@ -540,8 +542,10 @@ class Etch::Client
         # original file.
         if config.elements['/config/revert']
           origpathbase = File.join(@origbase, file)
+          origpath = nil
 
           # Restore the original file if it is around
+          revert_occurred = false
           if File.exist?("#{origpathbase}.ORIG")
             origpath = "#{origpathbase}.ORIG"
             origdir = File.dirname(origpath)
@@ -553,10 +557,7 @@ class Etch::Client
 
             puts "Restoring #{origpath} to #{file}"
             recursive_copy_and_rename(origdir, origbase, file) if (!@dryrun)
-
-            # Now remove the backed-up original so that future runs
-            # don't do anything
-            remove_file(origpath) if (!@dryrun)
+            revert_occurred = true
           elsif File.exist?("#{origpathbase}.TAR")
             origpath = "#{origpathbase}.TAR"
             filedir = File.dirname(file)
@@ -566,19 +567,24 @@ class Etch::Client
 
             puts "Restoring #{file} from #{origpath}"
             system("cd #{filedir} && tar xf #{origpath}") if (!@dryrun)
-
-            # Now remove the backed-up original so that future runs
-            # don't do anything
-            remove_file(origpath) if (!@dryrun)
+            revert_occurred = true
           elsif File.exist?("#{origpathbase}.NOORIG")
             origpath = "#{origpathbase}.NOORIG"
             puts "Original #{file} didn't exist, restoring that state"
 
             # Remove anything we might have written out for this file
             remove_file(file) if (!@dryrun)
+            revert_occurred = true
+          end
 
-            # Now remove the backed-up original so that future runs
-            # don't do anything
+          # Update the history log
+          if revert_occurred
+            save_history(file)
+          end
+
+          # Now remove the backed-up original so that future runs
+          # don't do anything
+          if origpath
             remove_file(origpath) if (!@dryrun)
           end
 
@@ -1696,109 +1702,110 @@ class Etch::Client
 
     origpath
   end
-
+  
   # This subroutine maintains a revision history for the file in @historybase
   def save_history(file)
-    histpath = File.join(@historybase, "#{file}.HISTORY")
+    histdir = File.join(@historybase, "#{file}.HISTORY")
+    current = File.join(histdir, 'current')
+    
+    # Migrate old RCS history
+    if File.file?(histdir) && File.directory?(File.join(File.dirname(histdir), 'RCS'))
+      if !@dryrun
+        puts "Migrating old RCS history to new format"
+        rcsmax = nil
+        IO.popen("rlog #{histdir}") do |pipe|
+          pipe.each do |line|
+            if line =~ /^head: 1.(.*)/
+              rcsmax = $1.to_i
+              break
+            end
+          end
+        end
+        if !rcsmax
+          raise "Failed to parse RCS history rlog output"
+        end
+        tmphistdir = tempdir(histdir)
+        1.upto(rcsmax) do |rcsrev|
+          rcsrevcontents = `co -q -p1.#{rcsrev} #{histdir}`
+          # rcsrev-1 because RCS starts revisions at 1.1 and we start files
+          # at 0000
+          File.open(File.join(tmphistdir, sprintf('%04d', rcsrev-1)), 'w') do |rcsrevfile|
+            rcsrevfile.write(rcsrevcontents)
+          end
+        end
+        FileUtils.copy(histdir, File.join(tmphistdir, 'current'))
+        File.delete(histdir)
+        File.rename(tmphistdir, histdir)
+      end
+    end
 
     # Make sure the directory tree for this file exists in the
     # directory we save history in.
-    histdir = File.dirname(histpath)
-    if !File.directory?(histdir)
-      puts "Making directory tree #{histdir}"
+    if !File.exist?(histdir)
+      puts "Making history directory #{histdir}"
       FileUtils.mkpath(histdir) if (!@dryrun)
     end
-    # Make sure the corresponding RCS directory exists as well.
-    histrcsdir = File.join(histdir, 'RCS')
-    if !File.directory?(histrcsdir)
-      puts "Making directory tree #{histrcsdir}"
-      FileUtils.mkpath(histrcsdir) if (!@dryrun)
-    end
-
-    # If the history log doesn't exist and we didn't just create the
-    # original backup, that indicates that the original backup was made
-    # previously but the history log was not started at the same time.
-    # There are a variety of reasons why this might be the case (the
-    # original was saved by a previous version of etch that didn't have
-    # the history log feature, or the original was saved manually by
-    # someone) but whatever the reason is we want to use the original
-    # backup to start the history log before updating the history log
-    # with the current file.
-    if !File.exist?(histpath) && !@first_update[file]
+    
+    # If the history log doesn't exist and we didn't just create the original
+    # backup then that indicates that the original backup was made previously
+    # but the history log was not started at the same time. There are a
+    # variety of reasons why this might be the case (the most likely is that
+    # the original was saved manually by someone) but whatever the reason is
+    # we want to use the original backup to start the history log before
+    # updating the history log with the current file.
+    if !File.exist?(File.join(histdir, 'current')) && !@first_update[file]
       origpath = save_orig(file)
       if File.file?(origpath) && !File.symlink?(origpath)
         puts "Starting history log with saved original file:  " +
-          "#{origpath} -> #{histpath}"
-        FileUtils.copy(origpath, histpath) if (!@dryrun)
+             "#{origpath} -> #{current}"
+        FileUtils.copy(origpath, current) if (!@dryrun)
       else
         puts "Starting history log with 'ls -ld' output for " +
-          "saved original file:  #{origpath} -> #{histpath}"
-        system("ls -ld #{origpath} > #{histpath} 2>&1") if (!@dryrun)
-      end
-      # Check the newly created history file into RCS
-      histbase = File.basename(histpath)
-      puts "Checking initial history log into RCS:  #{histpath}"
-      if !@dryrun
-        # The -m flag shouldn't be needed, but it won't hurt
-        # anything and if something is out of sync and an RCS file
-        # already exists it will prevent ci from going interactive.
-        system(
-          "cd #{histdir} && " +
-          "ci -q -t-'Original of an etch modified file' " +
-          "-m'Update of an etch modified file' #{histbase} && " +
-          "co -q -r -kb #{histbase}")
+             "saved original file:  #{origpath} -> #{current}"
+        system("ls -ld #{origpath} > #{current} 2>&1") if (!@dryrun)
       end
       set_history_permissions(file)
     end
-  
-    # Copy current file
-
-    # If the file already exists in RCS we need to check out a locked
-    # copy before updating it
-    histbase = File.basename(histpath)
-    rcsstatus = false
-    if !@dryrun
-      rcsstatus = system("cd #{histdir} && rlog -R #{histbase} > /dev/null 2>&1")
-    end
-    if rcsstatus
-      # set_history_permissions may set the checked-out file
-      # writeable, which normally causes co to abort.  Thus the -f
-      # flag.
-      system("cd #{histdir} && co -q -l -f #{histbase}") if !@dryrun
-    end
-
+    
+    # Make temporary copy of file
+    newcurrent = current+'.new'
     if File.file?(file) && !File.symlink?(file)
-      puts "Updating history log:  #{file} -> #{histpath}"
-      FileUtils.copy(file, histpath) if (!@dryrun)
+      puts "Updating history log:  #{file} -> #{current}"
+      remove_file(newcurrent)
+      FileUtils.copy(file, newcurrent) if (!@dryrun)
     else
-      puts "Updating history log with 'ls -ld' output:  " +
-        "#{histpath}"
-      system("ls -ld #{file} > #{histpath} 2>&1") if (!@dryrun)
+      puts "Updating history log with 'ls -ld' output:  #{file} -> #{current}"
+      system("ls -ld #{file} > #{newcurrent} 2>&1") if (!@dryrun)
     end
-
-    # Check the history file into RCS
-    puts "Checking history log update into RCS:  #{histpath}"
-    if !@dryrun
-      # We only need one of the -t or -m flags depending on whether
-      # the history log already exists or not, rather than try to
-      # keep track of which one we need just specify both and let RCS
-      # pick the one it needs.
-      system(
-        "cd #{histdir} && " +
-        "ci -q -t-'Original of an etch modified file' " +
-        "-m'Update of an etch modified file' #{histbase} && " +
-        "co -q -r -kb #{histbase}")
+    
+    # Roll current to next XXXX if current != XXXX
+    if File.exist?(current)
+      nextfile = '0000'
+      maxfile = Dir.entries(histdir).select{|e|e=~/^\d+/}.max
+      if maxfile
+        if compare_file_contents(File.join(histdir, maxfile), File.read(current))
+          nextfile = nil
+        else
+          nextfile = sprintf('%04d', maxfile.to_i + 1)
+        end
+      end
+      if nextfile
+        File.rename(current, File.join(histdir, nextfile)) if (!@dryrun)
+      end
     end
-
+    
+    # Move temporary copy to current
+    File.rename(current+'.new', current) if (!@dryrun)
+    
     set_history_permissions(file)
   end
-
+  
   # Ensures that the history log file has appropriate permissions to avoid
   # leaking information.
   def set_history_permissions(file)
     origpath = File.join(@origbase, "#{file}.ORIG")
-    histpath = File.join(@historybase, "#{file}.HISTORY")
-
+    histdir = File.join(@historybase, "#{file}.HISTORY")
+    
     # We set the permissions to the more restrictive of the original
     # file permissions and the current file permissions.
     origperms = 0777
@@ -1813,17 +1820,15 @@ class Etch::Client
       # Mask off the file type
       fileperms = st.mode & 07777
     end
-
     histperms = origperms & fileperms
-
-    File.chmod(histperms, histpath) if (!@dryrun)
-
-    # Set the permissions on the RCS file too
-    histbase = File.basename(histpath)
-    histdir = File.dirname(histpath)
-    histrcsdir = "#{histdir}/RCS"
-    histrcspath = "#{histrcsdir}/#{histbase},v"
-    File.chmod(histperms, histrcspath) if (!@dryrun)
+    
+    if File.directory?(histdir)
+      Dir.foreach(histdir) do |histfile|
+        next if histfile == '.'
+        next if histfile == '..'
+        File.chmod(histperms, File.join(histdir, histfile)) if (!@dryrun)
+      end
+    end
   end
   
   def get_local_requests(file)
@@ -2202,8 +2207,10 @@ class Etch::Client
     # Note that cp -p will follow symlinks.  GNU cp has a -d option to
     # prevent that, but Solaris cp does not, so we resort to cpio.
     # GNU cpio has a --quiet option, but Solaris cpio does not.  Sigh.
+    # GNU find and cpio also have -print0/--null to handle filenames with
+    # spaces or special characters, but that's not standard either.
     system("cd #{sourcedir} && find #{sourcefile} | cpio -pdum #{destdir}") or
-      raise "Copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
+      raise "Recursive copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
   end
   def recursive_copy_and_rename(sourcedir, sourcefile, destname)
     tmpdir = tempdir(destname)
@@ -2211,7 +2218,17 @@ class Etch::Client
     File.rename(File.join(tmpdir, sourcefile), destname)
     Dir.delete(tmpdir)
   end
-
+  def nonrecursive_copy(sourcedir, sourcefile, destdir)
+    system("cd #{sourcedir} && echo #{sourcefile} | cpio -pdum #{destdir}") or
+      raise "Non-recursive copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
+  end
+  def nonrecursive_copy_and_rename(sourcedir, sourcefile, destname)
+    tmpdir = tempdir(destname)
+    nonrecursive_copy(sourcedir, sourcefile, tmpdir)
+    File.rename(File.join(tmpdir, sourcefile), destname)
+    Dir.delete(tmpdir)
+  end
+  
   def lock_file(file)
     lockpath = File.join(@lockbase, "#{file}.LOCK")
 

@@ -22,16 +22,15 @@ class EtchHistoryTests < Test::Unit::TestCase
     # Create a directory to use as a working directory for the client
     @testbase = tempdir
     #puts "Using #{@testbase} as client working directory"
+    
+    @origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
+    @historydir = File.join(@testbase, 'history', "#{@targetfile}.HISTORY")
   end
   
   def test_history
     #
     # Ensure original file is backed up and history log started
     #
-
-    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
-    historyfile = File.join(@testbase, 'history', "#{@targetfile}.HISTORY")
-    historydir = File.dirname(historyfile)
 
     # Put some text into the original file so that we can make sure it was
     # properly backed up.
@@ -63,15 +62,9 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running initial history test"
     run_etch(@server, @testbase)
 
-    assert_equal(origcontents, get_file_contents(origfile), 'original backup of file')
-    system("cd #{historydir} && co -q -f -r1.1 #{historyfile}")
-    #system("ls -l #{historyfile}")
-    assert_equal(origcontents, get_file_contents(historyfile), 'history log started in rcs')
-    system("cd #{historydir} && co -q -f #{historyfile}")
-    #system("ls -l #{historyfile}")
-    assert_equal(sourcecontents, get_file_contents(historyfile), 'history log of file started and updated')
-    rcsexit = system("cd #{historydir} && rlog -h #{historyfile} | grep '^head: 1.2'")
-    assert(rcsexit, 'history log started and updated in rcs')
+    assert_equal(origcontents, get_file_contents(@origfile), 'original backup of file')
+    assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
+    assert_equal(sourcecontents, get_file_contents(File.join(@historydir, 'current')), 'current history file')
 
     #
     # Ensure history log is updated and original file does not change
@@ -86,10 +79,10 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running update test"
     run_etch(@server, @testbase)
 
-    assert_equal(origcontents, get_file_contents(origfile), 'original backup of file unchanged')
-    assert_equal(updatedsourcecontents, get_file_contents(historyfile), 'history log of file updated')
-    rcsexit = system("cd #{historydir} && rlog -h #{historyfile} | grep '^head: 1.3'")
-    assert(rcsexit, 'history log updated in rcs')
+    assert_equal(origcontents, get_file_contents(@origfile), 'original backup of file unchanged')
+    assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
+    assert_equal(sourcecontents, get_file_contents(File.join(@historydir, '0001')), '0001 history file')
+    assert_equal(updatedsourcecontents, get_file_contents(File.join(@historydir, 'current')), 'updated current history file')
 
     #
     # Test revert feature
@@ -117,6 +110,11 @@ class EtchHistoryTests < Test::Unit::TestCase
     run_etch(@server, @testbase)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'original contents reverted')
+    assert(!File.exist?(@origfile), 'reverted original file')
+    assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
+    assert_equal(sourcecontents, get_file_contents(File.join(@historydir, '0001')), '0001 history file')
+    assert_equal(updatedsourcecontents, get_file_contents(File.join(@historydir, '0002')), '0002 history file')
+    assert_equal(origcontents, get_file_contents(File.join(@historydir, 'current')), 'reverted current history file')
 
     #
     # Update the contents of a reverted file and make sure etch doesn't
@@ -133,6 +131,8 @@ class EtchHistoryTests < Test::Unit::TestCase
     run_etch(@server, @testbase)
 
     assert_equal(updatedorigcontents, get_file_contents(@targetfile), 'Updated original contents unchanged')
+    assert(!File.exist?(@origfile), 'reverted original file')
+    assert_equal(origcontents, get_file_contents(File.join(@historydir, 'current')), 'Updated reverted current history file')
   end
   
   def test_history_setup
@@ -150,7 +150,6 @@ class EtchHistoryTests < Test::Unit::TestCase
     # original contents.
     #
     
-    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
     origcontents = "This is the original text"
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
@@ -180,7 +179,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running history setup test"
     run_etch(@server, @testbase)
 
-    assert_equal(origcontents + "\n", get_file_contents(origfile), 'original backup of file via setup')
+    assert_equal(origcontents + "\n", get_file_contents(@origfile), 'original backup of file via setup')
     assert_equal(sourcecontents + origcontents + "\n", get_file_contents(@targetfile), 'contents using original backup of file via setup')
   end
   
@@ -220,7 +219,6 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running '#{testname}' test"
     run_etch(@server, @testbase)
     
-    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
     origcontents = "This is the original text for #{testname}"
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
@@ -249,17 +247,13 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running '#{testname}' test"
     run_etch(@server, @testbase)
     
-    assert_equal(origcontents + "\n", get_file_contents(origfile), testname)
+    assert_equal(origcontents + "\n", get_file_contents(@origfile), testname)
   end
   
   def test_history_link
     #
     # Ensure original file is backed up when it is a link
     #
-
-    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
-    historyfile = File.join(@testbase, 'history', "#{@targetfile}.HISTORY")
-    historydir = File.dirname(historyfile)
 
     # Generate another file to use as our link target
     @destfile = Tempfile.new('etchtest').path
@@ -291,19 +285,14 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running history link test"
     run_etch(@server, @testbase)
 
-    assert_equal(@destfile, File.readlink(origfile), 'original backup of link')
-    system("cd #{historydir} && co -q -f -r1.1 #{historyfile}")
-    assert_match("#{@targetfile} -> #{@destfile}", get_file_contents(historyfile), 'history backup of link')
+    assert_equal(@destfile, File.readlink(@origfile), 'original backup of link')
+    assert_match("#{@targetfile} -> #{@destfile}", get_file_contents(File.join(@historydir, '0000')), '0000 history file of link')
   end
 
   def test_history_directory
     #
     # Ensure original file is backed up when it is a directory
     #
-
-    origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
-    historyfile = File.join(@testbase, 'history', "#{@targetfile}.HISTORY")
-    historydir = File.dirname(historyfile)
 
     # Make the original target a directory
     File.delete(@targetfile)
@@ -341,14 +330,14 @@ class EtchHistoryTests < Test::Unit::TestCase
     #puts "Running history directory test"
     run_etch(@server, @testbase)
 
-    assert(File.directory?(origfile), 'original backup of directory')
+    assert(File.directory?(@origfile), 'original backup of directory')
     # Verify that etch backed up the original directory properly
-    assert_equal(before_uid, File.stat(origfile).uid, 'original directory uid')
-    assert_equal(before_gid, File.stat(origfile).gid, 'original directory gid')
-    assert_equal(before_mode, File.stat(origfile).mode, 'original directory mode')
+    assert_equal(before_uid, File.stat(@origfile).uid, 'original directory uid')
+    assert_equal(before_gid, File.stat(@origfile).gid, 'original directory gid')
+    assert_equal(before_mode, File.stat(@origfile).mode, 'original directory mode')
     # Check that the history log looks reasonable, it should contain an
     # 'ls -ld' of the directory
-    assert_match(" #{@targetfile}", get_file_contents(historyfile), 'history backup of directory')
+    assert_match(" #{@targetfile}", get_file_contents(File.join(@historydir, '0000')), '0000 history file of directory')
   end
 
   def test_history_directory_contents
@@ -358,10 +347,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     # differently in that case
     #
 
-    #origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
-    origfile = File.join(@testbase, 'orig', "#{@targetfile}.TAR")
-    historyfile = File.join(@testbase, 'history', "#{@targetfile}.HISTORY")
-    historydir = File.dirname(historyfile)
+    origtarfile = File.join(@testbase, 'orig', "#{@targetfile}.TAR")
 
     # Make the original target a directory
     File.delete(@targetfile)
@@ -394,12 +380,78 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # In this case, because we converted a directory to something else the
     # original will be a tarball of the directory
-    assert(File.file?(origfile), 'original backup of directory converted to file')
+    assert(File.file?(origtarfile), 'original backup of directory converted to file')
     # The tarball should have two entries, the directory and the 'testfile'
     # we put inside it
-    assert_equal('2', `tar tf #{origfile} | wc -l`.chomp.strip, 'original backup of directory contents')
+    assert_equal('2', `tar tf #{origtarfile} | wc -l`.chomp.strip, 'original backup of directory contents')
   end
-
+  
+  def test_history_conversion
+    #
+    # Test the conversion of old RCS history logs to the new format
+    #
+    
+    # Mock up an original file and RCS history log
+    mockorigcontents = "This is the original text\n"
+    FileUtils.mkdir_p(File.dirname(@origfile))
+    File.open(@origfile, 'w') do |file|
+      file.write(mockorigcontents)
+    end
+    historyparent = File.dirname(@historydir)
+    FileUtils.mkdir_p(historyparent)
+    File.open(@historydir, 'w') do |file|
+      file.write(mockorigcontents)
+    end
+    histrcsdir = File.join(historyparent, 'RCS')
+    FileUtils.mkdir_p(histrcsdir)
+    histbase = File.basename(@historydir)
+    system(
+      "cd #{historyparent} && " +
+      "ci -q -t-'Original of an etch modified file' " +
+      "-m'Update of an etch modified file' #{histbase} && " +
+      "co -q -r -kb #{histbase}")
+    mocksourcecontents = "This is the contents in the RCS history log\n"
+    system("cd #{historyparent} && co -q -l #{histbase}")
+    File.open(@historydir, 'w') do |file|
+      file.write(mocksourcecontents)
+    end
+    system(
+      "cd #{historyparent} && " +
+      "ci -q -t-'Original of an etch modified file' " +
+      "-m'Update of an etch modified file' #{histbase} && " +
+      "co -q -r -kb #{histbase}")
+    File.open(@targetfile, 'w') do |file|
+      file.write(mocksourcecontents)
+    end
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Run etch
+    #puts "Running history conversion test"
+    run_etch(@server, @testbase)
+    
+    assert_equal(mockorigcontents,   get_file_contents(File.join(@historydir, '0000')), 'RCS conv 0000 history file')
+    assert_equal(mocksourcecontents, get_file_contents(File.join(@historydir, '0001')), 'RCS conv 0001 history file')
+    assert_equal(sourcecontents,     get_file_contents(File.join(@historydir, 'current')),  'RCS conv current history file')
+  end
+  
   def teardown
     remove_repository(@repodir)
     FileUtils.rm_rf(@testbase)
