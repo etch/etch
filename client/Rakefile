@@ -51,8 +51,8 @@ def copy_etch_files(destdir, options={})
     
     # Substitute ETCHVER into etchclient.rb
     # Substitute proper path into CONFIGDIR in etchclient.rb if appropriate
-    File.open(File.join(libdir, 'etchclient.rb.new'), 'w') do |newfile|
-      IO.foreach(File.join(libdir, 'etchclient.rb')) do |line|
+    File.open(File.join(libdir, 'etchclient.rb'), 'w') do |newfile|
+      IO.foreach('etchclient.rb') do |line|
         if line =~ /^\s*VERSION/
           line.sub!(/=.*/, "= '#{ETCHVER}'")
         end
@@ -408,7 +408,7 @@ task :gem do
   #
   
   rm_rf(BUILDROOT)
-  copy_tpkg_files(BUILDROOT,
+  copy_etch_files(BUILDROOT,
                   :bindir => 'bin',
                   :libdir => 'lib')
   
