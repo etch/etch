@@ -137,6 +137,7 @@ task :rpm do
     line.sub!('%VER%', ETCHVER)
     spec.puts(line)
   end
+  spec.close
   
   #
   # Build the package
