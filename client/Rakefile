@@ -57,7 +57,7 @@ def copy_etch_files(destdir, options={})
           line.sub!(/=.*/, "= '#{ETCHVER}'")
         end
         if options[:etcdir] && line =~ /^\s*CONFIGDIR/
-          line.sub!(/=.*/, "= #{options[:etcdir]}")
+          line.sub!(/=.*/, "= '#{options[:etcdir]}'")
         end
         newfile.write(line)
       end
