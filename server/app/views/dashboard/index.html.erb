@@ -18,9 +18,8 @@
   </tbody>
 </table>
 
-<script type="text/javascript" src="/javascripts/swfobject.js"></script>
-<%= @status_graph %>
-<%= @client_graph %>
+<%= render :partial => "status_chart" %>
+<%= render :partial => "client_chart" %>
 
 </div> <!-- end dashboard_body -->
 

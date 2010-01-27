@@ -348,5 +348,20 @@ table.network_summary caption
 
 #loginbox p { text-align: right; }
 
+#status_chart
+{
+  /* Center this chart */
+  margin-left: auto;
+  margin-right: auto;
+  /* The chart is defined as 300px wide when created in the dashboard controller */
+  width: 300px;
+}
+#client_chart
+{
+  margin-left: auto;
+  margin-right: auto;
+  width: 500px;
+}
+
 /* Hide all HRs, they are only meant for print, or non CSS browsers */
 hr { display: none; }
