@@ -3,7 +3,7 @@
 require 'fileutils'
 require 'tempfile'
 
-if !File.directory('/etc/etchserver/trunk')
+if !File.directory?('/etc/etchserver/trunk')
   abort "Please check out an etch config repo in /etc/etchserver/trunk"
 end
 
