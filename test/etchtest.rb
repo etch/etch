@@ -71,13 +71,15 @@ module EtchTests
   def start_server(repo='no_repo_yet')
     # We want the running server's notion of the server base to be a symlink
     # that we can easily change later in swap_repository.
-    serverbase = Tempfile.new('etchtest').path
-    File.delete(serverbase)
+    serverbasefile = Tempfile.new('etchtest')
+    serverbase = serverbasefile.path
+    serverbasefile.close!
     File.symlink(repo, serverbase)
     ENV['etchserverbase'] = serverbase
     # Pick a random port in the 3001-6000 range (range somewhat randomly chosen)
     port = 3001 + rand(3000)
     if pid = fork
+      # FIXME: replace this with a check that the server has started
       puts "Giving the server some time to start up"
       sleep(5)
     else
