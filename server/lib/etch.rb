@@ -266,7 +266,7 @@ class Etch
     begin
       configfilter!(Etch.xmlroot(config_xml))
     rescue Exception => e
-      raise e.exception("Error filtering config.xml for #{file}:\n" + e.message)
+      raise Etch.wrap_exception(e, "Error filtering config.xml for #{file}:\n" + e.message)
     end
     
     # Validate the filtered file against config.dtd
@@ -842,7 +842,7 @@ class Etch
     begin
       configfilter!(Etch.xmlroot(commands_xml))
     rescue Exception => e
-      raise e.exception("Error filtering commands.xml for #{command}:\n" + e.message)
+      raise Etch.wrap_exception(e, "Error filtering commands.xml for #{command}:\n" + e.message)
     end
     
     # Validate the filtered file against commands.dtd
@@ -911,12 +911,12 @@ class Etch
           raise "Inconsistent command 'exec' entries for #{command}: " +
             command_exec_elements.collect {|elem| Etch.xmltext(elem)}.join(',')
         end
-	# If filtering has removed both the guard and command elements
-	# we can remove this step.
+        # If filtering has removed both the guard and command elements
+        # we can remove this step.
         if guard_exec_elements.empty? && command_exec_elements.empty?
           remove << step
-	# If filtering has removed the guard but not the command or vice
-	# versa that's an error.
+        # If filtering has removed the guard but not the command or vice
+        # versa that's an error.
         elsif guard_exec_elements.empty?
           raise "Filtering removed guard, but left command: " +
             Etch.xmltext(command_exec_elements.first)
@@ -1328,6 +1328,16 @@ class Etch
       raise "Unknown @xmllib #{@xmllib}"
     end
   end
+  
+  # Used where we wish to capture an exception and modify the message.  This
+  # method returns a new exception with desired message but with the backtrace
+  # from the original exception so that the backtrace info is not lost.  This
+  # is necessary because Exception lacks a set_message method.
+  def self.wrap_exception(e, message)
+    eprime = e.exception(message)
+    eprime.set_backtrace(e.backtrace)
+    eprime
+  end
 end
 
 class EtchExternalSource
@@ -1363,7 +1373,7 @@ class EtchExternalSource
     rescue Exception => e
       # Help the user figure out where the exception occurred, otherwise they
       # just get told it happened here, which isn't very helpful.
-      raise e.exception("Exception while processing template #{template} for file #{@file}:\n" + e.message)
+      raise Etch.wrap_exception(e, "Exception while processing template #{template} for file #{@file}:\n" + e.message)
     end
   end
 
@@ -1382,7 +1392,7 @@ class EtchExternalSource
       else
         # Help the user figure out where the exception occurred, otherwise they
         # just get told it happened here in eval, which isn't very helpful.
-        raise e.exception("Exception while processing script #{script} for file #{@file}:\n" + e.message)
+        raise Etch.wrap_exception(e, "Exception while processing script #{script} for file #{@file}:\n" + e.message)
       end
     end
     @contents
