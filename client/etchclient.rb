@@ -53,7 +53,7 @@ class Etch::Client
     @server = options[:server] ? options[:server] : 'https://etch'
     @tag = options[:tag]
     @varbase = options[:varbase] ? options[:varbase] : '/var/etch'
-    @local = File.expand_path(options[:local])
+    @local = options[:local] ? File.expand_path(options[:local]) : nil
     @debug = options[:debug]
     @dryrun = options[:dryrun]
     @interactive = options[:interactive]
