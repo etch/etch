@@ -11,7 +11,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
   def setup
     # Generate a file to use as our etch target/destination
-    @targetfile = Tempfile.new('etchtest').path
+    @targetfile = released_tempfile
     #puts "Using #{@targetfile} as target file"
     
     # Generate a directory for our test repository
@@ -23,7 +23,7 @@ class EtchDeleteTests < Test::Unit::TestCase
     #puts "Using #{@testbase} as client working directory"
 
     # Generate another file to use as our link target
-    @destfile = Tempfile.new('etchtest').path
+    @destfile = released_tempfile
     #puts "Using #{@destfile} as link destination file"
   end
   

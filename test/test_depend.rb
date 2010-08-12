@@ -11,9 +11,9 @@ class EtchDependTests < Test::Unit::TestCase
 
   def setup
     # Generate a couple of files to use as our etch target/destinations
-    @targetfile = Tempfile.new('etchtest').path
+    @targetfile = released_tempfile
     #puts "Using #{@targetfile} as target file"
-    @targetfile2 = Tempfile.new('etchtest').path
+    @targetfile2 = released_tempfile
     #puts "Using #{@targetfile2} as 2nd target file"
     
     # Generate a directory for our test repository

@@ -12,7 +12,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
   def setup
     # Generate a file to use as our etch target/destination
-    @targetfile = Tempfile.new('etchtest').path
+    @targetfile = released_tempfile
     #puts "Using #{@targetfile} as target file"
     
     # Delete the target file so that we're starting with nothing.  Creating
@@ -28,8 +28,8 @@ class EtchLinkTests < Test::Unit::TestCase
     #puts "Using #{@testbase} as client working directory"
     
     # Generate a couple more files to use as our link targets
-    @destfile = Tempfile.new('etchtest').path
-    @destfile2 = Tempfile.new('etchtest').path
+    @destfile = released_tempfile
+    @destfile2 = released_tempfile
     #puts "Using #{@destfile} as link destination file"
   end
   

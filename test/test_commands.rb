@@ -11,7 +11,7 @@ class EtchCommandTests < Test::Unit::TestCase
   
   def setup
     # Generate a file to use as a target in commands
-    @targetfile = Tempfile.new('etchtest').path
+    @targetfile = released_tempfile
     #puts "Using #{@targetfile} as target file"
     
     # Generate a directory for our test repository
@@ -249,7 +249,7 @@ class EtchCommandTests < Test::Unit::TestCase
     #
     testname = 'command with file dependency'
     
-    targetfile2 = Tempfile.new('etchtest').path
+    targetfile2 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/source/#{targetfile2}")
     File.open("#{@repodir}/source/#{targetfile2}/config.xml", 'w') do |file|
       file.puts <<-EOF

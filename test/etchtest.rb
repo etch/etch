@@ -11,12 +11,32 @@ module EtchTests
   SERVERDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/server"
   CLIENTDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/client"
   
+  # Creates a temporary file via Tempfile, capture the filename, tell Tempfile
+  # to clean up, then return the path.  This gives the caller a filename that
+  # they should be able to write to, that was recently unused and unique, and
+  # that Tempfile won't try to clean up later.  This can be useful when the
+  # caller might want a path to use for symlinks, directories, etc. where
+  # Tempfile might choke trying to clean up what it expects to be a plain
+  # file.
+  def deleted_tempfile
+    tmpfile = Tempfile.new('etchtest')
+    tmppath = tmpfile.path
+    tmpfile.close!
+    tmppath
+  end
+  # Creates a file via Tempfile but then arranges for Tempfile to release it
+  # so that the caller doesn't have to worry about Tempfile cleaning it up
+  # later at an inopportune time.  It is up to the caller to ensure the file
+  # is cleaned up.
+  def released_tempfile
+    tmppath = deleted_tempfile
+    File.open(tmppath, 'w') {|file|}
+    tmppath
+  end
   # Haven't found a Ruby method for creating temporary directories,
   # so create a temporary file and replace it with a directory.
   def tempdir
-    tmpfile = Tempfile.new('etchtest')
-    tmpdir = tmpfile.path
-    tmpfile.close!
+    tmpdir = deleted_tempfile
     Dir.mkdir(tmpdir)
     tmpdir
   end

@@ -11,7 +11,7 @@ class EtchActionTests < Test::Unit::TestCase
 
   def setup
     # Generate a file to use as our etch target/destination
-    @targetfile = Tempfile.new('etchtest').path
+    @targetfile = released_tempfile
     #puts "Using #{@targetfile} as target file"
     
     # Generate a directory for our test repository
@@ -23,7 +23,7 @@ class EtchActionTests < Test::Unit::TestCase
     #puts "Using #{@testbase} as client working directory"
     
     # Generate another file to use as our link target
-    @destfile = Tempfile.new('etchtest').path
+    @destfile = released_tempfile
     #puts "Using #{@destfile} as link destination file"
   end
   
@@ -345,8 +345,7 @@ class EtchActionTests < Test::Unit::TestCase
     # that /etc/foo exist first.
     #
     
-    nestedtargetdir = Tempfile.new('etchtest').path
-    File.delete(nestedtargetdir)
+    nestedtargetdir = deleted_tempfile
     nestedtargetfile = File.join(nestedtargetdir, 'etchnestedtest')
     
     FileUtils.mkdir_p("#{@repodir}/source/#{nestedtargetfile}")
@@ -377,6 +376,8 @@ class EtchActionTests < Test::Unit::TestCase
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(nestedtargetfile), 'nested target with test')
+    
+    FileUtils.rm_rf(nestedtargetdir)
   end
   
   def test_action_with_xml_escape

@@ -11,7 +11,7 @@ class EtchOptionTests < Test::Unit::TestCase
 
   def setup
     # Generate a file to use as our etch target/destination
-    @targetfile = Tempfile.new('etchtest').path
+    @targetfile = released_tempfile
     #puts "Using #{@targetfile} as target file"
     
     # Generate a directory for our test repository
@@ -136,7 +136,7 @@ class EtchOptionTests < Test::Unit::TestCase
         </config>
       EOF
     end
-    targetfile2 = Tempfile.new('etchtest').path
+    targetfile2 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/source/#{targetfile2}")
     File.open("#{@repodir}/source/#{targetfile2}/config.xml", 'w') do |file|
       file.puts <<-EOF
@@ -150,7 +150,7 @@ class EtchOptionTests < Test::Unit::TestCase
         </config>
       EOF
     end
-    targetfile3 = Tempfile.new('etchtest').path
+    targetfile3 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/source/#{targetfile3}")
     File.open("#{@repodir}/source/#{targetfile3}/config.xml", 'w') do |file|
       file.puts <<-EOF
@@ -172,7 +172,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    cmdtargetfile1 = Tempfile.new('etchtest').path
+    cmdtargetfile1 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/commands/etchtest1")
     File.open("#{@repodir}/commands/etchtest1/commands.xml", 'w') do |file|
       file.puts <<-EOF
@@ -188,7 +188,7 @@ class EtchOptionTests < Test::Unit::TestCase
         </commands>
       EOF
     end
-    cmdtargetfile2 = Tempfile.new('etchtest').path
+    cmdtargetfile2 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/commands/etchtest2")
     File.open("#{@repodir}/commands/etchtest2/commands.xml", 'w') do |file|
       file.puts <<-EOF
@@ -204,7 +204,7 @@ class EtchOptionTests < Test::Unit::TestCase
         </commands>
       EOF
     end
-    cmdtargetfile3 = Tempfile.new('etchtest').path
+    cmdtargetfile3 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/commands/etchtest3")
     File.open("#{@repodir}/commands/etchtest3/commands.xml", 'w') do |file|
       file.puts <<-EOF
@@ -266,8 +266,8 @@ class EtchOptionTests < Test::Unit::TestCase
     #
     testname = 'command line file requests with depends'
     
-    targetfile2 = Tempfile.new('etchtest').path
-    targetfile3 = Tempfile.new('etchtest').path
+    targetfile2 = released_tempfile
+    targetfile3 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
@@ -333,8 +333,8 @@ class EtchOptionTests < Test::Unit::TestCase
     #
     testname = 'mixed command line requests with depends'
     
-    targetfile2 = Tempfile.new('etchtest').path
-    targetfile3 = Tempfile.new('etchtest').path
+    targetfile2 = released_tempfile
+    targetfile3 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
@@ -384,7 +384,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    cmdtargetfile1 = Tempfile.new('etchtest').path
+    cmdtargetfile1 = released_tempfile
     FileUtils.mkdir_p("#{@repodir}/commands/etchtest1")
     File.open("#{@repodir}/commands/etchtest1/commands.xml", 'w') do |file|
       file.puts <<-EOF
