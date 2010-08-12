@@ -7,7 +7,14 @@
 require File.join(File.dirname(__FILE__), 'etchtest')
 require 'net/http'
 require 'rexml/document'
-require 'facter'
+begin
+  # Try loading facter w/o gems first so that we don't introduce a
+  # dependency on gems if it is not needed.
+  require 'facter'    # Facter
+rescue LoadError
+  require 'rubygems'
+  require 'facter'
+end
 
 class EtchAuthTests < Test::Unit::TestCase
   include EtchTests
