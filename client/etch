@@ -16,6 +16,9 @@ require 'etchclient'
 options = {}
 @generateall = nil
 
+# Extra options to OptionParser reduce the amount of whitespace it introduces
+# into the help message, making it easier to make the help message fit in a
+# 80x24 window.
 opts = OptionParser.new(nil, 24, '  ')
 opts.banner = 'Usage: etch [options] [/path/to/config/file | command] [otherfile ...]'
 opts.on('--generate-all', 'Request all configuration.') do |opt|
