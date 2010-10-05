@@ -5,6 +5,7 @@
 #
 
 require File.join(File.dirname(__FILE__), 'etchtest')
+require 'webrick'
 
 class EtchOptionTests < Test::Unit::TestCase
   include EtchTests
@@ -419,6 +420,87 @@ class EtchOptionTests < Test::Unit::TestCase
     assert_equal(origcontents + testname, get_file_contents(cmdtargetfile1), testname + ' cmdandfile cmd 1')
     assert_equal(sourcecontents, get_file_contents(targetfile2), testname + ' cmdandfile file 2')
     assert_equal(sourcecontents, get_file_contents(targetfile3), testname + ' cmdandfile file 3')
+  end
+  
+  def test_redirects
+    #
+    # Test that we do not follow HTTP redirects
+    #
+    testname = 'do not follow redirects by default'
+    
+    # Put some text into the original file so that we can make sure it is
+    # not touched.
+    origcontents = "This is the original text\n"
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Set up a web server which redirects to the test server
+    redirect_port = 3500
+    server = WEBrick::HTTPServer.new(:Port => redirect_port)
+    # Trap signals to invoke the shutdown procedure cleanly
+    ['INT', 'TERM'].each do |signal|
+       trap(signal){ server.shutdown }
+    end
+    server.mount_proc("/") do |request, response|
+      # Oddly request.request_uri is a URI::HTTP object, so you have to call
+      # the request_uri method on it to get the actual request uri
+      response.set_redirect(
+        WEBrick::HTTPStatus::Found,
+        URI.join("http://localhost:#{@server[:port]}/", request.request_uri.request_uri))
+    end
+    t = Thread.new { server.start }
+    # Give webrick time to start
+    sleep(5)
+    
+    # Test that we don't follow redirects by default
+    run_etch(@server, @testbase, true, '', redirect_port)
+    assert_equal(origcontents, get_file_contents(@targetfile), testname)
+    
+    # Check that we do follow redirects with the appropriate option
+    # NOTE:  Due to lack of need/demand we have not yet implemented an option
+    #        to follow redirects
+    # testname = 'follow redirects with --follow-redirects'
+    # run_etch(@server, @testbase, false, '--follow-redirects', redirect_port)
+    # assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+    
+    # Test redirect with valid SSL
+    
+    # Test redirect where the first server has an invalid SSL cert but
+    # redirects to a server with an valid cert
+    
+    # Test redirect where the first server has a valid SSL cert but
+    # redirects to a server with an invalid cert
+    
+    # Test that we don't follow infinite redirects
+    testname = 'infinite redirects'
+    server.mount_proc("/") do |request, response|
+      response.set_redirect(
+        WEBrick::HTTPStatus::Found, "http://localhost:#{redirect_port}/")
+    end
+    run_etch(@server, @testbase, true, '', redirect_port)
+    
+    server.shutdown
+    t.kill
   end
   
   def teardown
