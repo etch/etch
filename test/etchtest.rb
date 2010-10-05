@@ -74,6 +74,11 @@ module EtchTests
   def get_server(newrepo=nil)
     if !@@server
       @@server = start_server
+      # FIXME: This doesn't get called for some reason, I suspect TestTask or
+      # Test::Unit are interfering since they probably also use trap to
+      # implement their magic.  As a result we end up leaving the server
+      # running in the background.
+      trap("EXIT") { stop_server(@@server) }
     end
     if newrepo
       swap_repository(@@server, newrepo)
@@ -117,8 +122,11 @@ module EtchTests
     Process.waitpid(server[:pid])
   end
   
-  def run_etch(server, testbase, errors_expected=false, extra_args='')
+  def run_etch(server, testbase, errors_expected=false, extra_args='', port=nil)
     extra_args = extra_args + " --debug"
+    if !port
+      port = server[:port]
+    end
     if errors_expected
       # Warn the user that errors are expected.  Otherwise it can be
       # disconcerting if you're watching the tests run and see errors.
@@ -128,7 +136,7 @@ module EtchTests
       puts "#"
       #sleep 3
     end
-    result = system("ruby #{CLIENTDIR}/etch --generate-all --server=http://localhost:#{server[:port]} --test-base=#{testbase} --key=#{File.dirname(__FILE__)}/keys/testkey #{extra_args}")
+    result = system("ruby #{CLIENTDIR}/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --key=#{File.dirname(__FILE__)}/keys/testkey #{extra_args}")
     if errors_expected
       assert(!result)
     else
