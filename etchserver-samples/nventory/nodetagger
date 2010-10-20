@@ -1,7 +1,7 @@
 #!/usr/bin/ruby -w
 ##############################################################################
 # This is a node tagging script for etch which gets tags from nVentory
-# http://etch.wiki.sourceforge.net/ControlledDeployment
+# http://sourceforge.net/apps/trac/etch/wiki/ControlledDeployment
 ##############################################################################
 
 require 'optparse'
