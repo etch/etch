@@ -1,7 +1,7 @@
 #!/usr/bin/ruby -w
 ##############################################################################
 # This is a node grouping script for etch which gets groups from nVentory
-# http://etch.wiki.sourceforge.net/NodeGroups
+# http://sourceforge.net/apps/trac/etch/wiki/NodeGroups
 ##############################################################################
 
 require 'nventory'
@@ -13,7 +13,7 @@ name = ARGV[0] or abort "No hostname passed"
 #
 
 nvclient = NVentory::Client.new
-results = nvclient.get_objects('nodes', {}, { 'name' => name }, {}, {}, ['node_groups'])
+results = nvclient.get_objects(:objecttype => 'nodes', :exactget => { 'name' => name }, :includes => ['node_groups'])
 
 if results.include?(name) && results[name].include?('node_groups')
   results[name]['node_groups'].each do |ng|
