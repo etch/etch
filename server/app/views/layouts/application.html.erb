@@ -26,7 +26,7 @@ Welcome back, <%= link_to logged_in_account.name, account_path(logged_in_account
 <%- end -%>
 </p>
 
-<h1 id="branding"><a href="/">Etch</a></h1>
+<h1 id="branding"><%= link_to "Etch", { :controller => 'dashboard' } %></h1>
 
 <hr />
 </div> <!-- end header -->
