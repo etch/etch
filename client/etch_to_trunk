@@ -1,21 +1,45 @@
 #!/usr/bin/ruby -w
 
 require 'nventory'
+require 'time'
+require 'optparse'
 
-@username = ENV['LOGNAME']
+ETCH_SERVER_TZ = 'UTC'    # The etch servers run in UTC
 
-if ARGV.length == 0
-  abort "Usage: #{File.basename($0)} <server1> [<server2> <server3>]"
+options = {}
+opts = OptionParser.new
+opts.banner = 'Usage: etch_to_trunk [options] <server1> [<server2> <server3>]'
+opts.on('-u', '--username USERNAME', 'Username for connecting to nventory server.') do |opt|
+  options[:username] = opt
+end 
+opts.on('-t', '--timezone TIMEZONE', 'Time zone of etch server.') do |opt|
+  options[:timezone] = opt
+end 
+opts.on_tail('-h', '--help', 'Show this message.') do
+  puts opts
+  exit
 end
 
-# The etch servers run in UTC
-ENV['TZ'] = 'UTC'
-currentheadtag = Time.now.strftime('trunk-%Y%m%d-%H00')
+nodes = opts.parse(ARGV)
+
+if ARGV.length == 0
+  puts opts
+  exit
+end
+
+@username = options[:username] || ENV['LOGNAME']
+etch_server_tz = options[:timezone] || ETCH_SERVER_TZ
+
+if etch_server_tz
+  currentheadtag = Time.at(Time.now.utc + Time.zone_offset(etch_server_tz)).strftime('trunk-%Y%m%d-%H00')
+else  # if no timezone is specified then just use local time for the tag 
+  currentheadtag = Time.now.strftime('trunk-%Y%m%d-%H00')
+end
 
 # Find the requested clients
 nvclient = NVentory::Client.new
-results = nvclient.get_objects('nodes', {}, { 'name' => ARGV }, {}, {})
-ARGV.each do |name|
+results = nvclient.get_objects('nodes', {}, { 'name' => nodes }, {}, {})
+nodes.each do |name|
   if results.empty? && results[name].nil?
     abort "No entry found for #{name}"
   else
