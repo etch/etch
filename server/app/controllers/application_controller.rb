@@ -22,6 +22,7 @@ class ApplicationController < ActionController::Base
   # This authentication system is targeted at etch clients.  There should be
   # an alternate authentication mechanism targeted at humans so that humans
   # can interact with this service when authentication is enabled.
+  # https://sourceforge.net/apps/trac/etch/ticket/11
   def authenticate
     if Etch::Server.auth_enabled?
       if request.headers['Authorization'] &&
