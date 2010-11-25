@@ -24,8 +24,8 @@ class EtchLinkTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
     
     # Generate a couple more files to use as our link targets
     @destfile = released_tempfile
@@ -51,7 +51,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial link test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'link create')
 
@@ -72,7 +72,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link update test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(@destfile2, File.readlink(@targetfile), 'link update')
 
@@ -101,7 +101,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link update from non-existent file test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'link update from non-existent file')
   end
@@ -127,7 +127,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link to non-existent destination test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the link was not created
     assert(!File.symlink?(@targetfile), 'link to non-existent destination')
@@ -151,7 +151,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link to non-existent destination with override test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the link was updated properly
     assert_equal(@destfile, File.readlink(@targetfile), 'link to non-existent destination with override')
@@ -180,7 +180,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running relative link test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the link was updated properly
     assert_equal(reldestfile, File.readlink(@targetfile), 'relative link')
@@ -207,7 +207,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link ownership and permissions test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the link ownership got set correctly
     #  Most systems don't support give-away chown, so this test won't work
@@ -242,7 +242,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running duplicate dest instructions test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'duplicate dest instructions')
   end
@@ -266,7 +266,7 @@ class EtchLinkTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running contradictory dest instructions test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory dest instructions')
@@ -295,7 +295,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running duplicate script instructions test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'duplicate script instructions')
   end
@@ -326,7 +326,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running contradictory script instructions test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory script instructions')
@@ -334,7 +334,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
     FileUtils.rm_f(@destfile)
     FileUtils.rm_f(@destfile2)

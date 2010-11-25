@@ -32,8 +32,8 @@ class EtchAuthTests < Test::Unit::TestCase
     @server = start_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
     
     # Make sure the server will initially think this is a new client
     hostname = Facter['fqdn'].value
@@ -91,7 +91,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -122,7 +122,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -161,7 +161,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch with the wrong key to force a bad signature
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, true, "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}")
+    run_etch(@server, @testroot, :errors_expected => true, :key => "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}")
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -206,7 +206,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -219,7 +219,7 @@ class EtchAuthTests < Test::Unit::TestCase
     sleep 3
     repodir2 = initialize_repository
     server2 = start_server(repodir2)
-    run_etch(server2, @testbase)
+    run_etch(server2, @testroot)
     stop_server(server2)
     remove_repository(repodir2)
     
@@ -249,7 +249,7 @@ class EtchAuthTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -258,7 +258,7 @@ class EtchAuthTests < Test::Unit::TestCase
   def teardown
     stop_server(@server)
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

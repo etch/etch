@@ -5,6 +5,7 @@
 require 'test/unit'
 require 'tempfile'
 require 'fileutils'
+require 'net/http'
 
 module EtchTests
   # Roughly ../server and ../client
@@ -104,9 +105,26 @@ module EtchTests
     # Pick a random port in the 3001-6000 range (range somewhat randomly chosen)
     port = 3001 + rand(3000)
     if pid = fork
-      # FIXME: replace this with a check that the server has started
-      puts "Giving the server some time to start up"
-      sleep(5)
+      # Give the server up to 30s to start, checking every second
+      serverstarted = false
+      catch :serverstarted do
+        30.times do
+          begin
+            Net::HTTP.start('localhost', port) do |http|
+              response = http.head("/")
+              if response.kind_of?(Net::HTTPSuccess)
+                serverstarted = true
+                throw :serverstarted
+              end
+            end
+          rescue => e
+          end
+          sleep(1)
+        end
+      end
+      if !serverstarted
+        raise "Etch server failed to start"
+      end
     else
       if UNICORN
         exec("cd #{SERVERDIR} && unicorn_rails -p #{port}")
@@ -122,12 +140,29 @@ module EtchTests
     Process.waitpid(server[:pid])
   end
   
-  def run_etch(server, testbase, errors_expected=false, extra_args='', port=nil)
-    extra_args = extra_args + " --debug"
-    if !port
-      port = server[:port]
+  def run_etch(server, testroot, options={})
+    extra_args = ''
+    if options[:extra_args]
+      extra_args += options[:extra_args]
     end
-    if errors_expected
+    extra_args += " --debug"
+    
+    port = server[:port]
+    if options[:port]
+      port = options[:port]
+    end
+    
+    server = "--server=http://localhost:#{port}"
+    if options[:server]
+      server = options[:server]
+    end
+    
+    key = "--key=#{File.dirname(__FILE__)}/keys/testkey"
+    if options[:key]
+      key = options[:key]
+    end
+    
+    if options[:errors_expected]
       # Warn the user that errors are expected.  Otherwise it can be
       # disconcerting if you're watching the tests run and see errors.
       #sleep 3
@@ -136,11 +171,11 @@ module EtchTests
       puts "#"
       #sleep 3
     end
-    result = system("ruby #{CLIENTDIR}/etch --generate-all --server=http://localhost:#{port} --test-base=#{testbase} --key=#{File.dirname(__FILE__)}/keys/testkey #{extra_args}")
-    if errors_expected
-      assert(!result)
+    result = system("ruby #{CLIENTDIR}/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}")
+    if options[:errors_expected]
+      assert(!result, options[:testname])
     else
-      assert(result)
+      assert(result, options[:testname])
     end
   end
   

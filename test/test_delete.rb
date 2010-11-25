@@ -19,8 +19,8 @@ class EtchDeleteTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
 
     # Generate another file to use as our link target
     @destfile = released_tempfile
@@ -47,7 +47,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
@@ -73,7 +73,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the link was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
@@ -101,7 +101,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the directory was not deleted
     assert(File.directory?(@targetfile), testname)
@@ -130,7 +130,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the directory was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
@@ -153,7 +153,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that we still don't have a file.  That's rather unlikely,
     # this is really more a test that etch doesn't throw an error if
@@ -187,7 +187,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running duplicate script instructions test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert(!File.exist?(@targetfile), 'duplicate script instructions')
 
@@ -220,7 +220,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running contradictory script instructions test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the file wasn't removed
     assert(File.exist?(@targetfile), 'contradictory script instructions')
@@ -229,7 +229,7 @@ class EtchDeleteTests < Test::Unit::TestCase
 
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
     FileUtils.rm_rf(@destfile)
   end

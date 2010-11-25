@@ -20,8 +20,8 @@ class EtchScriptTests < Test::Unit::TestCase
     @server = get_server(@repodir)
 
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
   end
 
   def test_scripts
@@ -60,7 +60,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running script with syntax error test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with syntax error size comparison')
@@ -93,7 +93,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running script with no output"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with no output size comparison')
@@ -123,7 +123,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file script test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -164,7 +164,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file source script test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -204,7 +204,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running file source script test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -240,7 +240,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link script test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the link was created properly
     assert_equal(@destfile, File.readlink(@targetfile), 'link script')
@@ -271,7 +271,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running link script with no output"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_readlink, File.readlink(@targetfile), 'link script with no output readlink comparison')
@@ -298,7 +298,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running directory script test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the directory was created
     assert(File.directory?(@targetfile), 'directory script')
@@ -333,7 +333,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running directory script with no output"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'directory script with no output size comparison')
@@ -361,7 +361,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running delete script test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was removed
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'delete script')
@@ -398,7 +398,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running delete script with no output"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'delete script with no output size comparison')
@@ -407,7 +407,7 @@ class EtchScriptTests < Test::Unit::TestCase
 
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

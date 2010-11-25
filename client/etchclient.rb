@@ -41,7 +41,8 @@ class Etch::Client
   CONFIRM_SKIP = 2
   CONFIRM_QUIT = 3
   PRIVATE_KEY_PATHS = ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh_host_rsa_key"]
-  CONFIGDIR = '/etc'
+  DEFAULT_CONFIGDIR = '/etc'
+  DEFAULT_VARBASE = '/var/etch'
   
   # We need these in relation to the output capturing
   ORIG_STDOUT = STDOUT.dup
@@ -52,7 +53,6 @@ class Etch::Client
   def initialize(options)
     @server = options[:server] ? options[:server] : 'https://etch'
     @tag = options[:tag]
-    @varbase = options[:varbase] ? options[:varbase] : '/var/etch'
     @local = options[:local] ? File.expand_path(options[:local]) : nil
     @debug = options[:debug]
     @dryrun = options[:dryrun]
@@ -63,10 +63,65 @@ class Etch::Client
     @disableforce = options[:disableforce]
     @lockforce = options[:lockforce]
     
-    # Ensure we have a sane path, particularly since we are often run from
-    # cron.
-    # FIXME: Read from config file
-    ENV['PATH'] = '/bin:/usr/bin:/sbin:/usr/sbin:/opt/csw/bin:/opt/csw/sbin'
+    @configdir = DEFAULT_CONFIGDIR
+    @varbase = DEFAULT_VARBASE
+    
+    @file_system_root = '/'  # Not sure if this needs to be more portable
+    # This option is only intended for use by the test suite
+    if options[:file_system_root]
+      @file_system_root = options[:file_system_root]
+      @varbase = File.join(@file_system_root, @varbase)
+      @configdir = File.join(@file_system_root, @configdir)
+    end
+    
+    @configfile = File.join(@configdir, 'etch.conf')
+    
+    if File.exist?(@configfile)
+      IO.foreach(@configfile) do |line|
+        line.chomp!
+        next if (line =~ /^\s*$/);  # Skip blank lines
+        next if (line =~ /^\s*#/);  # Skip comments
+        line.strip!  # Remove leading/trailing whitespace
+        key, value = line.split(/\s*=\s*/, 2)
+        if key == 'server'
+          # A setting for the server to use which comes from upstream
+          # (generally from a command line option) takes precedence
+          # over the config file
+          if !options[:server]
+            @server = value
+            # Warn the user, as this could potentially be confusing
+            # if they don't realize there's a config file lying
+            # around
+            warn "Using server #{@server} from #{@configfile}" if @debug
+          else
+            # "command line override" isn't necessarily accurate, we don't
+            # know why the caller passed us an option to override the config
+            # file, but most of the time it will be due to a command line
+            # option and I want the message to be easily understood by users. 
+            # If someone can come up with some better wording without turning
+            # the message into something as long as this comment that would be
+            # welcome.
+            warn "Ignoring 'server' option in #{@configfile} due to command line override" if @debug
+          end
+        elsif key == 'local'
+          if !options[:local] && !options[:server]
+            @local = value
+            warn "Using local directory #{@local} from #{@configfile}" if @debug
+          else
+            warn "Ignoring 'local' option in #{@configfile} due to command line override" if @debug
+          end
+        elsif key == 'key'
+          if !options[:key]
+            @key = value
+            warn "Using key #{@key} from #{@configfile}" if @debug
+          else
+            warn "Ignoring 'key' option in #{@configfile} due to command line override" if @debug
+          end
+        elsif key == 'path'
+          ENV['PATH'] = value
+        end
+      end
+    end
     
     @origbase    = File.join(@varbase, 'orig')
     @historybase = File.join(@varbase, 'history')
@@ -141,17 +196,17 @@ class Etch::Client
       http = Net::HTTP.new(@filesuri.host, @filesuri.port)
       if @filesuri.scheme == "https"
         # Eliminate the OpenSSL "using default DH parameters" warning
-        if File.exist?(File.join(CONFIGDIR, 'etch', 'dhparams'))
-          dh = OpenSSL::PKey::DH.new(IO.read(File.join(CONFIGDIR, 'etch', 'dhparams')))
+        if File.exist?(File.join(@configdir, 'etch', 'dhparams'))
+          dh = OpenSSL::PKey::DH.new(IO.read(File.join(@configdir, 'etch', 'dhparams')))
           Net::HTTP.ssl_context_accessor(:tmp_dh_callback)
           http.tmp_dh_callback = proc { dh }
         end
         http.use_ssl = true
-        if File.exist?(File.join(CONFIGDIR, 'etch', 'ca.pem'))
-          http.ca_file = File.join(CONFIGDIR, 'etch', 'ca.pem')
+        if File.exist?(File.join(@configdir, 'etch', 'ca.pem'))
+          http.ca_file = File.join(@configdir, 'etch', 'ca.pem')
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-        elsif File.directory?(File.join(CONFIGDIR, 'etch', 'ca'))
-          http.ca_path = File.join(CONFIGDIR, 'etch', 'ca')
+        elsif File.directory?(File.join(@configdir, 'etch', 'ca'))
+          http.ca_path = File.join(@configdir, 'etch', 'ca')
           http.verify_mode = OpenSSL::SSL::VERIFY_PEER
         end
       end

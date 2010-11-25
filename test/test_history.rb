@@ -20,11 +20,11 @@ class EtchHistoryTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
     
-    @origfile = File.join(@testbase, 'orig', "#{@targetfile}.ORIG")
-    @historydir = File.join(@testbase, 'history', "#{@targetfile}.HISTORY")
+    @origfile = File.join(@testroot, 'var', 'etch', 'orig', "#{@targetfile}.ORIG")
+    @historydir = File.join(@testroot, 'var', 'etch', 'history', "#{@targetfile}.HISTORY")
   end
   
   def test_history
@@ -60,7 +60,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial history test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(origcontents, get_file_contents(@origfile), 'original backup of file')
     assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
@@ -77,7 +77,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running update test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(origcontents, get_file_contents(@origfile), 'original backup of file unchanged')
     assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
@@ -107,7 +107,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running revert test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'original contents reverted')
     assert(!File.exist?(@origfile), 'reverted original file')
@@ -128,7 +128,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running revert test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(updatedorigcontents, get_file_contents(@targetfile), 'Updated original contents unchanged')
     assert(!File.exist?(@origfile), 'reverted original file')
@@ -177,7 +177,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history setup test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(origcontents + "\n", get_file_contents(@origfile), 'original backup of file via setup')
     assert_equal(sourcecontents + origcontents + "\n", get_file_contents(@targetfile), 'contents using original backup of file via setup')
@@ -217,7 +217,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     origcontents = "This is the original text for #{testname}"
     
@@ -245,7 +245,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     assert_equal(origcontents + "\n", get_file_contents(@origfile), testname)
   end
@@ -283,7 +283,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history link test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal(@destfile, File.readlink(@origfile), 'original backup of link')
     assert_match("#{@targetfile} -> #{@destfile}", get_file_contents(File.join(@historydir, '0000')), '0000 history file of link')
@@ -328,7 +328,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history directory test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert(File.directory?(@origfile), 'original backup of directory')
     # Verify that etch backed up the original directory properly
@@ -347,7 +347,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     # differently in that case
     #
 
-    origtarfile = File.join(@testbase, 'orig', "#{@targetfile}.TAR")
+    origtarfile = File.join(@testroot, 'var', 'etch', 'orig', "#{@targetfile}.TAR")
 
     # Make the original target a directory
     File.delete(@targetfile)
@@ -376,7 +376,7 @@ class EtchHistoryTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running history directory contents test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # In this case, because we converted a directory to something else the
     # original will be a tarball of the directory
@@ -445,7 +445,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running history conversion test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     assert_equal(mockorigcontents,   get_file_contents(File.join(@historydir, '0000')), 'RCS conv 0000 history file')
     assert_equal(mocksourcecontents, get_file_contents(File.join(@historydir, '0001')), 'RCS conv 0001 history file')
@@ -454,7 +454,7 @@ class EtchHistoryTests < Test::Unit::TestCase
   
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

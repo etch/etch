@@ -20,8 +20,8 @@ class EtchNodeGroupTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
   end
   
   def test_group
@@ -51,7 +51,7 @@ class EtchNodeGroupTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -92,7 +92,7 @@ class EtchNodeGroupTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -133,7 +133,7 @@ echo "grouper_group2"
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -177,7 +177,7 @@ echo "grouper_group2"
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the file wasn't modified
     assert_equal(oldsourcecontents, get_file_contents(@targetfile), testname)
@@ -185,7 +185,7 @@ echo "grouper_group2"
   
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

@@ -19,8 +19,8 @@ class EtchActionTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
     
     # Generate another file to use as our link target
     @destfile = released_tempfile
@@ -76,7 +76,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial action test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the actions were executed
     #  The setup actions will get run several times as we loop
@@ -100,7 +100,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch again and make sure that the exec_once command wasn't run
     # again
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     assert_equal("exec_once\n", get_file_contents("#{@repodir}/exec_once"), 'exec_once_2nd_check')
   end
@@ -142,7 +142,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial action test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed setup')
@@ -185,7 +185,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed pre test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed pre')
@@ -234,7 +234,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the original was restored, and that post was run twice
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed test target')
@@ -270,7 +270,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test_before_post test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that post was not run
     assert(!File.exist?("#{@repodir}/post"), 'failed test_before_post post')
@@ -286,7 +286,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test symlink test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the original symlink was restored
     assert_equal(@destfile, File.readlink(@targetfile), 'failed test symlink')
@@ -303,7 +303,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test directory test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the original directory was restored
     assert(File.directory?(@targetfile), 'failed test directory')
@@ -325,7 +325,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running failed test no original file test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     # Verify that the lack of an original file was restored
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'failed test no original file')
@@ -372,7 +372,7 @@ class EtchActionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running nested target with test test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(nestedtargetfile), 'nested target with test')
@@ -415,7 +415,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running XML escape test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
 
     # Verify that the action was executed
     assert_equal("post\n", get_file_contents("#{@repodir}/post_with_escape"), 'post with escape')
@@ -458,7 +458,7 @@ EOF
     
     # Run etch
     #puts "Running environment variable test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the action was executed
     assert_equal("testvalue\n", get_file_contents("#{@repodir}/post_with_env_output"), 'post with environment variable')
@@ -466,7 +466,7 @@ EOF
 
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
     FileUtils.rm_f(@destfile)
   end

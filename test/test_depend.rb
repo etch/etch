@@ -21,8 +21,8 @@ class EtchDependTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
   end
   
   def test_depends
@@ -76,7 +76,7 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running initial dependency test"
-    run_etch(@server, @testbase, false)
+    run_etch(@server, @testroot)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'dependency file 1')
@@ -138,7 +138,7 @@ class EtchDependTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, false, @targetfile)
+    run_etch(@server, @testroot, :extra_args => @targetfile)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'single request dependency file 1')
@@ -202,7 +202,7 @@ class EtchDependTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, true, @targetfile)
+    run_etch(@server, @testroot, :errors_expected => true, :extra_args => @targetfile)
 
     # Verify that the files weren't modified
     assert_equal(origcontents, get_file_contents(@targetfile), 'circular dependency file 1')
@@ -256,7 +256,7 @@ class EtchDependTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the regular file and the command-generated file were created
     # properly
@@ -268,7 +268,7 @@ class EtchDependTests < Test::Unit::TestCase
   
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

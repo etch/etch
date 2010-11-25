@@ -19,8 +19,8 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
   end
   
   def test_local_requests_script
@@ -44,7 +44,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     end
     
     # Create the local request file
-    requestdir = File.join(@testbase, 'requests', @targetfile)
+    requestdir = File.join(@testroot, 'var', 'etch', 'requests', @targetfile)
     requestfile = File.join(requestdir, 'testrequest')
     FileUtils.mkdir_p(requestdir)
     File.open(requestfile, 'w') do |file|
@@ -68,7 +68,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -95,7 +95,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     end
     
     # Create the local request file
-    requestdir = File.join(@testbase, 'requests', @targetfile)
+    requestdir = File.join(@testroot, 'var', 'etch', 'requests', @targetfile)
     requestfile = File.join(requestdir, 'testrequest')
     FileUtils.mkdir_p(requestdir)
     File.open(requestfile, 'w') do |file|
@@ -120,7 +120,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Verify that the file was created properly
     # Our whitespace in the heredoc above gets added to the generated file, so
@@ -131,7 +131,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
   
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

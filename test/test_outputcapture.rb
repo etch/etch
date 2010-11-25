@@ -23,8 +23,8 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
   end
   
   def test_output_capture
@@ -66,7 +66,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase)
+    run_etch(@server, @testroot)
     
     # Fetch the latest result for this client from the server and verify that
     # it contains the output from the post command.
@@ -122,7 +122,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
         # NOTE: This test is not normally run because the timeout is so long. 
         # Uncomment this run_etch line to run this test.
         #
-        #run_etch(@server, @testbase)
+        #run_etch(@server, @testroot)
       end
     rescue Timeout::Error
       flunk('output capturing did not time out as expected')
@@ -131,7 +131,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
   
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

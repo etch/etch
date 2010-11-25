@@ -20,8 +20,8 @@ class EtchOptionTests < Test::Unit::TestCase
     @server = get_server(@repodir)
     
     # Create a directory to use as a working directory for the client
-    @testbase = tempdir
-    #puts "Using #{@testbase} as client working directory"
+    @testroot = tempdir
+    #puts "Using #{@testroot} as client working directory"
   end
   
   def test_killswitch
@@ -62,7 +62,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running killswitch test"
-    run_etch(@server, @testbase, true)
+    run_etch(@server, @testroot, :errors_expected => true)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
   end
@@ -100,7 +100,7 @@ class EtchOptionTests < Test::Unit::TestCase
 
     # Run etch
     #puts "Running --dry-run test"
-    run_etch(@server, @testbase, false, '--dry-run')
+    run_etch(@server, @testroot, :extra_args => '--dry-run')
 
     assert_equal(origcontents, get_file_contents(@targetfile), '--dry-run')
   end
@@ -233,7 +233,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, false, "#{@targetfile} #{targetfile2} etchtest1 etchtest2")
+    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2} etchtest1 etchtest2")
     
     # Verify that only the requested files were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' file 1')
@@ -320,7 +320,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, false, "#{@targetfile} #{targetfile2}")
+    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2}")
     
     # Verify that all were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' filesonly file 1')
@@ -414,7 +414,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testbase, false, "etchtest1 #{targetfile2}")
+    run_etch(@server, @testroot, :extra_args => "etchtest1 #{targetfile2}")
     
     # Verify that all were created
     assert_equal(origcontents + testname, get_file_contents(cmdtargetfile1), testname + ' cmdandfile cmd 1')
@@ -473,14 +473,14 @@ class EtchOptionTests < Test::Unit::TestCase
     sleep(5)
     
     # Test that we don't follow redirects by default
-    run_etch(@server, @testbase, true, '', redirect_port)
+    run_etch(@server, @testroot, :errors_expected => true, :extra_args => '', :port => redirect_port)
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
     
     # Check that we do follow redirects with the appropriate option
     # NOTE:  Due to lack of need/demand we have not yet implemented an option
     #        to follow redirects
     # testname = 'follow redirects with --follow-redirects'
-    # run_etch(@server, @testbase, false, '--follow-redirects', redirect_port)
+    # run_etch(@server, @testroot, :extra_args => '--follow-redirects', :port => redirect_port)
     # assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
     
     # Test redirect with valid SSL
@@ -497,7 +497,7 @@ class EtchOptionTests < Test::Unit::TestCase
       response.set_redirect(
         WEBrick::HTTPStatus::Found, "http://localhost:#{redirect_port}/")
     end
-    run_etch(@server, @testbase, true, '', redirect_port)
+    run_etch(@server, @testroot, :errors_expected => true, :port => redirect_port)
     
     server.shutdown
     t.kill
@@ -505,7 +505,7 @@ class EtchOptionTests < Test::Unit::TestCase
   
   def teardown
     remove_repository(@repodir)
-    FileUtils.rm_rf(@testbase)
+    FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end

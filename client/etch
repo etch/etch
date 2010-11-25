@@ -62,8 +62,8 @@ end
 opts.on('--key PRIVATE_KEY', 'Use this private key for signing messages to server.') do |opt|
   options[:key] = opt
 end
-opts.on('--test-base TESTDIR', 'Use an alternate local working directory.') do |opt|
-  options[:varbase] = opt
+opts.on('--test-root TESTDIR', 'For use by the test suite only.') do |opt|
+  options[:file_system_root] = opt
 end
 opts.on('--debug', 'Print lots of messages about what etch is doing.') do |opt|
   options[:debug] = opt

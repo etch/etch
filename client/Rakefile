@@ -81,10 +81,9 @@ def copy_etch_files(destdir, options={})
   
   if options[:etcdir]
     etcdir = File.join(destdir, options[:etcdir])
-    # FIXME: Need to add support for etch.conf to the code
-    #mkdir_p(etcdir)
-    #cp('etch.conf', etcdir, :preserve => true)
-    #chmod(0644, File.join(etcdir, 'etch.conf'))
+    mkdir_p(etcdir)
+    cp('etch.conf', etcdir, :preserve => true)
+    chmod(0644, File.join(etcdir, 'etch.conf'))
     # All of the supporting config files go into a subdirectory
     etcetchdir = File.join(etcdir, 'etch')
     mkdir_p(etcetchdir)
