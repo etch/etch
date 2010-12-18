@@ -1,8 +1,18 @@
+require 'intmax'
+
 class OriginalsController < ApplicationController
   # GET /originals
   def index
-    @originals = Original.find :all
-
+    # Clients requesting XML get no pagination (all entries)
+    per_page = Original.per_page # will_paginate's default value
+    respond_to do |format|
+      format.html {}
+      format.xml { per_page = Integer::MAX }
+    end
+    
+    @search = Original.search(params[:search])
+    @originals = @search.paginate(:page => params[:page], :per_page => per_page)
+    
     respond_to do |format|
       format.html # index.html.erb
       format.xml  { render :xml => @originals }

@@ -1,8 +1,18 @@
+require 'intmax'
+
 class EtchConfigsController < ApplicationController
   # GET /etch_configs
   def index
-    @etch_configs = EtchConfig.find :all
-
+    # Clients requesting XML get no pagination (all entries)
+    per_page = EtchConfig.per_page # will_paginate's default value
+    respond_to do |format|
+      format.html {}
+      format.xml { per_page = Integer::MAX }
+    end
+    
+    @search = EtchConfig.search(params[:search])
+    @etch_configs = @search.paginate(:page => params[:page], :per_page => per_page)
+    
     respond_to do |format|
       format.html # index.html.erb
       format.xml  { render :xml => @etch_configs }
