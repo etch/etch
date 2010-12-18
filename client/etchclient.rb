@@ -123,6 +123,13 @@ class Etch::Client
       end
     end
     
+    if !File.readable(@key)
+      @key = nil
+    end
+    if !@key
+      warn "No readable private key found, messages to server will not be signed and may be rejected depending on server configuration"
+    end
+    
     @origbase    = File.join(@varbase, 'orig')
     @historybase = File.join(@varbase, 'history')
     @lockbase    = File.join(@varbase, 'locks')
@@ -2463,9 +2470,6 @@ class Etch::Client
         key = path
         break
       end
-    end
-    if !key
-      warn "No readable private key found, messages to server will not be signed and may be rejected depending on server configuration"
     end
     key
   end
