@@ -1,0 +1,28 @@
+<%- @page_title = 'Facts' -%>
+
+<h1>Facts</h1>
+
+<div id="results_table">
+<%= will_paginate @facts %>
+<table cellspacing="0" class="styled">
+  <thead>
+    <tr>
+      <th nowrap="nowrap" width="5%">&nbsp;</th>
+      <th><%= order @search, :by => :client %></th>
+      <th><%= order @search, :by => :key %></th>
+      <th><%= order @search, :by => :updated_at %></th>
+    </tr>
+  </thead>
+  <tbody>
+    <%- @facts.each do |fact| -%>
+    <tr class="<%= cycle('odd', 'even') -%>">
+      <td nowrap="nowrap" width="5%"><%= link_to 'View', fact_path(fact) %></td>
+      <td><%= fact.client.name %></td>
+      <td><%= fact.key %></td>
+      <td><%= fact.updated_at %></td>
+    </tr>
+    <%- end -%>
+  </tbody>
+</table>
+</div> <!-- end results_table div -->
+

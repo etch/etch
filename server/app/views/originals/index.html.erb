@@ -1,0 +1,28 @@
+<%- @page_title = 'Originals' -%>
+
+<h1>Originals</h1>
+
+<div id="results_table">
+<%= will_paginate @originals %>
+<table cellspacing="0" class="styled">
+  <thead>
+    <tr>
+      <th nowrap="nowrap" width="5%">&nbsp;</th>
+      <th><%= order @search, :by => :client %></th>
+      <th><%= order @search, :by => :file %></th>
+      <th><%= order @search, :by => :updated_at %></th>
+    </tr>
+  </thead>
+  <tbody>
+    <%- @originals.each do |original| -%>
+    <tr class="<%= cycle('odd', 'even') -%>">
+      <td nowrap="nowrap" width="5%"><%= link_to 'View', original_path(original) %></td>
+      <td><%= original.client.name %></td>
+      <td><%= original.file %></td>
+      <td><%= original.updated_at %></td>
+    </tr>
+    <%- end -%>
+  </tbody>
+</table>
+</div> <!-- end results_table div -->
+

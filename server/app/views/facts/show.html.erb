@@ -1,0 +1,24 @@
+<%- @page_title = "Fact" %>
+
+<div class="record_view">
+
+<h1>Fact</h1>
+
+<p>
+  <strong>Client:</strong> <%= link_to(@fact.client.name, client_path(@fact.client)) %><br />
+  <strong>Key:</strong>    <%= @fact.key %><br />
+</p>
+
+<p>
+  <strong>Value:</strong><br />
+  <pre><%= h @fact.value %></pre>
+</p>
+
+<p class="metadata">
+  <strong>Created at:</strong> <%= @fact.created_at %><br />
+  <strong>Updated at:</strong> <%= @fact.updated_at %><br />
+  <%= link_to 'Delete', fact_path(@fact), :confirm => 'Are you sure?', :method => :delete %></p>
+</p>
+
+</div>
+

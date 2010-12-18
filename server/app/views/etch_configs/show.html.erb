@@ -1,0 +1,24 @@
+<%- @page_title = "Config" %>
+
+<div class="record_view">
+
+<h1>Config</h1>
+
+<p>
+  <strong>Client:</strong> <%= link_to(@etch_config.client.name, client_path(@etch_config.client)) %><br />
+  <strong>File:</strong>   <%= @etch_config.file %><br />
+</p>
+
+<p>
+  <strong>Config:</strong><br />
+  <pre><%= h @etch_config.config %></pre>
+</p>
+
+<p class="metadata">
+  <strong>Created at:</strong> <%= @etch_config.created_at %><br />
+  <strong>Updated at:</strong> <%= @etch_config.updated_at %><br />
+  <%= link_to 'Delete', etch_config_path(@etch_config), :confirm => 'Are you sure?', :method => :delete %></p>
+</p>
+
+</div>
+
