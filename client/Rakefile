@@ -230,8 +230,10 @@ task :sysvpkg do
     cp('depend', 'solbuild/depend')
     prototype.puts("i depend=./depend")
     cp('postinstall.solaris', 'solbuild/postinstall')
+    chmod(0555, 'solbuild/postinstall')
     prototype.puts("i postinstall=./postinstall")
     cp('postremove.solaris', 'solbuild/postremove')
+    chmod(0555, 'solbuild/postremove')
     prototype.puts("i postremove=./postremove")
     # The tail +2 removes the first line, which is the base directory
     # and doesn't need to be included in the package.
@@ -319,8 +321,10 @@ task :sysvpkgsparc do
     cp('depend', 'solbuild/depend')
     prototype.puts("i depend=./depend")
     cp('postinstall.solaris', 'solbuild/postinstall')
+    chmod(0555, 'solbuild/postinstall')
     prototype.puts("i postinstall=./postinstall")
     cp('postremove.solaris', 'solbuild/postremove')
+    chmod(0555, 'solbuild/postremove')
     prototype.puts("i postremove=./postremove")
     # The tail +2 removes the first line, which is the base directory
     # and doesn't need to be included in the package.
