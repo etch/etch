@@ -5,6 +5,17 @@
 #
 
 require File.join(File.dirname(__FILE__), 'etchtest')
+require 'net/http'
+require 'rexml/document'
+require 'cgi'
+begin
+  # Try loading facter w/o gems first so that we don't introduce a
+  # dependency on gems if it is not needed.
+  require 'facter'
+rescue LoadError
+  require 'rubygems'
+  require 'facter'
+end
 
 class EtchConfTests < Test::Unit::TestCase
   include EtchTests
@@ -27,7 +38,6 @@ class EtchConfTests < Test::Unit::TestCase
     #
     # Test the server setting in etch.conf
     #
-    testname = 'etch.conf server setting'
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -42,6 +52,8 @@ class EtchConfTests < Test::Unit::TestCase
         </config>
       EOF
     end
+    
+    testname = 'etch.conf server setting'
     
     sourcecontents = "Test #{testname}\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
@@ -49,6 +61,7 @@ class EtchConfTests < Test::Unit::TestCase
     end
     
     # Test that it fails with a bogus etch.conf server setting
+    testname = 'etch.conf server setting, bogus'
     Dir.mkdir("#{@testroot}/etc")
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "server = http://bogushost:0"
@@ -56,16 +69,17 @@ class EtchConfTests < Test::Unit::TestCase
     
     # The --server option normally used by run_etch will override the config
     # file, signal run_etch to leave out the --server option
-    run_etch(@server, @testroot, :server => '', :errors_expected => true)
+    run_etch(@server, @testroot, :server => '', :errors_expected => true, :testname => testname)
     
     # And confirm that it now succeeds with a correct etch.conf server setting
+    testname = 'etch.conf server setting, correct'
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "server = http://localhost:#{@server[:port]}"
     end
     
     # The --server option normally used by run_etch will override the config
     # file, signal run_etch to leave out the --server option
-    run_etch(@server, @testroot, :server => '')
+    run_etch(@server, @testroot, :server => '', :testname => testname)
     assert_equal(sourcecontents, get_file_contents(@targetfile))
   end
   
@@ -73,7 +87,6 @@ class EtchConfTests < Test::Unit::TestCase
     #
     # Test the local setting in etch.conf
     #
-    testname = 'etch.conf local setting'
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -89,12 +102,15 @@ class EtchConfTests < Test::Unit::TestCase
       EOF
     end
     
+    testname = 'etch.conf local setting'
+    
     sourcecontents = "Test #{testname}\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
     
     # Test that it fails with a bogus etch.conf local setting
+    testname = 'etch.conf local setting, bogus'
     Dir.mkdir("#{@testroot}/etc")
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "local = /not/a/valid/path"
@@ -102,32 +118,148 @@ class EtchConfTests < Test::Unit::TestCase
     
     # Although the config file local setting will override it, tell run_etch
     # to leave out the --server option to avoid confusion
-    run_etch(@server, @testroot, :server => '', :errors_expected => true)
+    run_etch(@server, @testroot, :server => '', :errors_expected => true, :testname => testname)
     
     # And confirm that it now succeeds with a correct etch.conf local setting
+    testname = 'etch.conf local setting, correct'
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "local = #{@repodir}"
     end
     
     # Although the config file local setting will override it, tell run_etch
     # to leave out the --server option to avoid confusion
-    run_etch(@server, @testroot, :server => '')
+    run_etch(@server, @testroot, :server => '', :testname => testname)
     assert_equal(sourcecontents, get_file_contents(@targetfile))
   end
   
   def test_conf_key
-    # FIXME
+    # Start a server instance that has authentication enabled
+    authrepodir = initialize_repository
+    File.open(File.join(authrepodir, 'etchserver.conf'), 'w') do |file|
+      file.puts 'auth_enabled=true'
+      file.puts 'auth_deny_new_clients=true'
+    end
+    
+    # These tests set an etchserver.conf.  The server only reads that file
+    # once and caches the settings, so we need to start up new server
+    # instances for these tests rather than reusing the global test server.
+    authserver = start_server(authrepodir)
+    
+    # Generate an SSH key pair
+    keyfile = Tempfile.new('etchtest')
+    File.unlink(keyfile.path)
+    system("ssh-keygen -t rsa -f #{keyfile.path} -N '' -q")
+    pubkeycontents = File.read("#{keyfile.path}.pub")
+    sshrsakey = pubkeycontents.chomp.split[1]
+    
+    # Set the client's key fact on the server to this new key
+    hostname = Facter['fqdn'].value
+    # Note the use of @server instead of authserver, we need to talk to
+    # a server that doesn't have authentication enabled in order to make
+    # these changes.
+    Net::HTTP.start('localhost', @server[:port]) do |http|
+      # Find our client id
+      response = http.get("/clients.xml?name=#{hostname}")
+      if !response.kind_of?(Net::HTTPSuccess)
+        response.error!
+      end
+      response_xml = REXML::Document.new(response.body)
+      client_id = nil
+      if response_xml.elements['/clients/client/id']
+        client_id = response_xml.elements['/clients/client/id'].text
+        # If there's an existing "sshrsakey" fact for this client then
+        # delete it
+        response = http.get("/facts.xml?search[client_id]=#{client_id}&" +
+          "search[key]=sshrsakey")
+        if !response.kind_of?(Net::HTTPSuccess)
+          response.error!
+        end
+        response_xml = REXML::Document.new(response.body)
+        fact_id = nil
+        if response_xml.elements['/facts/fact/id']
+          fact_id = response_xml.elements['/facts/fact/id'].text
+        end
+        if fact_id
+          response = http.delete("/facts/#{fact_id}.xml")
+          if !response.kind_of?(Net::HTTPSuccess)
+            response.error!
+          end
+        end
+      else
+        # Handle the case where this is the first test this client has
+        # ever run and as such there's no entry for the client in the
+        # database.
+        response = http.post('/clients.xml',
+          "client[name]=#{CGI.escape(hostname)}")
+        if !response.kind_of?(Net::HTTPSuccess)
+          response.error!
+        end
+        response_xml = REXML::Document.new(response.body)
+        client_id = response_xml.elements['/client/id'].text
+      end
+      # Insert our key as the client's "sshrsakey" fact
+      response = http.post('/facts.xml',
+        "fact[client_id]=#{client_id}&" +
+        "fact[key]=sshrsakey&" +
+        "fact[value]=#{CGI.escape(sshrsakey)}")
+      if !response.kind_of?(Net::HTTPSuccess)
+        response.error!
+      end
+    end
+    
+    FileUtils.mkdir_p("#{authrepodir}/source/#{@targetfile}")
+    File.open("#{authrepodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file></warning_file>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    testname = 'etch.conf key setting'
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{authrepodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Test that it fails with a bogus etch.conf key setting
+    testname = 'etch.conf key setting, bogus'
+    Dir.mkdir("#{@testroot}/etc")
+    File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
+      file.puts "key = /not/a/valid/path"
+    end
     
     # The --key option normally used by run_etch will override the config
     # file, signal run_etch to leave out the --key option
-    #run_etch(@server, @testroot, :key => '')
+    run_etch(authserver, @testroot, :key => '',
+             :errors_expected => true, :testname => testname)
+    
+    # And confirm that it now succeeds with a correct etch.conf key setting
+    testname = 'etch.conf key setting, correct'
+    File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
+      file.puts "key = #{keyfile.path}"
+    end
+    
+    # The --key option normally used by run_etch will override the config
+    # file, signal run_etch to leave out the --key option
+    run_etch(authserver, @testroot, :key => '', :testname => testname)
+    assert_equal(sourcecontents, get_file_contents(@targetfile))
+    
+    # Tempfile will clean up the private key file, but not the associated
+    # public key file
+    FileUtils.rm_rf("#{keyfile.path}.pub")
   end
   
   def test_conf_path
     #
     # Test the path setting in etch.conf
     #
-    testname = 'etch.conf path setting'
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -146,6 +278,8 @@ class EtchConfTests < Test::Unit::TestCase
       EOF
     end
     
+    testname = 'etch.conf path setting'
+    
     sourcecontents = "Test #{testname}\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
@@ -159,16 +293,18 @@ class EtchConfTests < Test::Unit::TestCase
     File.chmod(0755, "#{@repodir}/pathtest/testpost")
     
     # Test that it fails without an etch.conf path setting
-    run_etch(@server, @testroot)
+    testname = 'etch.conf path setting, not set'
+    run_etch(@server, @testroot, :testname => testname)
     assert(!File.exist?("#{@repodir}/pathtest/testpost.output"))
     
+    testname = 'etch.conf path setting, set'
     Dir.mkdir("#{@testroot}/etc")
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "path = /bin:/usr/bin:/sbin:/usr/sbin:#{@repodir}/pathtest"
     end
     
     # And confirm that it now succeeds with an etch.conf path setting
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     assert(File.exist?("#{@repodir}/pathtest/testpost.output"))
   end
   
