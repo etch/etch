@@ -123,7 +123,7 @@ class Etch::Client
       end
     end
     
-    if !File.readable?(@key)
+    if @key && !File.readable?(@key)
       @key = nil
     end
     if !@key
