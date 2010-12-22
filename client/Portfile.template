@@ -39,4 +39,3 @@ build               {}
 destroot.cmd        ${prefix}/bin/rake
 destroot.target     install\[${destroot}\]
 destroot.destdir
-

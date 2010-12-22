@@ -395,7 +395,7 @@ task :macport => :fetch do
   portfile = File.join(Dir.tmpdir, 'Portfile')
   rm_f(portfile)
   File.open(portfile, 'w') do |newfile|
-    IO.foreach('Portfile') do |line|
+    IO.foreach('Portfile.template') do |line|
       line.sub!('%VER%', ETCHVER)
       line.sub!('%MD5%', md5)
       line.sub!('%SHA1%', sha1)
