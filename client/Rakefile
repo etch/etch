@@ -406,6 +406,7 @@ task :macport => :fetch do
   puts "Portfile is #{portfile}"
 end
 
+desc 'Build rubygem package'
 task :gem do
   #
   # Create package file structure in build root
