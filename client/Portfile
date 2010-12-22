@@ -8,6 +8,7 @@ name                etch
 version             %VER%
 categories          sysutils
 maintainers         aput.net:jheiss openmaintainer 
+supported_archs     noarch
 
 description         Etch is a system configuration management tool.
 
