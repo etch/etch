@@ -34,6 +34,7 @@ depends_build       port:rb-rake
 depends_run         port:facter
 
 worksrcdir          ${worksrcdir}/client
+supported_archs     noarch
 use_configure       no
 build               {}
 destroot.cmd        ${prefix}/bin/rake
