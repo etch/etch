@@ -18,6 +18,7 @@ Etch client
 /usr/lib/ruby/site_ruby/1.8/etch.rb
 /usr/lib/ruby/site_ruby/1.8/versiontype.rb
 /usr/share/man/man8/etch.8
+/etc/etch.conf
 /etc/etch
 /usr/sbin/etch_cron_wrapper
 /etc/cron.d/etch
