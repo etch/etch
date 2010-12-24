@@ -140,6 +140,25 @@ Display the etch usage message and exit.
 .SH FILES
 
 .TP
+.B /etc/etch.conf
+Optional configuration file for the etch client.  The distribution ships with
+an example file showing the available settings and their defaults.  The file
+syntax consists of "name = value" parameters.  Lines starting with '#' and
+empty lines are interpreted as comments.
+.IP
+.B server =
+The URL for connecting to the server.  http:// and https:// are supported.
+.IP
+.B path =
+PATH environment etch should use when executing external commands.
+.IP
+.B local =
+Etch can read configuration from a local directory rather than from a server.
+If set this will override the server setting.
+.IP
+.B key =
+SSH host key to use for authentication rather than standard system key.
+.TP
 .B /etc/etch/ca.pem
 SSL certificate(s) needed to verify the
 .B etch
