@@ -31,6 +31,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     # Ensure original file is backed up and history log started
     #
+    testname = 'initial history test'
 
     # Put some text into the original file so that we can make sure it was
     # properly backed up.
@@ -58,9 +59,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running initial history test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@origfile), 'original backup of file')
     assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
@@ -69,15 +68,14 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     # Ensure history log is updated and original file does not change
     #
+    testname = 'history update'
 
     updatedsourcecontents = "This is a second test\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(updatedsourcecontents)
     end
 
-    # Run etch
-    #puts "Running update test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@origfile), 'original backup of file unchanged')
     assert_equal(origcontents, get_file_contents(File.join(@historydir, '0000')), '0000 history file')
@@ -87,6 +85,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     # Test revert feature
     #
+    testname = 'revert'
 
     # Intentionally mix revert with other instructions to make sure the file
     # is reverted and nothing else happens.
@@ -105,9 +104,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running revert test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'original contents reverted')
     assert(!File.exist?(@origfile), 'reverted original file')
@@ -120,15 +117,14 @@ class EtchHistoryTests < Test::Unit::TestCase
     # Update the contents of a reverted file and make sure etch doesn't
     # overwrite them, as it should no longer be managing the file.
     #
+    testname = 'no update to reverted file'
 
     updatedorigcontents = "This is new original text\n"
     File.open(@targetfile, 'w') do |file|
       file.write(updatedorigcontents)
     end
 
-    # Run etch
-    #puts "Running revert test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(updatedorigcontents, get_file_contents(@targetfile), 'Updated original contents unchanged')
     assert(!File.exist?(@origfile), 'reverted original file')
@@ -149,6 +145,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     # tries before we achieved convergence and the client sent the correct
     # original contents.
     #
+    testname = 'history setup'
     
     origcontents = "This is the original text"
     
@@ -175,9 +172,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.puts("@contents << IO.read(@original_file)")
     end
 
-    # Run etch
-    #puts "Running history setup test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(origcontents + "\n", get_file_contents(@origfile), 'original backup of file via setup')
     assert_equal(sourcecontents + origcontents + "\n", get_file_contents(@targetfile), 'contents using original backup of file via setup')
@@ -215,9 +210,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       EOF
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => 'delayed history setup, first run')
     
     origcontents = "This is the original text for #{testname}"
     
@@ -243,9 +236,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     assert_equal(origcontents + "\n", get_file_contents(@origfile), testname)
   end
@@ -254,6 +245,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     # Ensure original file is backed up when it is a link
     #
+    testname = 'history link'
 
     # Generate another file to use as our link target
     @destfile = released_tempfile
@@ -281,9 +273,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running history link test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@origfile), 'original backup of link')
     assert_match("#{@targetfile} -> #{@destfile}", get_file_contents(File.join(@historydir, '0000')), '0000 history file of link')
@@ -293,6 +283,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     # Ensure original file is backed up when it is a directory
     #
+    testname = 'history directory'
 
     # Make the original target a directory
     File.delete(@targetfile)
@@ -326,9 +317,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running history directory test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@origfile), 'original backup of directory')
     # Verify that etch backed up the original directory properly
@@ -346,6 +335,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     # being converted to something else, as the original backup is handled
     # differently in that case
     #
+    testname = 'history directory'
 
     origtarfile = File.join(@testroot, 'var', 'etch', 'orig', "#{@targetfile}.TAR")
 
@@ -374,9 +364,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running history directory contents test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # In this case, because we converted a directory to something else the
     # original will be a tarball of the directory
@@ -390,6 +378,7 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     # Test the conversion of old RCS history logs to the new format
     #
+    testname = 'history conversion'
     
     # Mock up an original file and RCS history log
     mockorigcontents = "This is the original text\n"
@@ -443,9 +432,7 @@ class EtchHistoryTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running history conversion test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     assert_equal(mockorigcontents,   get_file_contents(File.join(@historydir, '0000')), 'RCS conv 0000 history file')
     assert_equal(mocksourcecontents, get_file_contents(File.join(@historydir, '0001')), 'RCS conv 0001 history file')

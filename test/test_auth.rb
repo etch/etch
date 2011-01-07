@@ -89,9 +89,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -120,9 +118,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -159,9 +155,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(origcontents)
     end
     
-    # Run etch with the wrong key to force a bad signature
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :errors_expected => true, :key => "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}")
+    run_etch(@server, @testroot, :errors_expected => true, :key => "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}", :testname => testname)
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -204,9 +198,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(origcontents)
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -219,7 +211,7 @@ class EtchAuthTests < Test::Unit::TestCase
     sleep 3
     repodir2 = initialize_repository
     server2 = start_server(repodir2)
-    run_etch(server2, @testroot)
+    run_etch(server2, @testroot, :testname => 'adding client to database')
     stop_server(server2)
     remove_repository(repodir2)
     
@@ -247,9 +239,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)

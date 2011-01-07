@@ -44,6 +44,7 @@ class EtchTransitionTests < Test::Unit::TestCase
     #
     # File to link transition
     #
+    testname = 'file to link transition'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -56,15 +57,14 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running file to link test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'file to link')
 
     #
     # File to directory transition
     #
+    testname = 'file to directory transition'
 
     # Reset target
     FileUtils.rm_rf(@targetfile)
@@ -81,9 +81,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running file to directory test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), 'file to directory')
   end
@@ -92,6 +90,7 @@ class EtchTransitionTests < Test::Unit::TestCase
     #
     # Link to file transition
     #
+    testname = 'link to file transition'
 
     # Reset target
     FileUtils.rm_rf(@targetfile)
@@ -116,9 +115,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running link to file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link to file')
@@ -128,6 +125,7 @@ class EtchTransitionTests < Test::Unit::TestCase
     # identical contents to the file contents we should be writing out
     # (to test that the comparison method doesn't follow symlinks)
     #
+    'link w/ same contents to file transition'
 
     # Reset target
     FileUtils.rm_rf(@targetfile)
@@ -155,9 +153,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running link w/ same contents to file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link w/ same contents to file')
@@ -165,6 +161,7 @@ class EtchTransitionTests < Test::Unit::TestCase
     #
     # Link to directory transition
     #
+    testname = 'link to directory transition'
 
     # Reset target
     FileUtils.rm_rf(@targetfile)
@@ -181,9 +178,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running link to directory test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), 'link to directory')
   end
@@ -192,6 +187,7 @@ class EtchTransitionTests < Test::Unit::TestCase
     #
     # Directory to file transition
     #
+    testname = 'directory to file transition'
 
     # Reset target
     FileUtils.rm_rf(@targetfile)
@@ -217,9 +213,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running directory to file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'directory to file')
@@ -227,6 +221,7 @@ class EtchTransitionTests < Test::Unit::TestCase
     #
     # Directory to link transition
     #
+    testname = 'directory to link transition'
 
     # Reset target
     FileUtils.rm_rf(@targetfile)
@@ -244,9 +239,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running directory to link test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'directory to link')
   end

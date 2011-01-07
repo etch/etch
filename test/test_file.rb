@@ -28,6 +28,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Run a test of basic file creation
     #
+    testname = 'initial file test'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -47,9 +48,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running initial file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -64,6 +63,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test with a template
     #
+    testname = 'file with template'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -84,9 +84,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(templatecontents)
     end
 
-    # Run etch
-    #puts "Running initial file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -101,6 +99,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test using a different warning file
     #
+    testname = 'different warning file'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -125,9 +124,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(warningcontents)
     end
 
-    # Run etch
-    #puts "Running different warning file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -142,6 +139,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test using no warning file
     #
+    testname = 'no warning file'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -162,9 +160,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running no warning file test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'no warning file')
@@ -172,6 +168,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test using a different line comment string
     #
+    testname = 'different line comment string'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -192,9 +189,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running different line comment test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -209,6 +204,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test using comment open/close
     #
+    testname = 'comment open/close'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -231,9 +227,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running comment open/close test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = "/*\n"
@@ -249,6 +243,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test warning on second line
     #
+    testname = 'warning on second line'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -271,9 +266,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running warning on second line test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = sourcecontents_firstline
@@ -289,6 +282,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test no space around warning
     #
+    testname = 'no space around warning'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -309,9 +303,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running no space around warning test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -325,6 +317,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test ownership and permissions
     #
+    testname = 'ownership and permissions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -342,9 +335,7 @@ class EtchFileTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running file ownership and permissions test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file ownership got set correctly
     #  Most systems don't support give-away chown, so this test won't work
@@ -362,6 +353,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test ownership w/ bogus owner/group names
     #
+    testname = 'file ownership w/ bogus owner/group names'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -378,9 +370,7 @@ class EtchFileTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running file ownership w/ bogus owner/group names"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the ownership defaulted to UID/GID 0
     #  Most systems don't support give-away chown, so this test won't work
@@ -395,6 +385,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Run a test of always_manage_metadata
     #
+    testname = 'always_manage_metadata'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -414,9 +405,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(testcontents)
     end
 
-    # Run etch
-    #puts "Running always_manage_metadata test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file permissions got set correctly
     perms = File.stat(@targetfile).mode & 07777
@@ -428,6 +417,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test duplicate plain instructions
     #
+    testname = 'duplicate plain instructions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -454,9 +444,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running duplicate plain instructions test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate plain instructions')
@@ -464,6 +452,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test contradictory plain instructions
     #
+    testname = 'contradictory plain instructions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -493,9 +482,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(source2contents)
     end
 
-    # Run etch
-    #puts "Running contradictory plain instructions test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory plain instructions')
@@ -503,6 +490,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test duplicate template instructions
     #
+    testname = 'duplicate template instructions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -529,9 +517,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running duplicate template instructions test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate template instructions')
@@ -539,6 +525,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test contradictory template instructions
     #
+    testname = 'contradictory template instructions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -568,9 +555,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(source2contents)
     end
 
-    # Run etch
-    #puts "Running contradictory template instructions test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory template instructions')
@@ -578,6 +563,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test duplicate script instructions
     #
+    testname = 'duplicate script instructions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -604,9 +590,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.puts("@contents << '#{sourcecontents}'")
     end
 
-    # Run etch
-    #puts "Running duplicate script instructions test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate script instructions')
@@ -614,6 +598,7 @@ class EtchFileTests < Test::Unit::TestCase
     #
     # Test contradictory script instructions
     #
+    testname = 'contradictory script instructions'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -643,9 +628,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(source2contents)
     end
 
-    # Run etch
-    #puts "Running contradictory script instructions test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory script instructions')
@@ -682,9 +665,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(specialtargetfile), testname)

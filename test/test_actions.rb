@@ -33,6 +33,7 @@ class EtchActionTests < Test::Unit::TestCase
     # Basic tests to ensure that actions are performed under normal
     # circumstances
     #
+    testname = 'basic action test'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -74,9 +75,7 @@ class EtchActionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running initial action test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the actions were executed
     #  The setup actions will get run several times as we loop
@@ -100,7 +99,7 @@ class EtchActionTests < Test::Unit::TestCase
 
     # Run etch again and make sure that the exec_once command wasn't run
     # again
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => 'action test, exec_once')
 
     assert_equal("exec_once\n", get_file_contents("#{@repodir}/exec_once"), 'exec_once_2nd_check')
   end
@@ -109,6 +108,7 @@ class EtchActionTests < Test::Unit::TestCase
     #
     # Test a failed setup command to ensure etch aborts
     #
+    testname = 'failed setup'
 
     # Put some text into the original file so that we can make sure it
     # is not touched.
@@ -140,9 +140,7 @@ class EtchActionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running initial action test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed setup')
@@ -152,6 +150,7 @@ class EtchActionTests < Test::Unit::TestCase
     #
     # Test a failed pre command to ensure etch aborts
     #
+    testname = 'failed pre'
 
     # Put some text into the original file so that we can make sure it
     # is not touched.
@@ -183,9 +182,7 @@ class EtchActionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running failed pre test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed pre')
@@ -196,6 +193,7 @@ class EtchActionTests < Test::Unit::TestCase
     # Run a test where the test action fails, ensure that the original
     # target file is restored and any post actions re-run afterwards
     #
+    testname = 'failed test'
 
     # Put some text into the original file so that we can make sure it
     # is restored.
@@ -232,9 +230,7 @@ class EtchActionTests < Test::Unit::TestCase
       file.write("Testing a failed test\n")
     end
 
-    # Run etch
-    #puts "Running failed test test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the original was restored, and that post was run twice
     assert_equal(origcontents, get_file_contents(@targetfile), 'failed test target')
@@ -246,6 +242,7 @@ class EtchActionTests < Test::Unit::TestCase
     # Run a test where the test_before_post action fails, ensure that
     # post is not run
     #
+    testname = 'failed test_before_post'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -268,9 +265,7 @@ class EtchActionTests < Test::Unit::TestCase
       EOF
     end
 
-    # Run etch
-    #puts "Running failed test_before_post test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that post was not run
     assert(!File.exist?("#{@repodir}/post"), 'failed test_before_post post')
@@ -279,14 +274,13 @@ class EtchActionTests < Test::Unit::TestCase
     # Run a test where the test action fails, and the original target file
     # is a symlink.  Ensure that the symlink is restored.
     #
+    testname = 'failed test_before_post symlink'
 
     # Prepare the target
     File.delete(@targetfile) if File.exist?(@targetfile)
     File.symlink(@destfile, @targetfile)
 
-    # Run etch
-    #puts "Running failed test symlink test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the original symlink was restored
     assert_equal(@destfile, File.readlink(@targetfile), 'failed test symlink')
@@ -295,15 +289,14 @@ class EtchActionTests < Test::Unit::TestCase
     # Run a test where the test action fails, and the original target file
     # is a directory.  Ensure that the directory is restored.
     #
+    testname = 'failed test_before_post directory'
 
     # Prepare the target
     File.delete(@targetfile) if File.exist?(@targetfile)
     Dir.mkdir(@targetfile)
     File.open("#{@targetfile}/testfile", 'w') { |file| }
 
-    # Run etch
-    #puts "Running failed test directory test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the original directory was restored
     assert(File.directory?(@targetfile), 'failed test directory')
@@ -314,6 +307,7 @@ class EtchActionTests < Test::Unit::TestCase
     # target file.  Ensure that the end result is that there is no file left
     # behind.
     #
+    testname = 'failed test_before_post no original'
 
     # We can reuse the config.xml from the previous test
 
@@ -323,9 +317,7 @@ class EtchActionTests < Test::Unit::TestCase
     end
     File.delete("#{@repodir}/post") if File.exist?("#{@repodir}/post")
 
-    # Run etch
-    #puts "Running failed test no original file test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the lack of an original file was restored
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'failed test no original file')
@@ -344,6 +336,7 @@ class EtchActionTests < Test::Unit::TestCase
     # back if the test fails) is made as /etc/foo/bar.XXXXX, which requires
     # that /etc/foo exist first.
     #
+    testname = 'test action with nested target'
     
     nestedtargetdir = deleted_tempfile
     nestedtargetfile = File.join(nestedtargetdir, 'etchnestedtest')
@@ -370,9 +363,7 @@ class EtchActionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running nested target with test test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(nestedtargetfile), 'nested target with test')
@@ -390,6 +381,7 @@ class EtchActionTests < Test::Unit::TestCase
     # So if the user wants to use something like && in an action they must
     # escape the & with &amp;
     #
+    testname = 'XML escape'
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -413,9 +405,7 @@ class EtchActionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running XML escape test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the action was executed
     assert_equal("post\n", get_file_contents("#{@repodir}/post_with_escape"), 'post with escape')
@@ -425,6 +415,7 @@ class EtchActionTests < Test::Unit::TestCase
     #
     # Test an action involving passing an environment variable
     #
+    testname = 'action with environment variable'
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -456,9 +447,7 @@ EOF
     end
     File.chmod(0755, "#{@repodir}/post_with_env")
     
-    # Run etch
-    #puts "Running environment variable test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Verify that the action was executed
     assert_equal("testvalue\n", get_file_contents("#{@repodir}/post_with_env_output"), 'post with environment variable')

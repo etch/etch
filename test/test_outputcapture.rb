@@ -64,9 +64,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Fetch the latest result for this client from the server and verify that
     # it contains the output from the post command.
@@ -116,13 +114,10 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
     begin
       Timeout.timeout(Etch::Client::OUTPUT_CAPTURE_TIMEOUT + 15) do
-        # Run etch
-        #puts "Running '#{testname}' test"
-        #
         # NOTE: This test is not normally run because the timeout is so long. 
         # Uncomment this run_etch line to run this test.
         #
-        #run_etch(@server, @testroot)
+        #run_etch(@server, @testroot, :testname => testname)
       end
     rescue Timeout::Error
       flunk('output capturing did not time out as expected')

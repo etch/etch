@@ -36,6 +36,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Start with a test of a script with a syntax error
     #
+    testname = 'script with syntax error'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -58,9 +59,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    # Run etch
-    #puts "Running script with syntax error test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with syntax error size comparison')
@@ -69,6 +68,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test where the script doesn't output anything
     #
+    testname = 'script with no output'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -91,9 +91,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    # Run etch
-    #puts "Running script with no output"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with no output size comparison')
@@ -102,6 +100,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test using a script to generate the contents of a file
     #
+    testname = 'script to generate the contents of a file'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -121,9 +120,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << '#{sourcecontents}'")
     end
 
-    # Run etch
-    #puts "Running file script test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -138,6 +135,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test where the script reads the contents from another file
     #
+    testname = 'script reads the contents from another file'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -162,9 +160,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << IO.read('source')")
     end
 
-    # Run etch
-    #puts "Running file source script test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -179,6 +175,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test where the script appends to the original file
     #
+    testname = 'script appends to the original file'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -202,9 +199,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << IO.read('source')")
     end
 
-    # Run etch
-    #puts "Running file source script test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -220,6 +215,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test of using a script to generate a link
     #
+    testname = 'script to generate a link'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -238,9 +234,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << '#{@destfile}'")
     end
 
-    # Run etch
-    #puts "Running link script test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link was created properly
     assert_equal(@destfile, File.readlink(@targetfile), 'link script')
@@ -249,6 +243,7 @@ class EtchScriptTests < Test::Unit::TestCase
     # Run a test where the script doesn't output anything in link
     # context
     #
+    testname = 'link script with no output'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -269,9 +264,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_readlink = File.readlink(@targetfile)
     before_ctime = File.stat(@targetfile).ctime
 
-    # Run etch
-    #puts "Running link script with no output"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_readlink, File.readlink(@targetfile), 'link script with no output readlink comparison')
@@ -280,6 +273,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test of using a script to generate a directory
     #
+    testname = 'script to generate a directory'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -296,9 +290,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    # Run etch
-    #puts "Running directory script test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the directory was created
     assert(File.directory?(@targetfile), 'directory script')
@@ -307,6 +299,7 @@ class EtchScriptTests < Test::Unit::TestCase
     # Run a test where the script doesn't output anything in directory
     # context
     #
+    testname = 'directory script with no output'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -331,9 +324,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    # Run etch
-    #puts "Running directory script with no output"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'directory script with no output size comparison')
@@ -342,6 +333,7 @@ class EtchScriptTests < Test::Unit::TestCase
     #
     # Run a test of using a script to delete
     #
+    testname = 'script to delete'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -359,9 +351,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    # Run etch
-    #puts "Running delete script test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was removed
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'delete script')
@@ -370,6 +360,7 @@ class EtchScriptTests < Test::Unit::TestCase
     # Run a test where the script doesn't output anything in delete
     # context
     #
+    testname = 'delete script with no output'
 
     # Recreate the target file
     origcontents = "This is the original text\n"
@@ -396,9 +387,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    # Run etch
-    #puts "Running delete script with no output"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'delete script with no output size comparison')

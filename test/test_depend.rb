@@ -29,6 +29,7 @@ class EtchDependTests < Test::Unit::TestCase
     #
     # Run a basic dependency test
     #
+    testname = 'initial dependency test'
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -74,9 +75,7 @@ class EtchDependTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running initial dependency test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'dependency file 1')
@@ -136,9 +135,7 @@ class EtchDependTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :extra_args => @targetfile)
+    run_etch(@server, @testroot, :extra_args => @targetfile, :testname => testname)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'single request dependency file 1')
@@ -200,9 +197,7 @@ class EtchDependTests < Test::Unit::TestCase
       end
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :errors_expected => true, :extra_args => @targetfile)
+    run_etch(@server, @testroot, :errors_expected => true, :extra_args => @targetfile, :testname => testname)
 
     # Verify that the files weren't modified
     assert_equal(origcontents, get_file_contents(@targetfile), 'circular dependency file 1')
@@ -254,9 +249,7 @@ class EtchDependTests < Test::Unit::TestCase
       EOF
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot)
+    run_etch(@server, @testroot, :testname => testname)
     
     # Verify that the regular file and the command-generated file were created
     # properly

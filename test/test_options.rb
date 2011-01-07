@@ -29,6 +29,7 @@ class EtchOptionTests < Test::Unit::TestCase
     # Test killswitch (not really a command-line option, but seems to
     # fit best in this file)
     #
+    testname = 'killswitch'
 
     # Put some text into the original file so that we can make sure it is
     # not touched.
@@ -60,9 +61,7 @@ class EtchOptionTests < Test::Unit::TestCase
       file.write('killswitch test')
     end
     
-    # Run etch
-    #puts "Running killswitch test"
-    run_etch(@server, @testroot, :errors_expected => true)
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
   end
@@ -71,6 +70,7 @@ class EtchOptionTests < Test::Unit::TestCase
     #
     # Test --dry-run
     #
+    testname = '--dry-run'
 
     # Put some text into the original file so that we can make sure it is
     # not touched.
@@ -98,9 +98,7 @@ class EtchOptionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    # Run etch
-    #puts "Running --dry-run test"
-    run_etch(@server, @testroot, :extra_args => '--dry-run')
+    run_etch(@server, @testroot, :extra_args => '--dry-run', :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@targetfile), '--dry-run')
   end
@@ -231,9 +229,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2} etchtest1 etchtest2")
+    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2} etchtest1 etchtest2", :testname => testname)
     
     # Verify that only the requested files were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' file 1')
@@ -318,9 +314,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2}")
+    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2}", :testname => testname)
     
     # Verify that all were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' filesonly file 1')
@@ -412,9 +406,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    # Run etch
-    #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :extra_args => "etchtest1 #{targetfile2}")
+    run_etch(@server, @testroot, :extra_args => "etchtest1 #{targetfile2}", :testname => testname)
     
     # Verify that all were created
     assert_equal(origcontents + testname, get_file_contents(cmdtargetfile1), testname + ' cmdandfile cmd 1')
@@ -473,7 +465,7 @@ class EtchOptionTests < Test::Unit::TestCase
     sleep(5)
     
     # Test that we don't follow redirects by default
-    run_etch(@server, @testroot, :errors_expected => true, :extra_args => '', :port => redirect_port)
+    run_etch(@server, @testroot, :errors_expected => true, :extra_args => '', :port => redirect_port, :testname => testname)
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
     
     # Check that we do follow redirects with the appropriate option
@@ -497,7 +489,7 @@ class EtchOptionTests < Test::Unit::TestCase
       response.set_redirect(
         WEBrick::HTTPStatus::Found, "http://localhost:#{redirect_port}/")
     end
-    run_etch(@server, @testroot, :errors_expected => true, :port => redirect_port)
+    run_etch(@server, @testroot, :errors_expected => true, :port => redirect_port, :testname => testname)
     
     server.shutdown
     t.kill
