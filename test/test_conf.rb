@@ -308,6 +308,102 @@ class EtchConfTests < Test::Unit::TestCase
     assert(File.exist?("#{@repodir}/pathtest/testpost.output"))
   end
   
+  def test_conf_detailed_results
+    #
+    # Test the detailed_results setting in etch.conf
+    #
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file></warning_file>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    # No setting, should log to server by default
+    testname = 'etch.conf detailed_results setting, not set'
+    # We add a random component to the contents so that we can distinguish
+    # our test run from others in the server database
+    sourcecontents = "Test #{testname}, #{rand}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    run_etch(@server, @testroot, :testname => testname)
+    assert_match(sourcecontents, latest_result_message, testname)
+    
+    # Configure logging to server
+    testname = 'etch.conf detailed_results setting, log to server'
+    # We add a random component to the contents so that we can distinguish
+    # our test run from others in the server database
+    sourcecontents = "Test #{testname}, #{rand}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    FileUtils.mkdir_p("#{@testroot}/etc")
+    File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
+      file.puts "detailed_results = SERVER"
+    end
+    run_etch(@server, @testroot, :testname => testname)
+    assert_match(sourcecontents, latest_result_message, testname)
+    
+    # Configure logging to file
+    logfile = Tempfile.new('etchlog')
+    testname = 'etch.conf detailed_results setting, log to file'
+    sourcecontents = "Test #{testname}, #{rand}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    FileUtils.mkdir_p("#{@testroot}/etc")
+    File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
+      file.puts "detailed_results = #{logfile.path}"
+    end
+    run_etch(@server, @testroot, :testname => testname)
+    assert_match(sourcecontents, File.read(logfile.path), testname)
+    # Check that details weren't sent to server
+    # Odd that assert_no_match requires a Regexp when assert_match accepts a String
+    assert_no_match(Regexp.new(Regexp.escape(sourcecontents)), latest_result_message, testname)
+    
+    # Configure logging to server and file
+    logfile = Tempfile.new('etchlog')
+    testname = 'etch.conf detailed_results setting, log to server and file'
+    # We add a random component to the contents so that we can distinguish
+    # our test run from others in the server database
+    sourcecontents = "Test #{testname}, #{rand}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    FileUtils.mkdir_p("#{@testroot}/etc")
+    File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
+      file.puts "detailed_results = SERVER"
+      file.puts "detailed_results = #{logfile.path}"
+    end
+    run_etch(@server, @testroot, :testname => testname)
+    assert_match(sourcecontents, latest_result_message, testname)
+    assert_match(sourcecontents, File.read(logfile.path), testname)
+    
+    # Configure no logging
+    testname = 'etch.conf detailed_results setting, log nowhere'
+    sourcecontents = "Test #{testname}, #{rand}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    FileUtils.mkdir_p("#{@testroot}/etc")
+    File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
+      file.puts "detailed_results ="
+    end
+    run_etch(@server, @testroot, :testname => testname)
+    # Check that details weren't sent to server
+    # Odd that assert_no_match requires a Regexp when assert_match accepts a String
+    assert_no_match(Regexp.new(Regexp.escape(sourcecontents)), latest_result_message, testname)
+  end
+  
   def teardown
     remove_repository(@repodir)
     FileUtils.rm_rf(@testroot)

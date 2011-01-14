@@ -43,6 +43,7 @@ class Etch::Client
   PRIVATE_KEY_PATHS = ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh_host_rsa_key"]
   DEFAULT_CONFIGDIR = '/etc'
   DEFAULT_VARBASE = '/var/etch'
+  DEFAULT_DETAILED_RESULTS = ['SERVER']
   
   # We need these in relation to the output capturing
   ORIG_STDOUT = STDOUT.dup
@@ -75,6 +76,7 @@ class Etch::Client
     end
     
     @configfile = File.join(@configdir, 'etch.conf')
+    @detailed_results = []
     
     if File.exist?(@configfile)
       IO.foreach(@configfile) do |line|
@@ -119,6 +121,9 @@ class Etch::Client
           end
         elsif key == 'path'
           ENV['PATH'] = value
+        elsif key == 'detailed_results'
+          warn "Adding detailed results destination '#{value}'" if @debug
+          @detailed_results << value
         end
       end
     end
@@ -128,6 +133,10 @@ class Etch::Client
     end
     if !@key
       warn "No readable private key found, messages to server will not be signed and may be rejected depending on server configuration"
+    end
+    
+    if @detailed_results.empty?
+      @detailed_results = DEFAULT_DETAILED_RESULTS
     end
     
     @origbase    = File.join(@varbase, 'orig')
@@ -480,13 +489,15 @@ class Etch::Client
       rails_results << "fqdn=#{CGI.escape(@facts['fqdn'])}"
       rails_results << "status=#{CGI.escape(status.to_s)}"
       rails_results << "message=#{CGI.escape(message)}"
-      @results.each do |result|
-        # Strangely enough this works.  Even though the key is not unique to
-        # each result the Rails parameter parsing code keeps track of keys it
-        # has seen, and if it sees a duplicate it starts a new hash.
-        rails_results << "results[][file]=#{CGI.escape(result['file'])}"
-        rails_results << "results[][success]=#{CGI.escape(result['success'].to_s)}"
-        rails_results << "results[][message]=#{CGI.escape(result['message'])}"
+      if @detailed_results.include?('SERVER')
+        @results.each do |result|
+          # Strangely enough this works.  Even though the key is not unique to
+          # each result the Rails parameter parsing code keeps track of keys it
+          # has seen, and if it sees a duplicate it starts a new hash.
+          rails_results << "results[][file]=#{CGI.escape(result['file'])}"
+          rails_results << "results[][success]=#{CGI.escape(result['success'].to_s)}"
+          rails_results << "results[][message]=#{CGI.escape(result['message'])}"
+        end
       end
       puts "Sending results to server #{@resultsuri}" if (@debug)
       resultspost = Net::HTTP::Post.new(@resultsuri.path)
@@ -504,6 +515,27 @@ class Etch::Client
       else
         $stderr.puts "Error submitting results:"
         $stderr.puts response.body
+      end
+    end
+    
+    @detailed_results.each do |detail_dest|
+      # If any of the destinations look like a file (start with a /) then we
+      # log to that file
+      if detail_dest =~ %r{^/}
+        FileUtils.mkpath(File.dirname(detail_dest))
+        File.open(detail_dest, 'a') do |file|
+          # Add a header for the overall status of the run
+          file.puts "Etch run at #{Time.now}"
+          file.puts "Status: #{status}"
+          if !message.empty?
+            file.puts "Message:\n#{message}\n"
+          end
+          # Then the detailed results
+          @results.each do |result|
+            file.puts "File #{result['file']}, result #{result['success']}:\n"
+            file.puts result['message']
+          end
+        end
       end
     end
     
