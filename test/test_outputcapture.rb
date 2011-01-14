@@ -66,21 +66,6 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
     run_etch(@server, @testroot, :testname => testname)
     
-    # Fetch the latest result for this client from the server and verify that
-    # it contains the output from the post command.
-    hostname = Facter['fqdn'].value
-    latest_result_message = ''
-    Net::HTTP.start('localhost', @server[:port]) do |http|
-      response = http.get("/results.xml?clients.name=#{hostname}&sort=created_at_reverse")
-      if !response.kind_of?(Net::HTTPSuccess)
-        response.error!
-      end
-      response_xml = REXML::Document.new(response.body)
-      latest_result_message = nil
-      if response_xml.elements['/results/result/message']
-        latest_result_message = response_xml.elements['/results/result/message'].text
-      end
-    end
     assert_match(postoutput, latest_result_message, testname)
   end
   

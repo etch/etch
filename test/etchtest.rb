@@ -192,5 +192,23 @@ module EtchTests
       end
     end
   end
+  
+  # Fetch the latest result for this client from the server.  Useful for
+  # verifying that results were logged to the server as expected.
+  def latest_result_message
+    hostname = Facter['fqdn'].value
+    lrm = ''
+    Net::HTTP.start('localhost', @server[:port]) do |http|
+      response = http.get("/results.xml?clients.name=#{hostname}&sort=created_at_reverse")
+      if !response.kind_of?(Net::HTTPSuccess)
+        response.error!
+      end
+      response_xml = REXML::Document.new(response.body)
+      if response_xml.elements['/results/result/message']
+        lrm = response_xml.elements['/results/result/message'].text
+      end
+    end
+    lrm
+  end
 end
 
