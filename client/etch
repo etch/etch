@@ -35,6 +35,13 @@ opts.on('--damp-run', "Perform a dry run but run 'setup' entries for files.") do
   # entries.
   options[:dryrun] = 'damp'
 end
+opts.on('--list-files', 'Just list the files that would be configured') do |opt|
+  options[:listfiles] = opt
+  # generate all is implied
+  @generateall = true
+  # Set :dryrun as a extra measure to make sure we don't change anything
+  options[:dryrun] = 'listfiles'
+end
 opts.on('--interactive', 'Prompt for confirmation before each change.') do |opt|
   options[:interactive] = opt
 end

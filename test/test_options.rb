@@ -495,6 +495,47 @@ class EtchOptionTests < Test::Unit::TestCase
     t.kill
   end
   
+  def test_list_files
+    #
+    # Test --list-files
+    #
+    testname = '--list-files'
+    
+    # Put some text into the original file so that we can make sure it is
+    # not touched.
+    origcontents = "This is the original text\n"
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain>source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    sourcecontents = "This is a test\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+    
+    # Test that output from etch is appropriate
+    #run_etch(@server, @testroot, :extra_args => '--list-files', :testname => testname)
+    output = `ruby #{CLIENTDIR}/etch --generate-all --test-root=#{@testroot} --key=#{File.dirname(__FILE__)}/keys/testkey --server=http://localhost:#{@server[:port]} --list-files`
+    assert(output.include?("Files under management:\n#{@targetfile}\n"))
+    
+    # Ensure that the target file wasn't touched
+    assert_equal(origcontents, get_file_contents(@targetfile), testname)
+  end
+  
   def teardown
     remove_repository(@repodir)
     FileUtils.rm_rf(@testroot)

@@ -57,6 +57,7 @@ class Etch::Client
     @local = options[:local] ? File.expand_path(options[:local]) : nil
     @debug = options[:debug]
     @dryrun = options[:dryrun]
+    @listfiles = options[:listfiles]
     @interactive = options[:interactive]
     @filenameonly = options[:filenameonly]
     @fullfile = options[:fullfile]
@@ -206,6 +207,9 @@ class Etch::Client
     status = 0
     message = ''
     
+    # A variable to collect filenames if operating in @listfiles mode
+    files_to_list = {}
+    
     # Prep http instance
     http = nil
     if !@local
@@ -298,6 +302,11 @@ class Etch::Client
           unlock_all_files
         end
         
+        # It usually takes a few back and forth exchanges with the server to
+        # exchange all needed data and get a complete set of configuration. 
+        # The number of iterations is capped at 10 to prevent any unplanned
+        # infinite loops.  The limit of 10 was chosen somewhat arbitrarily but
+        # seems fine in practice.
         10.times do
           #
           # Send request to server
@@ -398,9 +407,13 @@ class Etch::Client
           # needed to create the original files.
           responsedata[:configs].each_key do |file|
             puts "Processing config for #{file}" if (@debug)
-            continue_processing = process_file(file, responsedata)
-            if !continue_processing
-              throw :stop_processing
+            if !@listfiles
+              continue_processing = process_file(file, responsedata)
+              if !continue_processing
+                throw :stop_processing
+              end
+            else
+              files_to_list[file] = true
             end
           end
           responsedata[:need_sums].each_key do |need_sum|
@@ -480,6 +493,11 @@ class Etch::Client
       end  # begin/rescue
     end  # catch
     
+    if @listfiles
+      puts "Files under management:"
+      files_to_list.keys.sort.each {|file| puts file}
+    end
+    
     # Send results to server
     if !@dryrun && !@local
       rails_results = []
@@ -518,22 +536,24 @@ class Etch::Client
       end
     end
     
-    @detailed_results.each do |detail_dest|
-      # If any of the destinations look like a file (start with a /) then we
-      # log to that file
-      if detail_dest =~ %r{^/}
-        FileUtils.mkpath(File.dirname(detail_dest))
-        File.open(detail_dest, 'a') do |file|
-          # Add a header for the overall status of the run
-          file.puts "Etch run at #{Time.now}"
-          file.puts "Status: #{status}"
-          if !message.empty?
-            file.puts "Message:\n#{message}\n"
-          end
-          # Then the detailed results
-          @results.each do |result|
-            file.puts "File #{result['file']}, result #{result['success']}:\n"
-            file.puts result['message']
+    if !@dryrun
+      @detailed_results.each do |detail_dest|
+        # If any of the destinations look like a file (start with a /) then we
+        # log to that file
+        if detail_dest =~ %r{^/}
+          FileUtils.mkpath(File.dirname(detail_dest))
+          File.open(detail_dest, 'a') do |file|
+            # Add a header for the overall status of the run
+            file.puts "Etch run at #{Time.now}"
+            file.puts "Status: #{status}"
+            if !message.empty?
+              file.puts "Message:\n#{message}\n"
+            end
+            # Then the detailed results
+            @results.each do |result|
+              file.puts "File #{result['file']}, result #{result['success']}:\n"
+              file.puts result['message']
+            end
           end
         end
       end
