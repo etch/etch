@@ -402,6 +402,8 @@ class EtchConfTests < Test::Unit::TestCase
     # Check that details weren't sent to server
     # Odd that assert_no_match requires a Regexp when assert_match accepts a String
     assert_no_match(Regexp.new(Regexp.escape(sourcecontents)), latest_result_message, testname)
+    
+    # FIXME: verify no logging in dry run mode
   end
   
   def teardown
