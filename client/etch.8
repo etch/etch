@@ -158,6 +158,12 @@ If set this will override the server setting.
 .IP
 .B key =
 SSH host key to use for authentication rather than standard system key.
+.IP
+.B detailed_results =
+Etch can send detailed results back to the server for viewing in the web UI
+and/or to a local log file.  Value should be SERVER or the full path to a log
+file.  Setting may be specified multiple times to send logs to multiple
+destinations.
 .TP
 .B /etc/etch/ca.pem
 SSL certificate(s) needed to verify the
