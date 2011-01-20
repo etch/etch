@@ -15,6 +15,9 @@ end
 opts.on('-t', '--timezone TIMEZONE', 'Time zone of etch server.') do |opt|
   options[:timezone] = opt
 end 
+opts.on('--nv SERVER', 'Where nVentory server is running.') do |opt|
+  options[:nv_server] = opt
+end
 opts.on_tail('-h', '--help', 'Show this message.') do
   puts opts
   exit
@@ -37,7 +40,12 @@ else  # if no timezone is specified then just use local time for the tag
 end
 
 # Find the requested clients
-nvclient = NVentory::Client.new
+nv_server = options[:nv_server]
+if nv_server
+  nvclient = NVentory::Client.new(:server=>"http://#{nv_server}")
+else
+  nvclient = NVentory::Client.new
+end
 results = nvclient.get_objects('nodes', {}, { 'name' => nodes }, {}, {})
 nodes.each do |name|
   if results.empty? && results[name].nil?
