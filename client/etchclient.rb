@@ -2292,13 +2292,25 @@ class Etch::Client
 
   def get_user_confirmation
     while true
-      print "Proceed/Skip/Quit? [p|s|q] "
-      response = $stdin.gets.chomp
-      if response == 'p'
+      print "Proceed/Skip/Quit? "
+      if instance_variable_defined?("@response")
+        case @response 
+          when /p|P/ then print "[P|s|q] "
+          when /s|S/ then print "[p|S|q] "
+          when /q|Q/ then print "[p|s|Q] "
+        end
+      else
+        print "[p|s|q] "
+      end
+      response  = $stdin.gets.chomp
+      if response =~ /p/i || (instance_variable_defined?("@response") && @response =~ /p/i)
+        @response = response if !response.strip.empty?
         return CONFIRM_PROCEED
-      elsif response == 's'
+      elsif response =~ /s/i || (instance_variable_defined?("@response") && @response =~ /s/i)
+        @response = response if !response.strip.empty?
         return CONFIRM_SKIP
-      elsif response == 'q'
+      elsif response =~ /q/i || (instance_variable_defined?("@response") && @response =~ /q/i)
+        @response = response if !response.strip.empty?
         return CONFIRM_QUIT
       end
     end
