@@ -35,7 +35,7 @@ require 'logger'
 require 'etch'
 
 class Etch::Client
-  VERSION = 'unset'
+  VERSION = '3.17.0'
   
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
@@ -43,7 +43,6 @@ class Etch::Client
   PRIVATE_KEY_PATHS = ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh_host_rsa_key"]
   DEFAULT_CONFIGDIR = '/etc'
   DEFAULT_VARBASE = '/var/etch'
-  DEFAULT_DETAILED_RESULTS = ['SERVER']
   
   # We need these in relation to the output capturing
   ORIG_STDOUT = STDOUT.dup
@@ -57,7 +56,6 @@ class Etch::Client
     @local = options[:local] ? File.expand_path(options[:local]) : nil
     @debug = options[:debug]
     @dryrun = options[:dryrun]
-    @listfiles = options[:listfiles]
     @interactive = options[:interactive]
     @filenameonly = options[:filenameonly]
     @fullfile = options[:fullfile]
@@ -67,6 +65,8 @@ class Etch::Client
     
     @configdir = DEFAULT_CONFIGDIR
     @varbase = DEFAULT_VARBASE
+
+    @last_response = ""
     
     @file_system_root = '/'  # Not sure if this needs to be more portable
     # This option is only intended for use by the test suite
@@ -77,7 +77,6 @@ class Etch::Client
     end
     
     @configfile = File.join(@configdir, 'etch.conf')
-    @detailed_results = []
     
     if File.exist?(@configfile)
       IO.foreach(@configfile) do |line|
@@ -122,9 +121,6 @@ class Etch::Client
           end
         elsif key == 'path'
           ENV['PATH'] = value
-        elsif key == 'detailed_results'
-          warn "Adding detailed results destination '#{value}'" if @debug
-          @detailed_results << value
         end
       end
     end
@@ -134,10 +130,6 @@ class Etch::Client
     end
     if !@key
       warn "No readable private key found, messages to server will not be signed and may be rejected depending on server configuration"
-    end
-    
-    if @detailed_results.empty?
-      @detailed_results = DEFAULT_DETAILED_RESULTS
     end
     
     @origbase    = File.join(@varbase, 'orig')
@@ -206,9 +198,6 @@ class Etch::Client
     # their exit value.  Zero indicates no errors.
     status = 0
     message = ''
-    
-    # A variable to collect filenames if operating in @listfiles mode
-    files_to_list = {}
     
     # Prep http instance
     http = nil
@@ -302,11 +291,6 @@ class Etch::Client
           unlock_all_files
         end
         
-        # It usually takes a few back and forth exchanges with the server to
-        # exchange all needed data and get a complete set of configuration. 
-        # The number of iterations is capped at 10 to prevent any unplanned
-        # infinite loops.  The limit of 10 was chosen somewhat arbitrarily but
-        # seems fine in practice.
         10.times do
           #
           # Send request to server
@@ -407,13 +391,9 @@ class Etch::Client
           # needed to create the original files.
           responsedata[:configs].each_key do |file|
             puts "Processing config for #{file}" if (@debug)
-            if !@listfiles
-              continue_processing = process_file(file, responsedata)
-              if !continue_processing
-                throw :stop_processing
-              end
-            else
-              files_to_list[file] = true
+            continue_processing = process_file(file, responsedata)
+            if !continue_processing
+              throw :stop_processing
             end
           end
           responsedata[:need_sums].each_key do |need_sum|
@@ -493,11 +473,6 @@ class Etch::Client
       end  # begin/rescue
     end  # catch
     
-    if @listfiles
-      puts "Files under management:"
-      files_to_list.keys.sort.each {|file| puts file}
-    end
-    
     # Send results to server
     if !@dryrun && !@local
       rails_results = []
@@ -507,15 +482,13 @@ class Etch::Client
       rails_results << "fqdn=#{CGI.escape(@facts['fqdn'])}"
       rails_results << "status=#{CGI.escape(status.to_s)}"
       rails_results << "message=#{CGI.escape(message)}"
-      if @detailed_results.include?('SERVER')
-        @results.each do |result|
-          # Strangely enough this works.  Even though the key is not unique to
-          # each result the Rails parameter parsing code keeps track of keys it
-          # has seen, and if it sees a duplicate it starts a new hash.
-          rails_results << "results[][file]=#{CGI.escape(result['file'])}"
-          rails_results << "results[][success]=#{CGI.escape(result['success'].to_s)}"
-          rails_results << "results[][message]=#{CGI.escape(result['message'])}"
-        end
+      @results.each do |result|
+        # Strangely enough this works.  Even though the key is not unique to
+        # each result the Rails parameter parsing code keeps track of keys it
+        # has seen, and if it sees a duplicate it starts a new hash.
+        rails_results << "results[][file]=#{CGI.escape(result['file'])}"
+        rails_results << "results[][success]=#{CGI.escape(result['success'].to_s)}"
+        rails_results << "results[][message]=#{CGI.escape(result['message'])}"
       end
       puts "Sending results to server #{@resultsuri}" if (@debug)
       resultspost = Net::HTTP::Post.new(@resultsuri.path)
@@ -533,29 +506,6 @@ class Etch::Client
       else
         $stderr.puts "Error submitting results:"
         $stderr.puts response.body
-      end
-    end
-    
-    if !@dryrun
-      @detailed_results.each do |detail_dest|
-        # If any of the destinations look like a file (start with a /) then we
-        # log to that file
-        if detail_dest =~ %r{^/}
-          FileUtils.mkpath(File.dirname(detail_dest))
-          File.open(detail_dest, 'a') do |file|
-            # Add a header for the overall status of the run
-            file.puts "Etch run at #{Time.now}"
-            file.puts "Status: #{status}"
-            if !message.empty?
-              file.puts "Message:\n#{message}\n"
-            end
-            # Then the detailed results
-            @results.each do |result|
-              file.puts "File #{result['file']}, result #{result['success']}:\n"
-              file.puts result['message']
-            end
-          end
-        end
       end
     end
     
@@ -2293,24 +2243,21 @@ class Etch::Client
   def get_user_confirmation
     while true
       print "Proceed/Skip/Quit? "
-      if instance_variable_defined?("@response")
-        case @response 
-          when /p|P/ then print "[P|s|q] "
-          when /s|S/ then print "[p|S|q] "
-          when /q|Q/ then print "[p|s|Q] "
-        end
-      else
-        print "[p|s|q] "
+      case @last_response
+        when /p|P/ then print "[P|s|q] "
+        when /s|S/ then print "[p|S|q] "
+        when /q|Q/ then print "[p|s|Q] "
+        else print "[p|s|q] "
       end
-      response  = $stdin.gets.chomp
-      if response =~ /p/i || (instance_variable_defined?("@response") && @response =~ /p/i)
-        @response = response if !response.strip.empty?
+      response = $stdin.gets.chomp
+      if response =~ /p/i || @last_response =~ /p/i
+        @last_response = response if !response.strip.empty?
         return CONFIRM_PROCEED
-      elsif response =~ /s/i || (instance_variable_defined?("@response") && @response =~ /s/i)
-        @response = response if !response.strip.empty?
+      elsif response =~ /s/i || @last_response =~ /s/i
+        @last_response = response if !response.strip.empty?
         return CONFIRM_SKIP
-      elsif response =~ /q/i || (instance_variable_defined?("@response") && @response =~ /q/i)
-        @response = response if !response.strip.empty?
+      elsif response =~ /q/i || @last_response =~ /q/i
+        @last_response = response if !response.strip.empty?
         return CONFIRM_QUIT
       end
     end
