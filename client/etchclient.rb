@@ -1981,8 +1981,9 @@ class Etch::Client
     requests
   end
   
-  # Haven't found a Ruby method for creating temporary directories,
-  # so create a temporary file and replace it with a directory.
+  # Ruby 1.8.7 and later have Dir.mktmpdir, but we support ruby 1.8.5 for
+  # RHEL/CentOS 5.  So this is a basic substitute.
+  # FIXME: consider "backport" for Dir.mktmpdir
   def tempdir(file)
     filebase = File.basename(file)
     filedir = File.dirname(file)
