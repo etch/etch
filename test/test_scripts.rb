@@ -52,7 +52,7 @@ class EtchScriptTests < Test::Unit::TestCase
     end
 
     File.open("#{@repodir}/source/#{@targetfile}/source.script", 'w') do |file|
-      file.write('syntax error')
+      file.write('syntax_error')
     end
 
     # Gather some stats about the file before we run etch
@@ -64,7 +64,72 @@ class EtchScriptTests < Test::Unit::TestCase
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with syntax error size comparison')
     assert_equal(before_ctime, File.stat(@targetfile).ctime, 'script with syntax error ctime comparison')
-
+    
+    #
+    # Script that calls return, make sure nothing blows up
+    #
+    testname = 'script calls return'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <source>
+              <script>source.script</script>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    File.open("#{@repodir}/source/#{@targetfile}/source.script", 'w') do |file|
+      file.write('return')
+    end
+    
+    # Gather some stats about the file before we run etch
+    before_size = File.stat(@targetfile).size
+    before_ctime = File.stat(@targetfile).ctime
+    
+    #run_etch(@server, @testroot, :errors_expected => false, :testname => testname)
+    run_etch(@server, @testroot, :testname => testname)
+    
+    # Verify that etch didn't do anything to the file
+    assert_equal(before_size, File.stat(@targetfile).size, testname + ' size comparison')
+    assert_equal(before_ctime, File.stat(@targetfile).ctime, testname + ' ctime comparison')
+    
+    #
+    # Script that calls exit, make sure nothing blows up
+    #
+    testname = 'script calls exit'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <source>
+              <script>source.script</script>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    File.open("#{@repodir}/source/#{@targetfile}/source.script", 'w') do |file|
+      file.write('exit')
+    end
+    
+    # Gather some stats about the file before we run etch
+    before_size = File.stat(@targetfile).size
+    before_ctime = File.stat(@targetfile).ctime
+    
+    run_etch(@server, @testroot, :testname => testname)
+    
+    # Verify that etch didn't do anything to the file
+    assert_equal(before_size, File.stat(@targetfile).size, testname + ' size comparison')
+    assert_equal(before_ctime, File.stat(@targetfile).ctime, testname + ' ctime comparison')
+    
     #
     # Run a test where the script doesn't output anything
     #

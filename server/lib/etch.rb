@@ -1384,7 +1384,7 @@ class EtchExternalSource
     @dlogger.debug "Processing script #{script} for file #{@file}"
     @contents = ''
     begin
-      eval(IO.read(script))
+      run_script_stage2(script)
     rescue Exception => e
       if e.kind_of?(SystemExit)
         # The user might call exit within a script.  We want the scripts
@@ -1396,6 +1396,14 @@ class EtchExternalSource
       end
     end
     @contents
+  end
+  # The user might call return within a script.  We want the scripts to act as
+  # much like a real script as possible.  Wrapping the eval in an extra method
+  # allows us to handle a return within the script seamlessly.  If the user
+  # calls return it triggers a return from this method.  Otherwise this method
+  # returns naturally.  Either works for us.
+  def run_script_stage2(script)
+    eval(IO.read(script))
   end
 end
 
