@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Solaris assumes init scripts are shell scripts and explicity calls
+# them via /sbin/sh rather than just executing them.  rc.static-routes
+# is a Perl script, so this is a simple wrapper around it to make things
+# work properly.
+
+/etc/rc.static-routes "$@"
+

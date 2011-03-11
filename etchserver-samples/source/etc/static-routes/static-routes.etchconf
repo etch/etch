@@ -1,0 +1,4 @@
+# nodegroup			# filename
+nodegroup1			static-routes.group1
+nodegroup2			static-routes.group2
+

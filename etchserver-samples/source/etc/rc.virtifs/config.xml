@@ -1,0 +1,10 @@
+<config>
+	<file>
+		<perms>555</perms>
+		<warning_on_second_line/>
+		<source>
+			<plain>rc.virtifs</plain>
+		</source>
+	</file>
+</config>
+

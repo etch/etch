@@ -1,0 +1,76 @@
+#!/usr/bin/ruby
+
+require 'ipaddr'
+
+# Given an IP return true if the IP is in the same subnet as any of the
+# interfaces on this machine
+def directly_reachable(target)
+  number_of_interfaces_checked = 0
+  @facts['interfaces'].split(',').each do |inf|
+    if @facts["ipaddress_#{inf}"] && @facts["netmask_#{inf}"]
+      number_of_interfaces_checked += 1
+      infaddr = IPAddr.new(@facts["ipaddress_#{inf}"] + '/' + @facts["netmask_#{inf}"])
+      return true if infaddr.include?(IPAddr.new(target))
+    end
+  end
+  if number_of_interfaces_checked > 0
+    return false
+  else
+    # If Facter failed for some reason and didn't send us any interface
+    # data we don't want to have etch unconfigure/misconfigure the
+    # networking on the client
+    abort "No interface addresses/netmasks received"
+  end
+end
+
+# Filters the supplied routing config file, leaving only routes which have
+# a destination directly reachable via one of the client's interfaces.  This
+# allows us to put the routes for all subnets in one file, rather than
+# maintaining a seperate route file for each subnet.  This isn't strictly
+# necessary on some platforms, as on those platforms attempting to add a
+# route to an unreachable destination will fail.  However, there are
+# platforms that will let you add routes to unreachable destinations, and
+# packets taking that route silently disappear.
+def filter(file)
+  output = ''
+  IO.foreach(file) do |line|
+    next if line =~ /^\s*$/  # Skip blank lines
+    next if line =~ /^\s*#/  # Skip comments
+    
+    dest, via = line.split
+    if via =~ /^\d+\.\d+\.\d+\.\d+$/ && directly_reachable(via)
+      output << line
+    else
+      @facts['interfaces'].split(',').each do |inf|
+        if via == inf
+          output << line
+        end
+      end
+    end
+  end
+  
+  if !output.empty?
+    output.insert(0, "# Entries from #{file}\n")
+  end
+  output
+end
+
+test_contents = []
+IO.foreach('static-routes.etchconf') do |line|
+  line.chomp!
+  next if line =~ /^\s*$/  # Skip blank lines
+  next if line =~ /^\s*#/  # Skip comments
+
+  group, file = line.split(' ', 2)
+  if @groups.include?(group)
+    test_contents << filter(file)
+  end
+end
+
+if !test_contents.empty?
+  testpass = ''
+  test_contents.each { |lines| lines.each { |line| dest, via = line.split ; (testpass = true) if dest == 'default' }}
+  if testpass == true
+    test_contents.each { |addme| @contents << addme }
+  end
+end

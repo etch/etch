@@ -1,0 +1,16 @@
+<config>
+	<file>
+		<!-- Shell script -->
+		<perms>555</perms>
+		<warning_on_second_line/>
+		<source>
+			<plain>rc.static-routes</plain>
+		</source>
+	</file>
+	<test>
+		<exec kernel="Linux">ping -c1 -W20 -q etch</exec>
+		<exec operatingsystem="Solaris">ping etch 20</exec>
+		<exec operatingsystem="FreeBSD">ping -c1 -t20 -q etch</exec>
+	</test>
+</config>
+

@@ -1,0 +1,4 @@
+# Node group		Virtual IP or hostname
+nodegroup1			10.1.2.3
+nodegroup2			virtual1.example.com
+

@@ -1,0 +1,21 @@
+#!/usr/bin/ruby
+
+require 'resolv'
+
+IO.foreach('virtifs.etchconf') do |line|
+	line.chomp!
+	next if line =~ /^\s*$/  # Skip blank lines
+	next if line =~ /^\s*#/  # Skip comments
+
+	group, hostname = line.split
+	if @groups.include?(group)
+		res = Resolv::DNS::new()
+		addr = res.getaddress(hostname)
+		if !addr
+				abort "DNS lookup of virtual interface #{hostname} failed"
+		end
+		ip = addr.to_s
+		@contents << hostname << ' ' << ip << "\n"
+	end
+end
+

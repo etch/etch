@@ -1,0 +1,20 @@
+<config>
+	<depend>/etc/rc.static-routes</depend>
+
+	<file>
+		<source>
+			<script>static-routes.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec>/etc/rc.static-routes</exec>
+	</post>
+
+	<test>
+		<exec kernel="Linux">ping -c3 -W20 -q etch</exec>
+		<exec operatingsystem="Solaris">sleep 3 ; ping etch 20</exec>
+		<exec operatingsystem="FreeBSD">ping -c3 -t20 -q etch</exec>
+	</test>
+</config>
+

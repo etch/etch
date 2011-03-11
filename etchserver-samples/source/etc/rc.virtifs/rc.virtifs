@@ -1,0 +1,80 @@
+#!/usr/bin/ruby -w
+
+require 'facter'
+require 'resolv'
+require 'ipaddr'
+
+ENV['PATH'] = '/bin:/sbin:/usr/bin:/usr/sbin'
+
+VIRTIFS_CONFIG = '/etc/virtifs'
+
+# Silently exit if the config file doesn't exist, that's an indication
+# that this machine doesn't need any virtual interfaces configured.
+exit if !File.exist?(VIRTIFS_CONFIG)
+
+# Tell facter to load everything, otherwise it tries to dynamically
+# load the individual fact libraries using a very broken mechanism
+Facter.loadfacts
+
+# Prepare the configuration of our virtual interfaces
+virtcounters = {}
+virtifs = {}
+IO.foreach(VIRTIFS_CONFIG) do |line|
+	line.chomp!
+	next if line =~ /^\s*#/  # Skip comments
+	next if line =~ /^\s*$/  # And blank lines
+	hostname, cachedip = line.split
+
+	# Try to look up the IP for that hostname
+	res = Resolv::DNS::new()
+	ip = nil
+	begin
+		addr = res.getaddress(hostname)
+		ip = addr.to_s
+	rescue Resolv::ResolvError
+		ip = cachedip
+	end
+	ipaddr = IPAddr.new(ip)
+
+	# Find the physical interface to which this virtual interface should
+	# belong
+	Facter['interfaces'].value.split(',').each do |nic|
+		if nic !~ /:/ && nic !~ /__tmp/
+			ifip = Facter["ipaddress_#{nic}"].value
+			next if ifip.nil?
+			mask = Facter["netmask_#{nic}"].value
+			subnetaddr = IPAddr.new("#{ifip}/#{mask}")
+			if subnetaddr.include?(ipaddr)
+				# Calculate the virtual interface name
+				virtif = nic + ':'
+				if virtcounters.has_key?(nic)
+					virtcounters[nic] += 1
+				else
+					virtcounters[nic] = 0
+				end
+				virtif << virtcounters[nic].to_s
+				# Store the interface data
+				virtifs[virtif] = { 'ip' => ip, 'mask' => mask }
+				break
+			end
+		end
+	end
+end
+
+# Clean up any existing virtual interfaces
+Facter['interfaces'].value.split(',').each do |nic|
+	if nic =~ /:/
+		puts "ifconfig #{nic} down"
+		system "ifconfig #{nic} down"
+	end
+end
+
+# Activate our virtual interface configuration
+virtifs.each do |virtif, virtifdata|
+	ip = virtifdata['ip']
+	mask = virtifdata['mask']
+
+	puts "ifconfig #{virtif} #{ip} netmask #{mask}"
+	system "ifconfig #{virtif} #{ip} netmask #{mask}"
+end
+

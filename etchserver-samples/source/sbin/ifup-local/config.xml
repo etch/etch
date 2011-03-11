@@ -1,0 +1,11 @@
+<config>
+	<file>
+		<!-- Shell script -->
+		<perms>555</perms>
+		<warning_on_second_line/>
+		<source>
+			<plain operatingsystem="/RedHat|CentOS/">ifup-local</plain>
+		</source>
+	</file>
+</config>
+

@@ -1,0 +1,9 @@
+# You might have multiple clients that need a similar set of routes, but
+# those clients are on multiple subnets and they need to use the correct
+# gateway for their subnet.  No worries, just list them all here and
+# static-routes.script will only add the routes that are reachable by
+# any given client.
+default         10.1.8.10
+10.0.0.0/8      10.1.8.1
+default         10.1.10.10
+10.0.0.0/8      10.1.10.1

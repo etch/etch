@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Setup any virtual interfaces needed on this system
+/etc/rc.virtifs
+# Setup any custom routing needed on this system
+/etc/rc.static-routes
+

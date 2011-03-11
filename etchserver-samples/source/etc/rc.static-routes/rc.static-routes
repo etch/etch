@@ -1,0 +1,445 @@
+#!/usr/bin/perl -w
+##############################################################################
+# This script controls routing on systems which need some form of static
+# routing configuration.
+##############################################################################
+
+$ENV{PATH} = '/bin:/sbin:/usr/bin:/usr/sbin';
+
+my $OS = `uname -s`;
+chomp $OS;
+
+my $ROUTE_CONFIG = "/etc/static-routes";
+
+# Silently exit if the route config file doesn't exist, that's an
+# indication that this machine doesn't need any special routing.
+exit if (! -f $ROUTE_CONFIG);
+
+# First clean out any existing static routes
+clean_routing_table();
+
+# Then add the desired static routes
+open(RC, "<$ROUTE_CONFIG") || die;
+while(<RC>)
+{
+	next if (/^\s*#/);  # Skip comments
+	next if (/^\s*$/);  # And blank lines
+
+	# Lines in the file contain two fields, seperated by whitespace.
+	# The first field is a destination (network and netmask) in
+	# nnn.nnn.nnn.nnn/xx format.
+	# The second field is either a gateway IP, or a network
+	# interface name.
+	# Examples:
+	# 10.0.0.0/4	10.8.90.1
+	# 224.0.0.0/4	eth0
+
+	my ($dest, $via) = split;
+	if ($dest && $via)
+	{
+		if (($dest =~ /\//) || ($dest eq "default"))
+		{
+			if ($via =~ /^\d+\.\d+\.\d+\.\d+$/)
+			{
+				add_route_via_gateway($dest, $via);
+			}
+			else
+			{
+				add_route_via_interface($dest, $via);
+			}
+		}
+		else
+		{
+			if ($via =~ /^\d+\.\d+\.\d+\.\d+$/)
+			{
+				add_host_route_via_gateway($dest, $via);
+			}
+			else
+			{
+				add_host_route_via_interface($dest, $via);
+			}
+		}
+	}
+}
+close(RC);
+
+#
+# Subroutines
+#
+
+sub clean_routing_table
+{
+	# Look through the routing table for things that look like
+	# static routes and remove them.
+	open(NETSTAT, 'netstat -rn |') || die;
+	while(<NETSTAT>)
+	{
+		if ($OS eq 'Linux')
+		{
+			my ($dest, $gw, $mask,
+				$flags, $mss, $window, $irtt, $if) = split;
+			# On Linux it seems that if the Gateway field
+			# is an IP address but isn't 0.0.0.0 then the
+			# route is static.
+			# Except for routes specified by interface
+			# instead of gateway.  It seems impossible to
+			# distinguish those in a general sense, so we
+			# cheat and make an exception for our multicast
+			# route.
+			if ($gw &&
+				$gw =~ /^\d+\.\d+\.\d+\.\d+$/ &&
+				$gw ne '0.0.0.0')
+			{
+				if ($flags && $flags =~ /H/)
+				{
+					delete_host_route_via_gateway($dest, $gw);
+				}
+				else
+				{
+					delete_route_via_gateway($dest, $gw, $mask);
+				}
+			}
+			elsif ($dest && $dest eq '224.0.0.0')
+			{
+				if ($flags && $flags =~ /H/)
+				{
+					delete_host_route_via_interface($dest, $if, $mask);
+				}
+				else
+				{
+					delete_route_via_interface($dest, $if, $mask);
+				}
+			}
+				
+		}
+		elsif ($OS eq 'SunOS')
+		{
+			my ($dest, $gw, $flags, $ref, $use, $if) = split;
+			# On Solaris it seems that if the Interface
+			# field is empty then the route is static.
+			# Except for routes specified by interface
+			# instead of gateway.  It seems impossible to
+			# distinguish those in a general sense, so we
+			# cheat and make an exception for our multicast
+			# route.
+			if ($gw && $gw =~ /^\d+\.\d+\.\d+\.\d+$/ && ! $if)
+			{
+				if ($flags && $flags =~ /H/)
+				{
+					delete_host_route_via_gateway($dest, $gw);
+				}
+				else
+				{
+					# There doesn't appear to be a way to
+					# get Solaris to show you the netmask
+					# associated with existing routes, but
+					# you need the netmask to remove the
+					# routes.  So guess at the netmask for
+					# standard routes in our environment and
+					# hope for the best.
+					if ($dest =~ /^10.0/)
+					{
+						$dest .= "/8";
+					}
+					elsif ($dest =~ /^10./)
+					{
+						$dest .= "/16";
+					}
+					elsif ($dest =~ /^172.16/)
+					{
+						$dest .= "/12";
+					}
+					elsif ($dest =~ /^192.168/)
+					{
+						$dest .= "/16";
+					}
+					elsif ($dest =~ /^224/)
+					{
+						$dest .= "/4";
+					}
+
+					delete_route_via_gateway($dest, $gw);
+				}
+			}
+			elsif ($dest && $dest eq '224.0.0.0')
+			{
+				if ($flags && $flags =~ /H/)
+				{
+					delete_host_route_via_interface($dest, $if);
+				}
+				else
+				{
+					# Guess at the netmask here too
+					$dest .= "/4";
+
+					delete_route_via_interface($dest, $if);
+				}
+			}
+		}
+		elsif ($OS eq 'FreeBSD')
+		{
+			my ($dest, $gw, $flags, $ref, $use, $if) = split;
+			# On FreeBSD if the 'Flags' field contains a 'S'
+			# then the route is static.  How civilized.
+			if ($flags && $flags =~ /S/)
+			{
+				if ($gw =~ /^\d+\.\d+\.\d+\.\d+$/)
+				{
+					if ($flags && $flags =~ /H/)
+					{
+						delete_host_route_via_gateway($dest, $gw);
+					}
+					else
+					{
+						delete_route_via_gateway($dest, $gw);
+					}
+				}
+				else
+				{
+					if ($flags && $flags =~ /H/)
+					{
+						delete_host_route_via_interface($dest, $if);
+					}
+					else
+					{
+						delete_route_via_interface($dest, $if);
+					}
+				}
+			}
+		}
+	}
+	close(NETSTAT);
+}
+
+sub add_route_via_gateway
+{
+	# We expect that the netmask for the route will be attached to
+	# the destination using the /xx format.
+	my ($dest, $gw) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route add -net $dest gw $gw");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		system("route add -net $dest $gw");
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route add -net $dest $gw");
+	}
+}
+
+sub add_host_route_via_gateway
+{
+	# We expect that the netmask for the route will be attached to
+	# the destination using the /xx format.
+	my ($dest, $gw) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route add -host $dest gw $gw");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		system("route add -host $dest $gw");
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route add -host $dest $gw");
+	}
+}
+
+sub add_route_via_interface
+{
+	# We expect that the netmask for the route will be attached to
+	# the destination using the /xx format.
+	my ($dest, $if) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route add -net $dest dev $if");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		my $ifip;
+		# Solaris is kinda wacky in that interface routes have
+		# to be added/delete using the IP of the interface, not
+		# the name of the interface.
+		open(IFCONFIG, "ifconfig $if |") || die;
+		while(<IFCONFIG>)
+		{
+			if (/inet (\d+\.\d+\.\d+\.\d+)/)
+			{
+				$ifip = $1;
+			}
+		}
+		close(IFCONFIG);
+
+		if ($ifip)
+		{
+			system("route add -net $dest -interface $ifip");
+		}
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route add -net $dest -interface $if");
+	}
+}
+
+sub add_host_route_via_interface
+{
+	# We expect that the netmask for the route will be attached to
+	# the destination using the /xx format.
+	my ($dest, $if) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route add -host $dest dev $if");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		my $ifip;
+		# Solaris is kinda wacky in that interface routes have
+		# to be added/delete using the IP of the interface, not
+		# the name of the interface.
+		open(IFCONFIG, "ifconfig $if |") || die;
+		while(<IFCONFIG>)
+		{
+			if (/inet (\d+\.\d+\.\d+\.\d+)/)
+			{
+				$ifip = $1;
+			}
+		}
+		close(IFCONFIG);
+
+		if ($ifip)
+		{
+			system("route add -host $dest -interface $ifip");
+		}
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route add -host $dest -interface $if");
+	}
+}
+
+sub delete_route_via_gateway
+{
+	# The mask is only supplied for Linux systems, on Solaris and
+	# FreeBSD the mask is attached in /xx format to the destination
+	# This is because netstat -rn on Linux reports the netmask
+	# associated with each route in a seperate column, rather than
+	# attaching it to the network number with the /xx format.
+	# And I'm too lazy to convert it.
+	my ($dest, $gw, $mask) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route del -net $dest netmask $mask gw $gw");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		system("route delete -net $dest $gw");
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route delete -net $dest $gw");
+	}
+}
+
+sub delete_host_route_via_gateway
+{
+	my ($dest, $gw) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route del -host $dest gw $gw");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		system("route delete -host $dest $gw");
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route delete -host $dest $gw");
+	}
+}
+
+sub delete_route_via_interface
+{
+	# The mask is only supplied for Linux systems, on Solaris and
+	# FreeBSD the mask is attached in /xx format to the destination.
+	# This is because netstat -rn on Linux reports the netmask
+	# associated with each route in a seperate column, rather than
+	# attaching it to the network number with the /xx format.
+	# And I'm too lazy to convert it.
+	my ($dest, $if, $mask) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route del -net $dest netmask $mask dev $if");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		my $ifip;
+		# Solaris is kinda wacky in that interface routes have
+		# to be added/delete using the IP of the interface, not
+		# the name of the interface.
+		open(IFCONFIG, "ifconfig $if |") || die;
+		while(<IFCONFIG>)
+		{
+			if (/inet (\d+\.\d+\.\d+\.\d+)/)
+			{
+				$ifip = $1;
+			}
+		}
+		close(IFCONFIG);
+
+		if ($ifip)
+		{
+			system("route delete -net $dest -interface $ifip");
+		}
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route delete -net $dest -interface $if");
+	}
+}
+
+sub delete_host_route_via_interface
+{
+	my ($dest, $if) = @_;
+
+	if ($OS eq 'Linux')
+	{
+		system("route del -host $dest dev $if");
+	}
+	elsif ($OS eq 'SunOS')
+	{
+		my $ifip;
+		# Solaris is kinda wacky in that interface routes have
+		# to be added/delete using the IP of the interface, not
+		# the name of the interface.
+		open(IFCONFIG, "ifconfig $if |") || die;
+		while(<IFCONFIG>)
+		{
+			if (/inet (\d+\.\d+\.\d+\.\d+)/)
+			{
+				$ifip = $1;
+			}
+		}
+		close(IFCONFIG);
+
+		if ($ifip)
+		{
+			system("route delete -host $dest -interface $ifip");
+		}
+	}
+	elsif ($OS eq 'FreeBSD')
+	{
+		system("route delete -host $dest -interface $if");
+	}
+}
+

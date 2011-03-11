@@ -1,0 +1,10 @@
+<config>
+	<file>
+		<perms>555</perms>
+		<warning_on_second_line/>
+		<source>
+			<plain operatingsystem="Solaris">S70static-routes</plain>
+		</source>
+	</file>
+</config>
+

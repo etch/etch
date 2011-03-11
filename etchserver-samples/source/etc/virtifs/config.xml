@@ -1,0 +1,14 @@
+<config>
+	<depend>/etc/rc.virtifs</depend>
+
+	<file>
+		<source>
+			<script>virtifs.script</script>
+		</source>
+	</file>
+
+	<post>
+		<exec>/etc/rc.virtifs</exec>
+	</post>
+</config>
+
