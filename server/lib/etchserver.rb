@@ -3,25 +3,6 @@ require 'base64'      # decode64, encode64
 require 'openssl'
 require 'time'        # Time.parse
 require 'fileutils'   # mkdir_p
-# By default we try to use libxml, falling back to rexml if it is not
-# available.  The xmllib environment variable can be used to force one library
-# or the other, mostly for testing purposes.
-begin
-  if !ENV['xmllib'] || ENV['xmllib'] == 'libxml'
-    require 'rubygems'  # libxml is a gem
-    require 'libxml'
-    @@xmllib = :libxml
-  else
-    raise LoadError
-  end
-rescue LoadError
-  if !ENV['xmllib'] || ENV['xmllib'] == 'rexml'
-    require 'rexml/document'
-    @@xmllib = :rexml
-  else
-    raise
-  end
-end
 require 'logger'
 require 'etch'
 
@@ -372,11 +353,11 @@ class Etch::Server
     
     # Generate the XML document to return to the client
     response_xml = Etch.xmlnewdoc
-    responseroot = Etch.xmlnewelem('files')
+    responseroot = Etch.xmlnewelem('files', response_xml)
     Etch.xmlsetroot(response_xml, responseroot)
     # Add configs for files we generated
     if response[:configs]
-      configs_xml = Etch.xmlnewelem('configs')
+      configs_xml = Etch.xmlnewelem('configs', response_xml)
       response[:configs].each do |file, config_xml|
         # Update the stored record of the config
         # Exclude configs which correspond to files for which we're requesting
@@ -408,18 +389,18 @@ class Etch::Server
         end
       end
       if !need_sum.empty?
-        need_sums_xml = Etch.xmlnewelem('need_sums')
+        need_sums_xml = Etch.xmlnewelem('need_sums', response_xml)
         need_sum.each do |need|
-          need_xml = Etch.xmlnewelem('need_sum')
+          need_xml = Etch.xmlnewelem('need_sum', response_xml)
           Etch.xmlsettext(need_xml, need)
           need_sums_xml << need_xml
         end
         responseroot << need_sums_xml
       end
       if !need_orig.empty?
-        need_origs_xml = Etch.xmlnewelem('need_origs')
+        need_origs_xml = Etch.xmlnewelem('need_origs', response_xml)
         need_orig.each do |need|
-          need_xml = Etch.xmlnewelem('need_orig')
+          need_xml = Etch.xmlnewelem('need_orig', response_xml)
           Etch.xmlsettext(need_xml, need)
           need_origs_xml << need_xml
         end
@@ -431,7 +412,7 @@ class Etch::Server
     # "commands", so we have to use something different here as the XML
     # element we insert all of those into as part of the response.
     if response[:allcommands]
-      commands_xml = Etch.xmlnewelem('allcommands')
+      commands_xml = Etch.xmlnewelem('allcommands', response_xml)
       response[:allcommands].each do |commandname, command_xml|
         # Update the stored record of the command
         config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => commandname, :config => command_xml.to_s)
@@ -444,19 +425,19 @@ class Etch::Server
       responseroot << commands_xml
     end
     if response[:retrycommands]
-      retrycommands_xml = Etch.xmlnewelem('retrycommands')
+      retrycommands_xml = Etch.xmlnewelem('retrycommands', response_xml)
       response[:retrycommands].each_key do |commandname|
-        retry_xml = Etch.xmlnewelem('retrycommand')
+        retry_xml = Etch.xmlnewelem('retrycommand', response_xml)
         Etch.xmlsettext(retry_xml, commandname)
         retrycommands_xml << retry_xml
       end
       responseroot << retrycommands_xml
     end
     
-    # FIXME: clean up XML formatting
+    # Clean up XML formatting
     # But only if we're in debug mode, in regular mode nobody but the
     # machines will see the XML and they don't care if it is pretty.
-    # Tidy's formatting breaks things, it inserts leading/trailing whitespace into text nodes
+    # FIXME: Tidy's formatting breaks things, it inserts leading/trailing whitespace into text nodes
     if @debug && false
       require 'tidy'
       Tidy.path = '/sw/lib/libtidy.dylib'

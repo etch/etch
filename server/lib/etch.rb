@@ -3,6 +3,19 @@ require 'pathname'    # absolute?
 require 'digest/sha1' # hexdigest
 require 'base64'      # decode64, encode64
 require 'fileutils'   # mkdir_p
+require 'erb'
+require 'versiontype' # Version
+require 'logger'
+
+class Etch
+  def self.xmllib
+    @@xmllib
+  end
+  def self.xmllib=(lib)
+    @@xmllib=lib
+  end
+end
+
 # By default we try to use libxml, falling back to rexml if it is not
 # available.  The xmllib environment variable can be used to force one library
 # or the other, mostly for testing purposes.
@@ -10,24 +23,24 @@ begin
   if !ENV['xmllib'] || ENV['xmllib'] == 'libxml'
     require 'rubygems'  # libxml is a gem
     require 'libxml'
-    @@xmllib = :libxml
+    Etch.xmllib = :libxml
+  elsif ENV['xmllib'] == 'nokogiri'
+    require 'rubygems'  # nokogiri is a gem
+    require 'nokogiri'
+    Etch.xmllib = :nokogiri
   else
     raise LoadError
   end
 rescue LoadError
   if !ENV['xmllib'] || ENV['xmllib'] == 'rexml'
     require 'rexml/document'
-    @@xmllib = :rexml
+    Etch.xmllib = :rexml
   else
     raise
   end
 end
-require 'erb'
-require 'versiontype' # Version
-require 'logger'
 
 class Etch
-  
   # FIXME: I'm not really proud of this, it seems like there ought to be a way
   # to just use one logger.  The problem is that on the server we'd like to
   # use RAILS_DEFAULT_LOGGER for general logging (which is logging to
@@ -270,8 +283,10 @@ class Etch
     end
     
     # Validate the filtered file against config.dtd
-    if !Etch.xmlvalidate(config_xml, @config_dtd)
-      raise "Filtered config.xml for #{file} fails validation"
+    begin
+      Etch.xmlvalidate(config_xml, @config_dtd)
+    rescue Exception => e
+      raise Etch.wrap_exception(e, "Filtered config.xml for #{file} fails validation:\n" + e.message)
     end
     
     generation_status = :unknown
@@ -846,8 +861,10 @@ class Etch
     end
     
     # Validate the filtered file against commands.dtd
-    if !Etch.xmlvalidate(commands_xml, @commands_dtd)
-      raise "Filtered commands.xml for #{command} fails validation"
+    begin
+      Etch.xmlvalidate(commands_xml, @commands_dtd)
+    rescue Exception => e
+      raise Etch.wrap_exception(e, "Filtered commands.xml for #{command} fails validation:\n" + e.message)
     end
     
     generation_status = :unknown
@@ -1076,101 +1093,153 @@ class Etch
     end
   end
   
+  # These methods provide an abstraction from the underlying XML library in
+  # use, allowing us to use whatever the user has available and switch between
+  # libraries easily.
+  
   def self.xmlnewdoc
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       LibXML::XML::Document.new
+    when :nokogiri
+      Nokogiri::XML::Document.new
     when :rexml
       REXML::Document.new
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlroot(doc)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
+      doc.root
+    when :nokogiri
       doc.root
     when :rexml
       doc.root
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlsetroot(doc, root)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
+      doc.root = root
+    when :nokogiri
       doc.root = root
     when :rexml
       doc << root
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlload(file)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       LibXML::XML::Document.file(file)
+    when :nokogiri
+      Nokogiri::XML(File.open(file)) do |config|
+        # Nokogiri is tolerant of malformed documents by default.  Good when
+        # parsing HTML, but there's no reason for us to tolerate errors.  We
+        # want to ensure that the user's instructions to us are clear.
+        config.options = Nokogiri::XML::ParseOptions::STRICT
+      end
     when :rexml
       REXML::Document.new(File.open(file))
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlloaddtd(dtdfile)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       LibXML::XML::Dtd.new(IO.read(dtdfile))
+    when :nokogiri
+      # For some reason there isn't a straightforward way to load a standalone
+      # DTD in Nokogiri
+      dtddoctext = '<!DOCTYPE dtd [' + File.read(dtdfile) + ']'
+      dtddoc = Nokogiri::XML(dtddoctext)
+      dtddoc.children.first
     when :rexml
       nil
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
+  # Returns true if validation is successful, or if validation is not
+  # supported by the XML library in use.  Raises an exception if validation
+  # fails.
   def self.xmlvalidate(xmldoc, dtd)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
-      xmldoc.validate(dtd)
+      result = xmldoc.validate(dtd)
+      # LibXML::XML::Document#validate is documented to return false if
+      # validation fails.  However, as currently implemented it raises an
+      # exception instead.  Just in case that behavior ever changes raise an
+      # exception if a false value is returned.
+      if result
+        true
+      else
+        raise "Validation failed"
+      end
+    when :nokogiri
+      errors = dtd.validate(xmldoc)
+      if errors.empty?
+        true
+      else
+        raise errors.join('|')
+      end
     when :rexml
       true
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
-  def self.xmlnewelem(name)
-    case @@xmllib
+  def self.xmlnewelem(name, doc)
+    case Etch.xmllib
     when :libxml
       LibXML::XML::Node.new(name)
+    when :nokogiri
+      Nokogiri::XML::Element.new(name, doc)
     when :rexml
       REXML::Element.new(name)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmleach(xmldoc, xpath, &block)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       xmldoc.find(xpath).each(&block)
+    when :nokogiri
+      xmldoc.xpath(xpath).each(&block)
     when :rexml
       xmldoc.elements.each(xpath, &block)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmleachall(xmldoc, &block)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       if xmldoc.kind_of?(LibXML::XML::Document)
         xmldoc.root.each_element(&block)
       else
         xmldoc.each_element(&block)
+      end
+    when :nokogiri
+      if xmldoc.kind_of?(Nokogiri::XML::Document)
+        xmldoc.root.element_children.each(&block)
+      else
+        xmldoc.element_children.each(&block)
       end
     when :rexml
       if xmldoc.node_type == :document
@@ -1179,23 +1248,25 @@ class Etch
         xmldoc.elements.each(&block)
       end
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmleachattrall(elem, &block)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       elem.attributes.each(&block)
+    when :nokogiri
+      elem.attribute_nodes.each(&block)
     when :rexml
       elem.attributes.each_attribute(&block)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlarray(xmldoc, xpath)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       elements = xmldoc.find(xpath)
       if elements
@@ -1203,27 +1274,33 @@ class Etch
       else
         []
       end
+    when :nokogiri
+      xmldoc.xpath(xpath).to_a
     when :rexml
       xmldoc.elements.to_a(xpath)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlfindfirst(xmldoc, xpath)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       xmldoc.find_first(xpath)
+    when :nokogiri
+      xmldoc.at_xpath(xpath)
     when :rexml
       xmldoc.elements[xpath]
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmltext(elem)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
+      elem.content
+    when :nokogiri
       elem.content
     when :rexml
       text = elem.text
@@ -1234,57 +1311,67 @@ class Etch
         ''
       end
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlsettext(elem, text)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
+      elem.content = text
+    when :nokogiri
       elem.content = text
     when :rexml
       elem.text = text
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmladd(xmldoc, xpath, name, contents=nil)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       elem = LibXML::XML::Node.new(name)
       if contents
         elem.content = contents
       end
       xmldoc.find_first(xpath) << elem
-      elem
+    when :nokogiri
+      elem = Nokogiri::XML::Node.new(name, xmldoc)
+      if contents
+        elem.content = contents
+      end
+      xmldoc.at_xpath(xpath) << elem
     when :rexml
       elem = REXML::Element.new(name)
       if contents
         elem.text = contents
       end
       xmldoc.elements[xpath].add_element(elem)
-      elem
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlcopyelem(elem, destelem)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       destelem << elem.copy(true)
+    when :nokogiri
+      destelem << elem.dup
     when :rexml
-      destelem.add_element(elem.dup)
+      destelem.add_element(elem.clone)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlremove(xmldoc, element)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       element.remove!
+    when :nokogiri
+      element.remove
     when :rexml
       if xmldoc.node_type == :document
         xmldoc.root.elements.delete(element)
@@ -1292,40 +1379,51 @@ class Etch
         xmldoc.elements.delete(element)
       end
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlremovepath(xmldoc, xpath)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       xmldoc.find(xpath).each { |elem| elem.remove! }
+    when :nokogiri
+      xmldoc.xpath(xpath).each { |elem| elem.remove }
     when :rexml
-      xmldoc.delete_element(xpath)
+      elem = nil
+      # delete_element only removes the first match, so call it in a loop
+      # until it returns nil to indicate no matching element remain
+      begin
+        elem = xmldoc.delete_element(xpath)
+      end while elem != nil
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlattradd(elem, attrname, attrvalue)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       elem.attributes[attrname] = attrvalue
+    when :nokogiri
+      elem[attrname] = attrvalue
     when :rexml
       elem.add_attribute(attrname, attrvalue)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   
   def self.xmlattrremove(elem, attribute)
-    case @@xmllib
+    case Etch.xmllib
     when :libxml
       attribute.remove!
+    when :nokogiri
+      attribute.remove
     when :rexml
       elem.attributes.delete(attribute)
     else
-      raise "Unknown @xmllib #{@xmllib}"
+      raise "Unknown XML library #{Etch.xmllib}"
     end
   end
   

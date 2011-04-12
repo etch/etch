@@ -3,8 +3,8 @@ To execute the tests in a specific file run "rake test TEST=test/file.rb".
 To execute a specific test method run
   "rake test TEST=test/file.rb TESTOPTS='--name=test_files'"
 
-To force a particular XML library set xmllib=libxml or xmllib=rexml in
-your environment before running the tests.
+To force a particular XML library set xmllib=libxml or xmllib=nokogiri or
+xmllib=rexml in your environment before running the tests.
 
 Some of the older files here have all of their tests in one method. Over
 time I'm breaking those up into multiple methods so that it is easier to
