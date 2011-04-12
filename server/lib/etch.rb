@@ -135,7 +135,7 @@ class Etch
     Etch.xmleach(@nodegroups_xml, '/nodegroups/nodegroup') do |parent|
       Etch.xmleach(parent, 'child') do |child|
         @group_hierarchy[Etch.xmltext(child)] = [] if !@group_hierarchy[Etch.xmltext(child)]
-        @group_hierarchy[Etch.xmltext(child)] << parent.attributes['name']
+        @group_hierarchy[Etch.xmltext(child)] << Etch.xmlattrvalue(parent, 'name')
       end
     end
 
