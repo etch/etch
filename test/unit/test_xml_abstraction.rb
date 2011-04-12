@@ -434,6 +434,17 @@ class TestXMLAbstraction < Test::Unit::TestCase
       raise "Unknown XML library #{Etch.xmllib}"
     end
   end
+  def test_xmlattrvalue
+    file = Tempfile.new('etch_xml_abstraction')
+    file.puts '<root><element attrname="attrvalue"><child/></element><element attrname="othervalue"/><other/></root>'
+    file.close
+    doc = Etch.xmlload(file.path)
+    
+    first = Etch.xmlarray(doc, '/root/element').first
+    second = Etch.xmlarray(doc, '/root/element').last
+    assert_equal('attrvalue', Etch.xmlattrvalue(first, 'attrname'))
+    assert_equal('othervalue', Etch.xmlattrvalue(second, 'attrname'))
+  end
   def test_xmlattrremove
     file = Tempfile.new('etch_xml_abstraction')
     file.puts '<root><element attrname="attrvalue"><child/></element><element attrname="othervalue"/><other/></root>'

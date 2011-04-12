@@ -1414,6 +1414,19 @@ class Etch
     end
   end
   
+  def self.xmlattrvalue(elem, attrname)
+    case Etch.xmllib
+    when :libxml
+      elem.attributes[attrname]
+    when :nokogiri
+      elem[attrname]
+    when :rexml
+      elem.attributes[attrname]
+    else
+      raise "Unknown XML library #{Etch.xmllib}"
+    end
+  end
+  
   def self.xmlattrremove(elem, attribute)
     case Etch.xmllib
     when :libxml
