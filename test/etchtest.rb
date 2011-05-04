@@ -175,7 +175,7 @@ module EtchTests
       puts "#"
       #sleep 3
     end
-    result = system("#{RUBY} #{CLIENTDIR}/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}")
+    result = system("#{RUBY} -I #{CLIENTDIR}/lib #{CLIENTDIR}/bin/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}")
     if options[:errors_expected]
       assert(!result, options[:testname])
     else
