@@ -170,10 +170,12 @@ class Etch
     filelist = []
     if request.empty?
       @dlogger.debug "Building complete file list for request from #{@fqdn}"
-      Find.find(@sourcebase) do |path|
-        if File.directory?(path) && File.exist?(File.join(path, 'config.xml'))
-          # Strip @sourcebase from start of path
-          filelist << path.sub(Regexp.new('^' + Regexp.escape(@sourcebase)), '')
+      if File.exist?(@sourcebase)
+        Find.find(@sourcebase) do |path|
+          if File.directory?(path) && File.exist?(File.join(path, 'config.xml'))
+            # Strip @sourcebase from start of path
+            filelist << path.sub(Regexp.new('^' + Regexp.escape(@sourcebase)), '')
+          end
         end
       end
     elsif request[:files]
@@ -206,9 +208,11 @@ class Etch
     commandnames = []
     if request.empty?
       @dlogger.debug "Building complete configuration commands for request from #{@fqdn}"
-      Find.find(@commandsbase) do |path|
-        if File.directory?(path) && File.exist?(File.join(path, 'commands.xml'))
-          commandnames << File.basename(path)
+      if File.exist?(@commandsbase)
+        Find.find(@commandsbase) do |path|
+          if File.directory?(path) && File.exist?(File.join(path, 'commands.xml'))
+            commandnames << File.basename(path)
+          end
         end
       end
     elsif request[:commands]

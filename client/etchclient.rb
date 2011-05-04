@@ -29,6 +29,7 @@ require 'fileutils'   # copy, mkpath, rmtree
 require 'fcntl'       # Fcntl::O_*
 require 'etc'         # getpwnam, getgrnam
 require 'tempfile'    # Tempfile
+require 'find'        # Find.find
 require 'cgi'
 require 'timeout'
 require 'logger'
@@ -1803,7 +1804,7 @@ class Etch::Client
           puts "Original file #{file} doesn't exist, saving that state permanently as #{origpath}"
         end
         if proceed
-          File.open(origpath, 'w') { |file| } if (!@dryrun)
+          File.open(origpath, 'w') { |origfile| } if (!@dryrun)
         end
       end
 
@@ -2014,7 +2015,7 @@ class Etch::Client
       else
         # If there's no file to back up then leave a marker file so
         # that restore_backup does the right thing
-        File.open("#{backuppath}.NOORIG", "w") { |file| }
+        File.open("#{backuppath}.NOORIG", "w") { |markerfile| }
       end
     end
 
@@ -2375,7 +2376,7 @@ class Etch::Client
       begin
         fd = IO::sysopen(lockpath, Fcntl::O_WRONLY|Fcntl::O_CREAT|Fcntl::O_EXCL)
         puts "Lock acquired for #{file}" if (@debug)
-        f = IO.open(fd) { |f| f.puts $$ }
+        f = IO.open(fd) { |lockfile| lockfile.puts $$ }
         @locked_files[file] = true
         return
       rescue Errno::EEXIST
@@ -2420,13 +2421,15 @@ class Etch::Client
   # and can be removed.  If told to force we remove all lockfiles.
   def remove_stale_lock_files
     twohoursago = Time.at(Time.now - 60 * 60 * 2)
-    Find.find(@lockbase) do |file|
-      next unless file =~ /\.LOCK$/
-      next unless File.file?(file)
-
-      if @lockforce || File.mtime(file) < twohoursago
-        puts "Removing stale lock file #{file}"
-        File.delete(file)
+    if File.exist?(@lockbase)
+      Find.find(@lockbase) do |file|
+        next unless file =~ /\.LOCK$/
+        next unless File.file?(file)
+        
+        if @lockforce || File.mtime(file) < twohoursago
+          puts "Removing stale lock file #{file}"
+          File.delete(file)
+        end
       end
     end
   end
