@@ -3,8 +3,8 @@
 ##############################################################################
 
 # Ensure we can find etch.rb if run within the development directory structure
-#   This is roughly equivalent to "../server/lib"
-serverlibdir = File.join(File.dirname(File.dirname(File.expand_path(__FILE__))), 'server', 'lib')
+#   This is roughly equivalent to "../../../server/lib"
+serverlibdir = File.join(File.dirname(File.dirname(File.dirname(File.dirname(File.expand_path(__FILE__))))), 'server', 'lib')
 if File.exist?(serverlibdir)
   $:.unshift(serverlibdir)
 end
