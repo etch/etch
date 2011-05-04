@@ -6,6 +6,9 @@ require 'test/unit'
 require 'tempfile'
 require 'fileutils'
 require 'net/http'
+require 'rbconfig'
+
+RUBY = File.join(*RbConfig::CONFIG.values_at("bindir", "ruby_install_name")) + RbConfig::CONFIG["EXEEXT"]
 
 module EtchTests
   # Roughly ../server and ../client
@@ -47,7 +50,8 @@ module EtchTests
     repo = tempdir
     
     # Put the basic files into that directory needed for a basic etch tree
-    FileUtils.cp_r(Dir.glob("#{File.dirname(__FILE__)}/testrepo/*"), repo)
+    # :preserve to maintain executable permissions on the scripts
+    FileUtils.cp_r(Dir.glob("#{File.dirname(__FILE__)}/testrepo/*"), repo, :preserve => true)
     
     hostname = `facter fqdn`.chomp
     nodegroups_string = ''
@@ -127,9 +131,9 @@ module EtchTests
       end
     else
       if UNICORN
-        exec("cd #{SERVERDIR} && unicorn_rails -p #{port}")
+        exec("cd #{SERVERDIR} && #{RUBY} `which unicorn_rails` -p #{port}")
       else
-        exec("cd #{SERVERDIR} && ./script/server -p #{port}")
+        exec("cd #{SERVERDIR} && #{RUBY} ./script/server -p #{port}")
       end
     end
     {:port => port, :pid => pid, :repo => serverbase}
@@ -171,7 +175,7 @@ module EtchTests
       puts "#"
       #sleep 3
     end
-    result = system("ruby #{CLIENTDIR}/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}")
+    result = system("#{RUBY} #{CLIENTDIR}/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}")
     if options[:errors_expected]
       assert(!result, options[:testname])
     else
