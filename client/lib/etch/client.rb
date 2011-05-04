@@ -9,30 +9,36 @@ if File.exist?(serverlibdir)
   $:.unshift(serverlibdir)
 end
 
-begin
-  # Try loading facter w/o gems first so that we don't introduce a
-  # dependency on gems if it is not needed.
-  require 'facter'    # Facter
-rescue LoadError
-  require 'rubygems'
-  require 'facter'
+# Exclude standard libraries and gems from the warnings induced by
+# running ruby with the -w flag.  Several of these have warnings under
+# ruby 1.9 and there's nothing we can do to fix that.
+require 'silently'
+Silently.silently do
+  begin
+    # Try loading facter w/o gems first so that we don't introduce a
+    # dependency on gems if it is not needed.
+    require 'facter'    # Facter
+  rescue LoadError
+    require 'rubygems'
+    require 'facter'
+  end
+  require 'find'
+  require 'digest/sha1' # hexdigest
+  require 'openssl'     # OpenSSL
+  require 'base64'      # decode64, encode64
+  require 'uri'
+  require 'net/http'
+  require 'net/https'
+  require 'rexml/document'
+  require 'fileutils'   # copy, mkpath, rmtree
+  require 'fcntl'       # Fcntl::O_*
+  require 'etc'         # getpwnam, getgrnam
+  require 'tempfile'    # Tempfile
+  require 'find'        # Find.find
+  require 'cgi'
+  require 'timeout'
+  require 'logger'
 end
-require 'find'
-require 'digest/sha1' # hexdigest
-require 'openssl'     # OpenSSL
-require 'base64'      # decode64, encode64
-require 'uri'
-require 'net/http'
-require 'net/https'
-require 'rexml/document'
-require 'fileutils'   # copy, mkpath, rmtree
-require 'fcntl'       # Fcntl::O_*
-require 'etc'         # getpwnam, getgrnam
-require 'tempfile'    # Tempfile
-require 'find'        # Find.find
-require 'cgi'
-require 'timeout'
-require 'logger'
 require 'etch'
 
 class Etch::Client

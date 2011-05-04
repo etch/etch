@@ -28,7 +28,7 @@ def copy_etch_files(destdir, options={})
       if options[:ruby]
         # Change #! line
         File.open(File.join(bindir, binapp), 'w') do |newfile|
-          File.open(binapp) do |oldfile|
+          File.open(File.join('bin', binapp)) do |oldfile|
             # Modify the first line
             firstline = oldfile.gets
             # Preserve any options.  I.e. #!/usr/bin/ruby -w
@@ -39,7 +39,7 @@ def copy_etch_files(destdir, options={})
           end
         end
       else
-        cp(binapp, bindir, :preserve => true)
+        cp(File.join('bin', binapp), bindir, :preserve => true)
       end
       chmod(0555, File.join(bindir, binapp))
     end
@@ -48,11 +48,12 @@ def copy_etch_files(destdir, options={})
   if options[:libdir]
     libdir = File.join(destdir, options[:libdir])
     mkdir_p(libdir)
+    mkdir_p(File.join(libdir, 'etch'))
     
-    # Substitute ETCHVER into etchclient.rb
-    # Substitute proper path into CONFIGDIR in etchclient.rb if appropriate
-    File.open(File.join(libdir, 'etchclient.rb'), 'w') do |newfile|
-      IO.foreach('etchclient.rb') do |line|
+    # Substitute ETCHVER into etch/client.rb
+    # Substitute proper path into CONFIGDIR in etch/client.rb if appropriate
+    File.open(File.join(libdir, 'etch', 'client.rb'), 'w') do |newfile|
+      IO.foreach(File.join('etch', 'client.rb')) do |line|
         if line =~ /^\s*VERSION/
           line.sub!(/=.*/, "= '#{ETCHVER}'")
         end
@@ -62,9 +63,9 @@ def copy_etch_files(destdir, options={})
         newfile.write(line)
       end
     end
-    chmod(0444, File.join(libdir, 'etchclient.rb'))
+    chmod(0444, File.join(libdir, 'etch', 'client.rb'))
     
-    serverlibs = ['etch.rb', 'versiontype.rb']
+    serverlibs = ['etch.rb', 'silently.rb', 'versiontype.rb']
     serverlibs.each do |serverlib|
       cp(File.join('..', 'server', 'lib', serverlib), libdir, :preserve => true)
       chmod(0444, File.join(libdir, serverlib))
@@ -75,21 +76,21 @@ def copy_etch_files(destdir, options={})
     mandir = File.join(destdir, options[:mandir])
     man8dir = File.join(mandir, 'man8')
     mkdir_p(man8dir)
-    cp('etch.8', man8dir, :preserve => true)
+    cp(File.join('man', 'man8', 'etch.8'), man8dir, :preserve => true)
     chmod(0444, File.join(man8dir, 'etch.8'))
   end
   
   if options[:etcdir]
     etcdir = File.join(destdir, options[:etcdir])
     mkdir_p(etcdir)
-    cp('etch.conf', etcdir, :preserve => true)
+    cp(File.join('etc', 'etch.conf'), etcdir, :preserve => true)
     chmod(0644, File.join(etcdir, 'etch.conf'))
     # All of the supporting config files go into a subdirectory
     etcetchdir = File.join(etcdir, 'etch')
     mkdir_p(etcetchdir)
     etcetchfiles = ['ca.pem', 'dhparams']
     etcetchfiles.each do |etcetchfile|
-      cp(etcetchfile, etcetchdir, :preserve => true)
+      cp(File.join('etc', 'etch', etcetchfile), etcetchdir, :preserve => true)
       chmod(0644, File.join(etcetchdir, etcetchfile))
     end
   end
@@ -97,9 +98,7 @@ def copy_etch_files(destdir, options={})
   if options[:crondir]
     crondir = File.join(destdir, options[:crondir])
     mkdir_p(crondir)
-    # Note file renamed to 'etch' here.  Filename is different in the repo for
-    # clarity and to avoid conflict with the main executable.
-    cp('etch_cron', File.join(crondir, 'etch'), :preserve => true)
+    cp(File.join('etc', 'cron.d', 'etch'), crondir, :preserve => true)
     chmod(0444, File.join(crondir, 'etch'))
   end
 end
@@ -132,7 +131,7 @@ task :rpm do
   #
   
   spec = Tempfile.new('etchrpm')
-  IO.foreach('etch-client.spec') do |line|
+  IO.foreach(File.join('packages', 'rpm', 'etch-client.spec')) do |line|
     line.sub!('%VER%', ETCHVER)
     spec.puts(line)
   end
@@ -161,7 +160,7 @@ task :deb do
   
   mkdir_p(File.join(BUILDROOT, 'DEBIAN'))
   File.open(File.join(BUILDROOT, 'DEBIAN', 'control'), 'w') do |control|
-    IO.foreach('control') do |line|
+    IO.foreach(File.join('packages', 'deb', 'control')) do |line|
       next if line =~ /^\s*#/  # Remove comments
       line.sub!('%VER%', ETCHVER)
       control.puts(line)
@@ -220,19 +219,19 @@ task :sysvpkg do
   rm_rf('solbuild')
   mkdir('solbuild')
   File.open(File.join('solbuild', 'pkginfo'), 'w') do |pkginfo|
-    IO.foreach('pkginfo') do |line|
+    IO.foreach(File.join('packages', 'sysv', 'pkginfo')) do |line|
       line.sub!('%VER%', ETCHVER)
       pkginfo.puts(line)
     end
   end
   File.open(File.join('solbuild', 'prototype'), 'w') do |prototype|
     prototype.puts("i pkginfo=./pkginfo")
-    cp('depend', 'solbuild/depend')
+    cp(File.join('packages', 'sysv', 'depend'), 'solbuild/depend')
     prototype.puts("i depend=./depend")
-    cp('postinstall.solaris', 'solbuild/postinstall')
+    cp(File.join('packages', 'sysv', 'postinstall.solaris'), 'solbuild/postinstall')
     chmod(0555, 'solbuild/postinstall')
     prototype.puts("i postinstall=./postinstall")
-    cp('postremove.solaris', 'solbuild/postremove')
+    cp(File.join('packages', 'sysv', 'postremove.solaris'), 'solbuild/postremove')
     chmod(0555, 'solbuild/postremove')
     prototype.puts("i postremove=./postremove")
     # The tail +2 removes the first line, which is the base directory
@@ -311,19 +310,19 @@ task :sysvpkgsparc do
   rm_rf('solbuild')
   mkdir('solbuild')
   File.open(File.join('solbuild', 'pkginfo'), 'w') do |pkginfo|
-    IO.foreach('pkginfo') do |line|
+    IO.foreach(File.join('packages', 'sysv', 'pkginfo')) do |line|
       line.sub!('%VER%', ETCHVER)
       pkginfo.puts(line)
     end
   end
   File.open(File.join('solbuild', 'prototype'), 'w') do |prototype|
     prototype.puts("i pkginfo=./pkginfo")
-    cp('depend', 'solbuild/depend')
+    cp(File.join('packages', 'sysv', 'depend'), 'solbuild/depend')
     prototype.puts("i depend=./depend")
-    cp('postinstall.solaris', 'solbuild/postinstall')
+    cp(File.join('packages', 'sysv', 'postinstall.solaris'), 'solbuild/postinstall')
     chmod(0555, 'solbuild/postinstall')
     prototype.puts("i postinstall=./postinstall")
-    cp('postremove.solaris', 'solbuild/postremove')
+    cp(File.join('packages', 'sysv', 'postremove.solaris'), 'solbuild/postremove')
     chmod(0555, 'solbuild/postremove')
     prototype.puts("i postremove=./postremove")
     # The tail +2 removes the first line, which is the base directory
@@ -395,7 +394,7 @@ task :macport => :fetch do
   portfile = File.join(Dir.tmpdir, 'Portfile')
   rm_f(portfile)
   File.open(portfile, 'w') do |newfile|
-    IO.foreach('Portfile.template') do |line|
+    IO.foreach(File.join('packages', 'macports', 'Portfile.template')) do |line|
       line.sub!('%VER%', ETCHVER)
       line.sub!('%MD5%', md5)
       line.sub!('%SHA1%', sha1)
@@ -421,7 +420,7 @@ task :gem do
   # Prep gemspec (renaming to Rakefile in the process)
   #
   File.open(File.join(BUILDROOT, 'Rakefile'), 'w') do |gemspec|
-    IO.foreach('gemspec') do |line|
+    IO.foreach(File.join('packages', 'gem', 'gemspec')) do |line|
       line.sub!('%VER%', ETCHVER)
       gemspec.puts(line)
     end

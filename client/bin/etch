@@ -3,11 +3,11 @@
 # Etch configuration file management tool
 ##############################################################################
 
-# Ensure we can find etchclient.rb
-$:.unshift(File.dirname(__FILE__))
+# Ensure we can find etch/client.rb when run within the development repository
+$:.unshift(File.join(File.dirname(__FILE__), 'lib'))
 
 require 'optparse'
-require 'etchclient'
+require 'etch/client'
 
 #
 # Parse the command line options
