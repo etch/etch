@@ -1,11 +1,17 @@
-require 'find'        # Find.find
-require 'pathname'    # absolute?
-require 'digest/sha1' # hexdigest
-require 'base64'      # decode64, encode64
-require 'fileutils'   # mkdir_p
-require 'erb'
+# Exclude standard libraries and gems from the warnings induced by
+# running ruby with the -w flag.  Several of these have warnings under
+# ruby 1.9 and there's nothing we can do to fix that.
+require 'silently'
+Silently.silently do
+  require 'find'        # Find.find
+  require 'pathname'    # absolute?
+  require 'digest/sha1' # hexdigest
+  require 'base64'      # decode64, encode64
+  require 'fileutils'   # mkdir_p
+  require 'erb'
+  require 'logger'
+end
 require 'versiontype' # Version
-require 'logger'
 
 class Etch
   def self.xmllib
@@ -19,24 +25,26 @@ end
 # By default we try to use libxml, falling back to rexml if it is not
 # available.  The xmllib environment variable can be used to force one library
 # or the other, mostly for testing purposes.
-begin
-  if !ENV['xmllib'] || ENV['xmllib'] == 'libxml'
-    require 'rubygems'  # libxml is a gem
-    require 'libxml'
-    Etch.xmllib = :libxml
-  elsif ENV['xmllib'] == 'nokogiri'
-    require 'rubygems'  # nokogiri is a gem
-    require 'nokogiri'
-    Etch.xmllib = :nokogiri
-  else
-    raise LoadError
-  end
-rescue LoadError
-  if !ENV['xmllib'] || ENV['xmllib'] == 'rexml'
-    require 'rexml/document'
-    Etch.xmllib = :rexml
-  else
-    raise
+Silently.silently do
+  begin
+    if !ENV['xmllib'] || ENV['xmllib'] == 'libxml'
+      require 'rubygems'  # libxml is a gem
+      require 'libxml'
+      Etch.xmllib = :libxml
+    elsif ENV['xmllib'] == 'nokogiri'
+      require 'rubygems'  # nokogiri is a gem
+      require 'nokogiri'
+      Etch.xmllib = :nokogiri
+    else
+      raise LoadError
+    end
+  rescue LoadError
+    if !ENV['xmllib'] || ENV['xmllib'] == 'rexml'
+      require 'rexml/document'
+      Etch.xmllib = :rexml
+    else
+      raise
+    end
   end
 end
 
