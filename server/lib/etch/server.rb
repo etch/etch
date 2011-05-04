@@ -78,9 +78,10 @@ class Etch::Server
     #
     
     str = Base64.decode64(key)
-    # check header
+    
+    # check header (this is actually the length of the key type field)
     hdr = str.slice!(0..3)
-    unless hdr[0] == 0 && hdr[1] == 0 && hdr[2] == 0 && hdr[3] == 7
+    if hdr.bytes.to_a != [0, 0, 0, 7]
       raise "Bad key format #{hdr}"
     end
     
