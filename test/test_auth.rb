@@ -4,7 +4,7 @@
 # Test etch's handling of client authentication
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 require 'net/http'
 require 'rexml/document'
 begin

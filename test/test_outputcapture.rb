@@ -4,7 +4,7 @@
 # Test output capturing
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 require 'timeout'
 $: << EtchTests::CLIENTDIR
 $: << File.join(EtchTests::SERVERDIR, 'lib')

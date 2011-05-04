@@ -4,7 +4,7 @@
 # Test etch's handling of node groups and the node group hierarchy
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 
 class EtchNodeGroupTests < Test::Unit::TestCase
   include EtchTests

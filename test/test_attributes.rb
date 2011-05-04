@@ -4,7 +4,7 @@
 # Test etch's handling of attribute filtering in config.xml files
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 require 'rubygems'  # Might be needed to find facter
 require 'facter'
 

@@ -4,7 +4,7 @@
 # Test etch's handling of its configuration file, etch.conf
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 require 'net/http'
 require 'rexml/document'
 require 'cgi'

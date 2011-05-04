@@ -5,7 +5,7 @@
 # creation of links and directories, and control the deletion of files
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 
 class EtchScriptTests < Test::Unit::TestCase
   include EtchTests

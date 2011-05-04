@@ -4,7 +4,7 @@
 # Test command line options to etch client
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 require 'webrick'
 
 class EtchOptionTests < Test::Unit::TestCase

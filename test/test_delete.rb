@@ -4,7 +4,7 @@
 # Test etch's handling of deleting files
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 
 class EtchDeleteTests < Test::Unit::TestCase
   include EtchTests

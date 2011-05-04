@@ -4,7 +4,7 @@
 # Test etch's handling of configuration commands
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 
 class EtchCommandTests < Test::Unit::TestCase
   include EtchTests

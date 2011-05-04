@@ -5,7 +5,7 @@
 # file, etc.)
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 
 class EtchTransitionTests < Test::Unit::TestCase
   include EtchTests

@@ -5,7 +5,7 @@
 # history files
 #
 
-require File.join(File.dirname(__FILE__), 'etchtest')
+require "./#{File.dirname(__FILE__)}/etchtest"
 
 class EtchHistoryTests < Test::Unit::TestCase
   include EtchTests
