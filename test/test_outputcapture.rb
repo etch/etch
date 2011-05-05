@@ -6,9 +6,9 @@
 
 require "./#{File.dirname(__FILE__)}/etchtest"
 require 'timeout'
-$: << EtchTests::CLIENTDIR
+$: << File.join(EtchTests::CLIENTDIR, 'lib')
 $: << File.join(EtchTests::SERVERDIR, 'lib')
-require 'etchclient'
+require 'etch/client'
 
 class EtchOutputCaptureTests < Test::Unit::TestCase
   include EtchTests
@@ -86,7 +86,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
             </source>
           </file>
           <post>
-            <exec>ruby -e 'sleep #{Etch::Client::OUTPUT_CAPTURE_TIMEOUT + 30}' &amp;</exec>
+            <exec>#{RUBY} -e 'sleep #{Etch::Client::OUTPUT_CAPTURE_TIMEOUT + 30}' &amp;</exec>
           </post>
         </config>
       EOF

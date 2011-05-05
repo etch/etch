@@ -105,7 +105,7 @@ class EtchOptionTests < Test::Unit::TestCase
   
   def test_help
     output = nil
-    IO.popen("ruby #{CLIENTDIR}/etch --help") do |pipe|
+    IO.popen("#{RUBY} #{CLIENTDIR}/bin/etch --help") do |pipe|
       output = pipe.readlines
     end
     # Make sure at least something resembling help output is there
@@ -529,7 +529,7 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Test that output from etch is appropriate
     #run_etch(@server, @testroot, :extra_args => '--list-files', :testname => testname)
-    output = `ruby #{CLIENTDIR}/etch --generate-all --test-root=#{@testroot} --key=#{File.dirname(__FILE__)}/keys/testkey --server=http://localhost:#{@server[:port]} --list-files`
+    output = `#{RUBY} #{CLIENTDIR}/bin/etch --generate-all --test-root=#{@testroot} --key=#{File.dirname(__FILE__)}/keys/testkey --server=http://localhost:#{@server[:port]} --list-files`
     assert(output.include?("Files under management:\n#{@targetfile}\n"))
     
     # Ensure that the target file wasn't touched
