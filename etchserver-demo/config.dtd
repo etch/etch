@@ -1,8 +1,9 @@
-<!ELEMENT config (revert?, depend*, server_setup?, setup?, pre?, (file|link|directory|delete)+, test_before_post?, post?, test?)>
+<!ELEMENT config (revert?, depend*, dependcommand*, server_setup?, setup?, pre?, (file|link|directory|delete)+, test_before_post?, post?, test?)>
 
 <!ELEMENT revert EMPTY>
 
 <!ELEMENT depend (#PCDATA)>
+<!ELEMENT dependcommand (#PCDATA)>
 
 <!ELEMENT server_setup (exec*)>
 <!ELEMENT setup (exec*)>
