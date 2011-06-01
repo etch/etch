@@ -23,6 +23,10 @@
 .IR SERVER ]
 .RB [ --tag
 .IR TAG ]
+.RB [ --configdir
+.IR CONFIGDIR ]
+.RB [ --vardir
+.IR VARDIR ]
 .RB [ --test-base
 .IR TESTDIR ]
 .RB [ --key
@@ -124,9 +128,17 @@ for /etc/etchserver/branches/mytestbranch.
 Use an alternate SSH private key file for signing messages that are sent to
 the server.
 .TP
-.BI --test-base " TESTDIR"
-Use an alternate local working directory instead of /var/etch.  Generally only
-used for allowing the etch test suite to be run as a non-root user.
+.BI --configdir " CONFIGDIR"
+Use an alternate configuration directory instead of /etc.  This is the
+location of etch.conf and other configuration files.  See FILES.
+.TP
+.BI --vardir " VARDIR"
+Use an alternate local working directory instead of /var/etch.  See FILES.
+.TP
+.BI --test-root " TESTDIR"
+Places the config and var directories relative to a test root directory.
+Generally only used for allowing the etch test suite to be run as a non-root
+user.
 .TP
 .B --debug
 Print lots of messages about what etch is doing.
