@@ -27,14 +27,14 @@ end
 # or the other, mostly for testing purposes.
 Silently.silently do
   begin
-    if !ENV['xmllib'] || ENV['xmllib'] == 'libxml'
-      require 'rubygems'  # libxml is a gem
-      require 'libxml'
-      Etch.xmllib = :libxml
-    elsif ENV['xmllib'] == 'nokogiri'
+    if !ENV['xmllib'] || ENV['xmllib'] == 'nokogiri'
       require 'rubygems'  # nokogiri is a gem
       require 'nokogiri'
       Etch.xmllib = :nokogiri
+    elsif ENV['xmllib'] == 'libxml'
+      require 'rubygems'  # libxml is a gem
+      require 'libxml'
+      Etch.xmllib = :libxml
     else
       raise LoadError
     end
