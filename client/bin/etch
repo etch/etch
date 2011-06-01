@@ -69,6 +69,12 @@ end
 opts.on('--key PRIVATE_KEY', 'Use this private key for signing messages to server.') do |opt|
   options[:key] = opt
 end
+opts.on('--configdir DIR', 'Directory containing etch.conf.') do |opt|
+  options[:configdir] = opt
+end
+opts.on('--vardir DIR', 'Directory for etch state and logs.') do |opt|
+  options[:vardir] = opt
+end
 opts.on('--test-root TESTDIR', 'For use by the test suite only.') do |opt|
   options[:file_system_root] = opt
 end

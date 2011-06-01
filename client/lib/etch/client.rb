@@ -49,7 +49,7 @@ class Etch::Client
   CONFIRM_QUIT = 3
   PRIVATE_KEY_PATHS = ["/etc/ssh/ssh_host_rsa_key", "/etc/ssh_host_rsa_key"]
   DEFAULT_CONFIGDIR = '/etc'
-  DEFAULT_VARBASE = '/var/etch'
+  DEFAULT_VARDIR = '/var/etch'
   DEFAULT_DETAILED_RESULTS = ['SERVER']
   
   # We need these in relation to the output capturing
@@ -60,6 +60,8 @@ class Etch::Client
   
   def initialize(options)
     @server = options[:server] ? options[:server] : 'https://etch'
+    @configdir = options[:configdir] ? options[:configdir] : DEFAULT_CONFIGDIR
+    @vardir = options[:vardir] ? options[:vardir] : DEFAULT_VARDIR
     @tag = options[:tag]
     @local = options[:local] ? File.expand_path(options[:local]) : nil
     @debug = options[:debug]
@@ -71,17 +73,14 @@ class Etch::Client
     @key = options[:key] ? options[:key] : get_private_key_path
     @disableforce = options[:disableforce]
     @lockforce = options[:lockforce]
-
-    @last_response = ""
     
-    @configdir = DEFAULT_CONFIGDIR
-    @varbase = DEFAULT_VARBASE
+    @last_response = ""
     
     @file_system_root = '/'  # Not sure if this needs to be more portable
     # This option is only intended for use by the test suite
     if options[:file_system_root]
       @file_system_root = options[:file_system_root]
-      @varbase = File.join(@file_system_root, @varbase)
+      @vardir = File.join(@file_system_root, @vardir)
       @configdir = File.join(@file_system_root, @configdir)
     end
     
@@ -149,10 +148,10 @@ class Etch::Client
       @detailed_results = DEFAULT_DETAILED_RESULTS
     end
     
-    @origbase    = File.join(@varbase, 'orig')
-    @historybase = File.join(@varbase, 'history')
-    @lockbase    = File.join(@varbase, 'locks')
-    @requestbase = File.join(@varbase, 'requests')
+    @origbase    = File.join(@vardir, 'orig')
+    @historybase = File.join(@vardir, 'history')
+    @lockbase    = File.join(@vardir, 'locks')
+    @requestbase = File.join(@vardir, 'requests')
     
     @facts = Facter.to_hash
     if @facts['operatingsystemrelease']
@@ -222,6 +221,7 @@ class Etch::Client
     # Prep http instance
     http = nil
     if !@local
+      puts "Connecting to #{@filesuri}" if (@debug)
       http = Net::HTTP.new(@filesuri.host, @filesuri.port)
       if @filesuri.scheme == "https"
         # Eliminate the OpenSSL "using default DH parameters" warning
@@ -572,7 +572,7 @@ class Etch::Client
   end
 
   def check_for_disable_etch_file
-    disable_etch = File.join(@varbase, 'disable_etch')
+    disable_etch = File.join(@vardir, 'disable_etch')
     message = ''
     if File.exist?(disable_etch)
       if !@disableforce
