@@ -169,6 +169,10 @@ class Etch::Client
       else
         dlogger.level = Logger::INFO
       end
+      blankrequest = {}
+      @facts.each_pair { |key, value| blankrequest[key] = value.to_s }
+      blankrequest['fqdn'] = @facts['fqdn']
+      @facts = blankrequest
       @etch = Etch.new(logger, dlogger)
     else
       # Make sure the server URL ends in a / so that we can append paths
