@@ -6,8 +6,8 @@
 
 require "./#{File.dirname(__FILE__)}/etchtest"
 require 'timeout'
-$: << File.join(EtchTests::CLIENTDIR, 'lib')
-$: << File.join(EtchTests::SERVERDIR, 'lib')
+$:.unshift(File.join(EtchTests::CLIENTDIR, 'lib'))
+$:.unshift(File.join(EtchTests::SERVERDIR, 'lib'))
 require 'etch/client'
 
 class EtchOutputCaptureTests < Test::Unit::TestCase

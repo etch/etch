@@ -1,6 +1,6 @@
 require 'test/unit'
 require 'tempfile'
-$: << "#{File.dirname(File.expand_path(__FILE__))}/../../server/lib"
+$:.unshift("#{File.dirname(File.expand_path(__FILE__))}/../../server/lib")
 require 'etch'
 
 # Test the XML abstraction methods in etch.rb
