@@ -279,6 +279,9 @@ class TestXMLAbstraction < Test::Unit::TestCase
     else
       raise "Unknown XML library #{Etch.xmllib}"
     end
+    # We have code that assumes xmlfindfirst returns a false value when
+    # queried for non-existent elements
+    assert(!Etch.xmlfindfirst(doc, '/not_an_element'))
   end
   def test_xmltext
     file = Tempfile.new('etch_xml_abstraction')
