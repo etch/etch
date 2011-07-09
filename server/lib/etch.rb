@@ -375,7 +375,7 @@ class Etch
       
       # Change into the corresponding directory so that the user can
       # refer to source files and scripts by their relative pathnames.
-      Dir::chdir "#{@sourcebase}/#{file}"
+      Dir.chdir "#{@sourcebase}/#{file}"
 
       # See what type of action the user has requested
 
@@ -426,7 +426,7 @@ class Etch
         
           # Just slurp the file in
           plain_file = Etch.xmltext(plain_elements.first)
-          newcontents = IO::read(plain_file)
+          newcontents = IO.read(plain_file)
         elsif Etch.xmlfindfirst(config_xml, '/config/file/source/template')
           template_elements = Etch.xmlarray(config_xml, '/config/file/source/template')
           if check_for_inconsistency(template_elements)
@@ -925,7 +925,7 @@ class Etch
       
       # Change into the corresponding directory so that the user can
       # refer to source files and scripts by their relative pathnames.
-      Dir::chdir "#{@commandsbase}/#{command}"
+      Dir.chdir "#{@commandsbase}/#{command}"
       
       # Check that the resulting document is consistent after filtering
       remove = []
