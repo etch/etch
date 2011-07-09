@@ -1372,7 +1372,7 @@ class Etch
     when :nokogiri
       destelem << elem.dup
     when :rexml
-      destelem.add_element(elem.clone)
+      destelem.add_element(elem.deep_clone)
     else
       raise "Unknown XML library #{Etch.xmllib}"
     end
