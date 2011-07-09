@@ -341,36 +341,52 @@ class TestXMLAbstraction < Test::Unit::TestCase
   end
   def test_xmlcopyelem
     file = Tempfile.new('etch_xml_abstraction')
-    file.puts '<root><element><child/></element><other/></root>'
+    file.puts '<root><element><child>child text</child></element><other/></root>'
     file.close
     doc = Etch.xmlload(file.path)
     
     original = Etch.xmlfindfirst(doc, '/root/element/child')
     Etch.xmlcopyelem(original, Etch.xmlfindfirst(doc, '/root/other'))
     copy = Etch.xmlfindfirst(doc, '/root/other/child')
-    # Change the child so that we can test that it is separate from the orignal
-    Etch.xmlsettext(copy, 'some text')
+    
     case Etch.xmllib
     when :libxml
       assert_kind_of(LibXML::XML::Node, original)
       assert_kind_of(LibXML::XML::Node, copy)
       assert_equal('child', original.name)
-      assert_equal('', Etch.xmltext(original))
+      assert_equal('child text', Etch.xmltext(original))
       assert_equal('child', copy.name)
-      assert_equal('some text', Etch.xmltext(copy))
+      assert_equal('child text', Etch.xmltext(copy))
     when :nokogiri
       assert_kind_of(Nokogiri::XML::Element, original)
       assert_kind_of(Nokogiri::XML::Element, copy)
       assert_equal('child', original.name)
-      assert_equal('', Etch.xmltext(original))
+      assert_equal('child text', Etch.xmltext(original))
       assert_equal('child', copy.name)
-      assert_equal('some text', Etch.xmltext(copy))
+      assert_equal('child text', Etch.xmltext(copy))
     when :rexml
       assert_kind_of(REXML::Element, original)
       assert_kind_of(REXML::Element, copy)
       assert_equal('child', original.name)
-      assert_equal('', Etch.xmltext(original))
+      assert_equal('child text', Etch.xmltext(original))
       assert_equal('child', copy.name)
+      assert_equal('child text', Etch.xmltext(copy))
+    else
+      raise "Unknown XML library #{Etch.xmllib}"
+    end
+    
+    # Change the child so that we can test that it is separate from the orignal
+    Etch.xmlsettext(copy, 'some text')
+    
+    case Etch.xmllib
+    when :libxml
+      assert_equal('child text', Etch.xmltext(original))
+      assert_equal('some text', Etch.xmltext(copy))
+    when :nokogiri
+      assert_equal('child text', Etch.xmltext(original))
+      assert_equal('some text', Etch.xmltext(copy))
+    when :rexml
+      assert_equal('child text', Etch.xmltext(original))
       assert_equal('some text', Etch.xmltext(copy))
     else
       raise "Unknown XML library #{Etch.xmllib}"
