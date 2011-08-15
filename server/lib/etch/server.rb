@@ -24,14 +24,16 @@ class Etch::Server
     end
     @@configbase
   end
-  
+
   @@auth_enabled = nil
   @@auth_deny_new_clients = nil
+  @@etchdebuglog = nil  
   def self.read_config_file
     config_file = File.join(configbase, 'etchserver.conf')
     if File.exist?(config_file)
       auth_enabled = false
       auth_deny_new_clients = false
+      etchdebuglog = nil
       IO.foreach(config_file) do |line|
         # Skip blank lines and comments
         next if line =~ /^\s*$/
@@ -47,7 +49,11 @@ class Etch::Server
             auth_deny_new_clients = true
           end
         end
+        if line =~ /^\s*etchdebuglog\s*=\s*(.*)/
+          etchdebuglog = $1
+        end
       end
+      @@etchdebuglog = etchdebuglog
       @@auth_enabled = auth_enabled
       @@auth_deny_new_clients = auth_deny_new_clients
     end
@@ -203,12 +209,19 @@ class Etch::Server
     @facts = facts
     @tag = tag
     @debug = debug
-    @dlogger = Logger.new(File.join(Rails.configuration.root_path, 'log', 'etchdebug.log'))
+
+    if @@etchdebuglog
+      @dlogger = Logger.new(@@etchdebuglog)
+    else
+      @dlogger = Logger.new(File.join(Rails.configuration.root_path, 'log', 'etchdebug.log'))
+    end
+
     if debug
       @dlogger.level = Logger::DEBUG
     else
       @dlogger.level = Logger::INFO
     end
+
     @fqdn = @facts['fqdn']
 
     if !@fqdn
