@@ -4,7 +4,7 @@
 # Test etch's handling of local requests
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 
 class EtchLocalRequestsTests < Test::Unit::TestCase
   include EtchTests

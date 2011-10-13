@@ -5,7 +5,7 @@
 # creation of links and directories, and control the deletion of files
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 
 class EtchScriptTests < Test::Unit::TestCase
   include EtchTests

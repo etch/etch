@@ -4,7 +4,7 @@
 # Test etch's handling of creating and updating symbolic links
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 require 'pathname'
 
 class EtchLinkTests < Test::Unit::TestCase

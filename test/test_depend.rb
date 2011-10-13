@@ -4,7 +4,7 @@
 # Test etch's handling of dependencies
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 
 class EtchDependTests < Test::Unit::TestCase
   include EtchTests

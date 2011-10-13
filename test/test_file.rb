@@ -4,7 +4,7 @@
 # Test etch's handling of creating and updating regular files
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 
 class EtchFileTests < Test::Unit::TestCase
   include EtchTests

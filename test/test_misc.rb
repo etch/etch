@@ -4,7 +4,7 @@
 # Test miscellaneous items that don't fit elsewhere
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 require 'webrick'
 
 class EtchMiscTests < Test::Unit::TestCase

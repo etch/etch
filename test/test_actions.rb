@@ -4,7 +4,7 @@
 # Test etch's handling of various actions:  pre, post, setup, test, etc.
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 
 class EtchActionTests < Test::Unit::TestCase
   include EtchTests

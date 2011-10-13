@@ -4,7 +4,7 @@
 # Test output capturing
 #
 
-require "./#{File.dirname(__FILE__)}/etchtest"
+require File.expand_path('etchtest', File.dirname(__FILE__))
 require 'timeout'
 $:.unshift(File.join(EtchTests::CLIENTDIR, 'lib'))
 $:.unshift(File.join(EtchTests::SERVERDIR, 'lib'))
