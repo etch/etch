@@ -141,7 +141,13 @@ module EtchTests
   
   def stop_server(server)
     Process.kill('TERM', server[:pid])
-    Process.waitpid(server[:pid])
+    sleep 1
+    r = Process.waitpid(server[:pid], Process::WNOHANG)
+    # SIGTERM is fine for unicorn but webrick doesn't die easily
+    if !r
+      Process.kill('KILL', server[:pid])
+      Process.waitpid(server[:pid])
+    end
   end
   
   def run_etch(server, testroot, options={})
