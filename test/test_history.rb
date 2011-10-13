@@ -380,6 +380,15 @@ class EtchHistoryTests < Test::Unit::TestCase
     #
     testname = 'history conversion'
     
+    # It is getting harder and harder to find a package of RCS for
+    # modern operating systems.  And at this point the likelihood of
+    # anyone still having unconverted history logs is getting vanishingly
+    # small.  So if we don't have the RCS executables available just skip
+    # these tests.
+    if `which ci` == '' || `which co` == ''
+      return
+    end
+    
     # Mock up an original file and RCS history log
     mockorigcontents = "This is the original text\n"
     FileUtils.mkdir_p(File.dirname(@origfile))
