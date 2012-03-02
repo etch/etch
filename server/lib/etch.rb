@@ -22,9 +22,9 @@ class Etch
   end
 end
 
-# By default we try to use libxml, falling back to rexml if it is not
-# available.  The xmllib environment variable can be used to force one library
-# or the other, mostly for testing purposes.
+# By default we try to use nokogiri, falling back to rexml if it is not
+# available.  The xmllib environment variable can be used to force a specific
+# library, mostly for testing purposes.
 Silently.silently do
   begin
     if !ENV['xmllib'] || ENV['xmllib'] == 'nokogiri'
