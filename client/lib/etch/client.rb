@@ -2452,6 +2452,8 @@ class Etch::Client
   # for etch to handle any given file, including running any
   # setup/pre/post commands.
   OUTPUT_CAPTURE_TIMEOUT = 5 * 60
+  # In interactive mode bump the timeout up to something absurdly large
+  OUTPUT_CAPTURE_INTERACTIVE_TIMEOUT = 14 * 24 * 60 * 60
   def start_output_capture
     # Establish a pipe, spawn a child process, and redirect stdout/stderr
     # to the pipe.  The child gathers up anything sent over the pipe and
@@ -2503,7 +2505,13 @@ class Etch::Client
           # capturing feature this results in etch hanging around forever
           # waiting for the pipes to close. We time out after a suitable
           # period of time so that etch processes don't hang around forever.
-          Timeout.timeout(OUTPUT_CAPTURE_TIMEOUT) do
+          timeout = nil
+          if @interactive
+            timeout = OUTPUT_CAPTURE_INTERACTIVE_TIMEOUT
+          else
+            timeout = OUTPUT_CAPTURE_TIMEOUT
+          end
+          Timeout.timeout(timeout) do
             while char = pread.getc
               putc(char)
               output << char.chr
