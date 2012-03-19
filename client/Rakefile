@@ -53,7 +53,7 @@ def copy_etch_files(destdir, options={})
     # Substitute ETCHVER into etch/client.rb
     # Substitute proper path into CONFIGDIR in etch/client.rb if appropriate
     File.open(File.join(libdir, 'etch', 'client.rb'), 'w') do |newfile|
-      IO.foreach(File.join('etch', 'client.rb')) do |line|
+      IO.foreach(File.join('lib', 'etch', 'client.rb')) do |line|
         if line =~ /^\s*VERSION/
           line.sub!(/=.*/, "= '#{ETCHVER}'")
         end
@@ -390,6 +390,7 @@ task :macport => :fetch do
   md5 = `openssl md5 #{TARBALL}`.chomp.split.last
   sha1 = `openssl sha1 #{TARBALL}`.chomp.split.last
   rmd160 = `openssl rmd160 #{TARBALL}`.chomp.split.last
+  sha256 = `openssl sha256 #{TARBALL}`.chomp.split.last
   
   portfile = File.join(Dir.tmpdir, 'Portfile')
   rm_f(portfile)
@@ -399,6 +400,7 @@ task :macport => :fetch do
       line.sub!('%MD5%', md5)
       line.sub!('%SHA1%', sha1)
       line.sub!('%RMD160%', rmd160)
+      line.sub!('%SHA256%', sha256)
       newfile.puts(line)
     end
   end
