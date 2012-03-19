@@ -5,9 +5,11 @@ PortSystem          1.0
 PortGroup           ruby 1.0
 
 name                etch
-version             3.17.0
+version             3.20.0
 categories          sysutils
 maintainers         aput.net:jheiss openmaintainer 
+supported_archs     noarch
+license             MIT
 
 description         Etch is a system configuration management tool.
 
@@ -23,17 +25,15 @@ long_description    Etch is a tool for managing the configuration of \
 homepage            http://etch.sourceforge.net/
 platforms           darwin
 
-master_sites        sourceforge
+master_sites        sourceforge:project/etch/etch/${version}
 
-checksums           md5     9b5216f62d4add225f50984cc07f630b \
-                    sha1    a4bc1c61f349464ca793d858abeca08760bde6e5 \
-                    rmd160  f827b360c69cceab1a864b11c7cf434b7c7a4a39
+checksums           rmd160  7f6525673bc636f3128268bf9ed6420c7098ff15 \
+                    sha256  3245e1187bd635e112daf954f0b30945ff522f16c4084290005ae962da932c1b
 
 depends_build       port:rb-rake
 depends_run         port:facter
 
 worksrcdir          ${worksrcdir}/client
-supported_archs     noarch
 use_configure       no
 build               {}
 destroot.cmd        ${prefix}/bin/rake
