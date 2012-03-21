@@ -5,7 +5,7 @@ PortSystem          1.0
 PortGroup           ruby 1.0
 
 name                etch
-version             3.20.0
+version             3.20.1
 categories          sysutils
 maintainers         aput.net:jheiss openmaintainer 
 supported_archs     noarch
@@ -27,8 +27,8 @@ platforms           darwin
 
 master_sites        sourceforge:project/etch/etch/${version}
 
-checksums           rmd160  7f6525673bc636f3128268bf9ed6420c7098ff15 \
-                    sha256  3245e1187bd635e112daf954f0b30945ff522f16c4084290005ae962da932c1b
+checksums           rmd160  c93fdb584928b25433c99b1fde430eef2b6f8deb \
+                    sha256  38a39c27edeaef03aa2f72417a481717030b34e7990d723ea1299a7bc6eac540
 
 depends_build       port:rb-rake
 depends_run         port:facter
