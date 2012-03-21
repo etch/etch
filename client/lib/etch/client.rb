@@ -2250,7 +2250,7 @@ class Etch::Client
         pw = Etc.getpwnam(user)
         uid = pw.uid
       rescue ArgumentError
-        puts "config.xml requests user #{user}, but that user can't be found.  Using UID 0."
+        puts "config.xml requests user #{user}, but that user can't be found.  Using UID 0." if @debug
         uid = 0
       end
     end
@@ -2270,7 +2270,7 @@ class Etch::Client
         gr = Etc.getgrnam(group)
         gid = gr.gid
       rescue ArgumentError
-        puts "config.xml requests group #{group}, but that group can't be found.  Using GID 0."
+        puts "config.xml requests group #{group}, but that group can't be found.  Using GID 0." if @debug
         gid = 0
       end
     end
