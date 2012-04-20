@@ -51,16 +51,16 @@ end
 class Etch
   # FIXME: I'm not really proud of this, it seems like there ought to be a way
   # to just use one logger.  The problem is that on the server we'd like to
-  # use RAILS_DEFAULT_LOGGER for general logging (which is logging to
+  # use Rails.logger for general logging (which is logging to
   # log/production.log), but be able to turn on debug-level logging for
   # individual connections (via the debug parameter sent in the HTTP
-  # requests).  If we twiddle the log level of RAILS_DEFAULT_LOGGER then all
+  # requests).  If we twiddle the log level of Rails.logger then all
   # connections coming in at the same time as the debug connection will also
   # get logged as debug, making the logs confusing.  And if the debug
   # connection aborts for some reason we also risk leaving
-  # RAILS_DEFAULT_LOGGER set to debug, flooding the logs.  So it seems like we
+  # Rails.logger set to debug, flooding the logs.  So it seems like we
   # need a seperate logger for debugging.  But that just seems wrong somehow. 
-  # We don't want to just dup RAILS_DEFAULT_LOGGER for each connection, even
+  # We don't want to just dup Rails.logger for each connection, even
   # if Logger didn't immediately blow up we'd probably end up with scrambled
   # logs as simultaneous connections tried to write at the same time.  Or
   # maybe that would work, depending on how Ruby and the OS buffer writes to

@@ -1,20 +1,21 @@
-<%- @page_title = "Client: " + h(@client.name) %>
+<%- @page_title = "Client: #{@client.name}" %>
 
 <div class="record_view">
 
-<h1>Client: <%= h(@client.name) %></h1>
+<h1>Client: <%= @client.name %></h1>
 
 <p>
-  <strong>Name:</strong>   <%= h(@client.name) %><br />
-  <strong>Status:</strong> <%= h(@client.status) %><br />
+  <strong>Name:</strong>   <%= @client.name %><br />
+  <strong>Status:</strong> <%= @client.status %><br />
 </p>
 
 <p>
   <%- hours = 0 -%>
   <%- if @timeline -%>
+    <strong>Timeline View</strong>
     <%- if @timeline == -1 -%>
       <%- # If the user requested everything then set our limit to the oldest entry -%>
-      <%- oldest = Result.find(:last, :conditions => ['client_id = ?', @client.id], :order => 'results.created_at') -%>
+      <%- oldest = Result.where('client_id = ?', @client.id).order('results.created_at').first -%>
       <%- hours = ((Time.now - oldest.created_at) / 60 / 60).to_i + 1 -%>
     <%- else -%>
       <%- hours = @timeline -%>
@@ -32,9 +33,9 @@
     </thead>
     <tbody>
     <%- (0..hours).each do |hour| -%>
-      <%- results = Result.find(:all, :conditions => ["client_id = ? AND created_at > ? AND created_at <= ?", @client.id, (hour+1).hours.ago, hour.hours.ago]) -%>
+      <%- results = Result.where("client_id = ? AND created_at > ? AND created_at <= ?", @client.id, (hour+1).hours.ago, hour.hours.ago) -%>
       <tr class="<%= cycle('odd', 'even') -%>">
-        <td nowrap="nowrap" width="5%"><%= link_to 'View', results_path + "?clients.id=#{@client.id}&starttime=#{hour+1}&endtime=#{hour}" %></td>
+        <td nowrap="nowrap" width="5%"><%= link_to 'View', results_path + "?q[client_name_eq]=#{@client.name}&q[created_at_gt]=#{(hour+1).hours.ago}&q[created_at_lteq]=#{hour.hours.ago}" %></td>
         <td><%= hour.hours.ago %></td>
         <td><%= hour %></td>
         <td><%= results.length %></td>
@@ -44,7 +45,7 @@
     </tbody>
   </table>
   <%- else -%>
-    <%= link_to 'View all results', "#{results_path}?clients.name=#{@client.name}" %> for this client<br/>
+    <%= link_to 'View all results', "#{results_path}?q[client_name_eq]=#{@client.name}" %> for this client<br/>
     Timeline for the last <%= link_to '24 hrs', "#{client_path(@client)}?timeline=24" %>,
                           <%= link_to '7 days', "#{client_path(@client)}?timeline=168" %>,
                           <%= link_to 'all',    "#{client_path(@client)}?timeline=-1" %>
@@ -53,12 +54,12 @@
 
 <p>
   <strong>Message:</strong><br />
-  <pre><%= h(@client.message) %></pre>
+  <pre><%= @client.message %></pre>
 </p>
 
 <p class="metadata">
-  <strong>Created at:</strong> <%= h(@client.created_at) %><br />
-  <strong>Updated at:</strong> <%= h(@client.updated_at) %><br />
+  <strong>Created at:</strong> <%= @client.created_at %><br />
+  <strong>Updated at:</strong> <%= @client.updated_at %><br />
   <%= link_to 'Delete', client_path(@client), :confirm => 'Are you sure?', :method => :delete %></p>
 </p>
 

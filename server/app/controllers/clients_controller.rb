@@ -3,79 +3,37 @@ require 'intmax'
 class ClientsController < ApplicationController
   # GET /clients
   def index
-    includes = {}
-
-    sort = case params[:sort]
-           when 'client'              then 'clients.name'
-           when 'client_reverse'      then 'clients.name DESC'
-           when 'status'              then 'clients.status'
-           when 'status_reverse'      then 'clients.status DESC'
-           when 'updated_at'          then 'clients.updated_at'
-           when 'updated_at_reverse'  then 'clients.updated_at DESC'
-           end
-    # If a sort was not defined we'll make one default
-    if sort.nil?
-      params[:sort] = 'client'
-      sort = 'clients.name'
+    # The dashboard has some custom search links for various health
+    # categories.  If the user selected one then use the appropriate scope as
+    # the starting point for further filtering rather than all clients.
+    scope = nil
+    case params['health']
+    when 'healthy'
+      scope = Client.healthy
+    when 'broken'
+      scope = Client.broken
+    when 'disabled'
+      scope = Client.disabled
+    when 'stale'
+      scope = Client.stale
+    else
+      scope = Client
     end
     
-    # Parse all other params as search query args
-    allowed_queries = ['name', 'status', 'updated_at']
-    conditions_query = []
-    conditions_values = []
-    params.each_pair do |key, value|
-      next if key == 'action'
-      next if key == 'controller'
-      next if key == 'format'
-      next if key == 'page'
-      next if key == 'sort'
-      
-      if key == 'health'
-        if value == 'healthy'
-          conditions_query << "status = 0 AND updated_at > ?"
-          conditions_values << 24.hours.ago
-        elsif value == 'broken'
-          conditions_query << "status != 0 AND status != 200 AND updated_at > ?"
-          conditions_values << 24.hours.ago
-        elsif value == 'disabled'
-          conditions_query << "status = 200 AND updated_at > ?"
-          conditions_values << 24.hours.ago
-        elsif value == 'stale'
-          conditions_query << "updated_at <= ?"
-          conditions_values << 24.hours.ago
-        end
-      elsif key == 'name_substring'
-        conditions_query << "name LIKE ?"
-        conditions_values << '%' + value + '%'
-      elsif key == 'updated_since'
-        conditions_query << "updated_at >= ?"
-        conditions_values << value.to_i.hours.ago
-      elsif key == 'not_updated_since'
-        conditions_query << "updated_at < ?"
-        conditions_values << value.to_i.hours.ago
-      elsif allowed_queries.include?(key)
-        conditions_query << "#{key} = ?"
-        conditions_values << value
-      end
-    end
-    conditions_string = conditions_query.join(' AND ')
-    
+    # Clients requesting XML get no pagination (all entries)
     per_page = Client.per_page # will_paginate's default value
-    # Client's requesting XML get all entries
-    respond_to { |format| format.html {}; format.xml { per_page = Integer::MAX } }
+    respond_to do |format|
+      format.html {}
+      format.xml { per_page = Integer::MAX }
+    end
     
-    @clients = Client.paginate(:all,
-                               :include => includes,
-                               :conditions => [ conditions_string, *conditions_values ],
-                               :order => sort,
-                               :page => params[:page],
-                               :per_page => per_page)
+    @q = scope.search(params[:q])
+    @clients = @q.result.paginate(:page => params[:page], :per_page => per_page)
     
     respond_to do |format|
       format.html # index.html.erb
       format.xml do
-        render :xml => @clients.to_xml(:include => convert_includes(includes),
-                                       :dasherize => false)
+        render :xml => @clients.to_xml(:dasherize => false)
       end
     end
   end
@@ -90,8 +48,7 @@ class ClientsController < ApplicationController
     @client = Client.find(params[:id])
     respond_to do |format|
       format.html # show.html.erb
-      format.xml  { render :xml => @client.to_xml(:include => convert_includes(includes),
-                                                  :dasherize => false) }
+      format.xml  { render :xml => @client.to_xml(:dasherize => false) }
     end
   end
   

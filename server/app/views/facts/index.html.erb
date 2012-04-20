@@ -8,9 +8,9 @@
   <thead>
     <tr>
       <th nowrap="nowrap" width="5%">&nbsp;</th>
-      <th><%= order @search, :by => :client %></th>
-      <th><%= order @search, :by => :key %></th>
-      <th><%= order @search, :by => :updated_at %></th>
+      <th><%= sort_link @q, :client_name, 'Client' %></th>
+      <th><%= sort_link @q, :key %></th>
+      <th><%= sort_link @q, :updated_at, 'Last Update' %></th>
     </tr>
   </thead>
   <tbody>

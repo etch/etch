@@ -3,14 +3,14 @@ require 'date'
 class DashboardController < ApplicationController
   def set_counts
     @total_count    = Client.count
-    @healthy_count  = Client.count(:conditions => ["status = 0 AND updated_at > ?", 24.hours.ago])
-    @broken_count   = Client.count(:conditions => ["status != 0 AND status != 200 AND updated_at > ?", 24.hours.ago])
-    @disabled_count = Client.count(:conditions => ["status = 200 AND updated_at > ?", 24.hours.ago])
-    @stale_count    = Client.count(:conditions => ["updated_at <= ?", 24.hours.ago])
+    @healthy_count  = Client.healthy.count
+    @broken_count   = Client.broken.count
+    @disabled_count = Client.disabled.count
+    @stale_count    = Client.stale.count
   end
   def set_charts
-    @status_chart = open_flash_chart_object(300, 300, url_for( :action => 'chart', :chart => 'status', :format => :json ))
-    @client_chart = open_flash_chart_object(500, 300, url_for( :action => 'chart', :chart => 'client', :format => :json ))
+    @status_chart = open_flash_chart_object(300, 300, url_for( :action => 'chart', :chart => 'status', :format => :json )).html_safe
+    @client_chart = open_flash_chart_object(500, 300, url_for( :action => 'chart', :chart => 'client', :format => :json )).html_safe
   end
   
   def index
@@ -55,8 +55,8 @@ class DashboardController < ApplicationController
           
           chart.x_axis = nil
           
-          render :text => chart, :layout => false
-          return
+          debug chart.render
+          render :text => chart.render and return
         when 'client'
           clients = []
           months = []
@@ -104,8 +104,7 @@ class DashboardController < ApplicationController
           
           chart.add_element(line_dot)
           
-          render :text => chart.to_s
-          return
+          render :text => chart.render and return
         end
       }
     end

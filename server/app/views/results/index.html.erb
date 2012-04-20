@@ -6,34 +6,34 @@
 <%- if @combined -%>
   <%- @results.each do |result| -%>
 <p>
-  <strong>Client:</strong>  <%= link_to(h(result.client.name), client_path(result.client)) %><br />
-  <strong>File:</strong>    <%= h(result.file) %><br />
-  <strong>Success:</strong> <%= h(result.success) %><br />
+  <strong>Client:</strong>  <%= link_to(result.client.name, client_path(result.client)) %><br />
+  <strong>File:</strong>    <%= result.file %><br />
+  <strong>Success:</strong> <%= result.success %><br />
 </p>
 
 <p class="metadata">
-  <strong>Time:</strong> <%= h(result.created_at) %><br />
+  <strong>Time:</strong> <%= result.created_at %><br />
 </p>
 
 <p>
   <strong>Message:</strong><br />
-  <pre><%= h(result.message) %></pre>
+  <pre><%= result.message %></pre>
 </p>
   <%- end -%>
 <%- else -%>
 <div id="results_table">
-  <%= link_to('View all these combined', results_path + "?combined=1&#{@query_params.join('&')}") %><br/>
+  <%= link_to('View all these combined', results_path + "?#{@query_string}&combined=1") %><br/>
   <%= will_paginate @results %>
   
   <table cellspacing="0" class="styled">
     <thead>
       <tr>
         <th nowrap="nowrap" width="5%">&nbsp;</th>
-        <th <%= sort_td_class_helper "client" %> > <%= sort_link_helper "Client", "client" %></th>
-        <th <%= sort_td_class_helper "file" %> > <%= sort_link_helper "File", "file" %></th>
-        <th <%= sort_td_class_helper "created_at" %> > <%= sort_link_helper "Time", "created_at" %></th>
-        <th <%= sort_td_class_helper "success" %> > <%= sort_link_helper "Success", "success" %></th>
-        <th <%= sort_td_class_helper "message_size" %> > <%= sort_link_helper "Message Size", "message_size" %></th>
+        <th><%= sort_link @q, :client_name, 'Client' %></th>
+        <th><%= sort_link @q, :file %></th>
+        <th><%= sort_link @q, :created_at, 'Time' %></th>
+        <th><%= sort_link @q, :success %></th>
+        <th><%= sort_link @q, :message_size %></th>
       </tr>
     </thead>
     <tbody>

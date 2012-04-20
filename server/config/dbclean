@@ -60,7 +60,7 @@ end
 # Do stuff
 #
 
-clientsuri = URI.join(options[:server], "clients.xml?not_updated_since=#{hours}")
+clientsuri = URI.join(options[:server], "clients.xml?q[updated_at_lt]=#{hours.hours.ago}")
 
 http = Net::HTTP.new(clientsuri.host, clientsuri.port)
 if clientsuri.scheme == "https"

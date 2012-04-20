@@ -4,17 +4,6 @@ require 'etch/server'
 # Likewise, all the methods added will be available for all controllers.
 
 class ApplicationController < ActionController::Base
-  helper :all # include all helpers, all the time
-
-  # See ActionController::Base for details 
-  # Uncomment this to filter the contents of submitted sensitive data parameters
-  # from your application log (in this case, all fields with names like "password"). 
-  # filter_parameter_logging :password
-
-  # Turn on the exception_notification plugin
-  # See environment.rb for the email address(s) to which exceptions are mailed
-  include ExceptionNotifiable
-
   # Verify that any changes are signed if the administrator has
   # enabled authentication
   before_filter :authenticate, :only => [:create, :update, :destroy]
@@ -45,22 +34,5 @@ class ApplicationController < ActionController::Base
         render :text => "Authentication required, no authentication data found", :status => :unauthorized
       end
     end
-  end
-  
-  # find and to_xml take their :include options in different formats
-  # find wants:
-  # :include => { :rack => { :datacenter_rack_assignment => :datacenter } }
-  # or this (which is what we use because it is easier to generate recursively)
-  # :include => { :rack => { :datacenter_rack_assignment => { :datacenter => {} } } }
-  # to_xml wants:
-  # :include => { :rack => { :include => { :datacenter_rack_assignment => { :include => { :datacenter => {} } } } } }
-  # This method takes the find format and returns the to_xml format
-  def convert_includes(includes)
-    includes.each do |key, value|
-      unless (value.nil? || value.blank?)
-        includes[key] = { :include => convert_includes(value) }
-      end
-    end
-    includes
   end
 end

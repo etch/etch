@@ -4,7 +4,11 @@
 <table width="100%">
   <tr>
     <td><h1>Clients</h1></td>
-    <td align="right">Search by name: <%- form_tag(clients_path, :method => :get) do -%><%= text_field_tag('name_substring') %><%- end -%></td>
+    <td align="right">Search by name:
+    <%= search_form_for @q do |f| %>
+      <%= f.text_field :name_cont %>
+    <% end %>
+    </td>
   </tr>
 </table>
 
@@ -15,9 +19,9 @@
     <thead>
       <tr>
         <th nowrap="nowrap" width="5%">&nbsp;</th>
-        <th <%= sort_td_class_helper "client" %> > <%= sort_link_helper "Client", "client" %></th>
-        <th <%= sort_td_class_helper "status" %> > <%= sort_link_helper "Status", "status" %></th>
-        <th <%= sort_td_class_helper "updated_at" %> > <%= sort_link_helper "Last Update", "updated_at" %></th>
+        <th><%= sort_link @q, :client %></th>
+        <th><%= sort_link @q, :status %></th>
+        <th><%= sort_link @q, :updated_at, 'Last Update' %></th>
       </tr>
     </thead>
     <tbody>

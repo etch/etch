@@ -10,8 +10,8 @@ class OriginalsController < ApplicationController
       format.xml { per_page = Integer::MAX }
     end
     
-    @search = Original.search(params[:search])
-    @originals = @search.paginate(:page => params[:page], :per_page => per_page)
+    @q = Original.search(params[:q])
+    @originals = @q.result.paginate(:page => params[:page], :per_page => per_page)
     
     respond_to do |format|
       format.html # index.html.erb

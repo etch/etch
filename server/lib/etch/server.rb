@@ -213,7 +213,7 @@ class Etch::Server
     if @@etchdebuglog
       @dlogger = Logger.new(@@etchdebuglog)
     else
-      @dlogger = Logger.new(File.join(Rails.configuration.root_path, 'log', 'etchdebug.log'))
+      @dlogger = Logger.new(File.join(Rails.root, 'log', 'etchdebug.log'))
     end
 
     if debug
@@ -358,7 +358,7 @@ class Etch::Server
     # Process the user's request
     #
     
-    etch = Etch.new(RAILS_DEFAULT_LOGGER, @dlogger)
+    etch = Etch.new(Rails.logger, @dlogger)
     response = etch.generate(@tagbase, @facts, request)
     
     #

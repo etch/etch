@@ -10,8 +10,8 @@ class FactsController < ApplicationController
       format.xml { per_page = Integer::MAX }
     end
     
-    @search = Fact.search(params[:search])
-    @facts = @search.paginate(:page => params[:page], :per_page => per_page)
+    @q = Fact.search(params[:q])
+    @facts = @q.result.paginate(:page => params[:page], :per_page => per_page)
     
     respond_to do |format|
       format.html # index.html.erb

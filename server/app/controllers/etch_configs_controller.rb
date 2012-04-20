@@ -10,8 +10,8 @@ class EtchConfigsController < ApplicationController
       format.xml { per_page = Integer::MAX }
     end
     
-    @search = EtchConfig.search(params[:search])
-    @etch_configs = @search.paginate(:page => params[:page], :per_page => per_page)
+    @q = EtchConfig.search(params[:q])
+    @etch_configs = @q.result.paginate(:page => params[:page], :per_page => per_page)
     
     respond_to do |format|
       format.html # index.html.erb

@@ -3,83 +3,27 @@ require 'intmax'
 class ResultsController < ApplicationController
   # GET /results
   def index
-    includes = {}
+    @combined = params[:combined]
+    @query_string = request.query_string
     
-    # The index page uses clients.name, so always include it in the includes.
-    # Otherwise there's a SQL lookup for each row
-    includes[:client] = {}
-    
-    sort = case params[:sort]
-           when 'client'                then includes[:client] = {}; 'clients.name'
-           when 'client_reverse'        then includes[:client] = {}; 'clients.name DESC'
-           when 'file'                  then 'results.file'
-           when 'file_reverse'          then 'results.file DESC'
-           when 'created_at'            then 'results.created_at'
-           when 'created_at_reverse'    then 'results.created_at DESC'
-           when 'success'               then 'results.success'
-           when 'success_reverse'       then 'results.success DESC'
-           when 'message_size'          then 'LENGTH(results.message)'
-           when 'message_size_reverse'  then 'LENGTH(results.message) DESC'
-           end
-    # If a sort was not defined we'll make one default
-    if sort.nil?
-      params[:sort] = 'client'
-      sort = 'clients.name'
-      includes[:client] = {}
+    # Clients requesting XML get no pagination (all entries)
+    per_page = Client.per_page # will_paginate's default value
+    respond_to do |format|
+      format.html {}
+      format.xml { per_page = Integer::MAX }
     end
-    
-    @combined = false
-    if params[:combined]
-      @combined = true
-    end
-    
-    # Parse all other params as search query args
-    allowed_queries = ['clients.id', 'clients.name', 'file', 'success']
-    conditions_query = []
-    conditions_values = []
-    @query_params = []
-    params.each_pair do |key, value|
-      next if key == 'action'
-      next if key == 'controller'
-      next if key == 'format'
-      next if key == 'page'
-      @query_params << "#{key}=#{value}"  # Used by view
-      next if key == 'sort'
-      next if key == 'combined'
-      
-      if key == 'starttime'
-        conditions_query << "results.created_at > ?"
-        conditions_values << value.to_i.hours.ago
-      elsif key == 'endtime'
-        conditions_query << "results.created_at <= ?"
-        conditions_values << value.to_i.hours.ago
-      elsif allowed_queries.include?(key)
-        conditions_query << "#{key} = ?"
-        conditions_values << value
-      end
-    end
-    conditions_string = conditions_query.join(' AND ')
-    
-    per_page = Result.per_page # will_paginate's default value
-    # Client's requesting XML get all entries
-    respond_to { |format| format.html {}; format.xml { per_page = Integer::MAX } }
     # As do clients who specifically request everything
     if @combined
       per_page = Integer::MAX
     end
     
-    @results = Result.paginate(:all,
-                               :include => includes,
-                               :conditions => [ conditions_string, *conditions_values ],
-                               :order => sort,
-                               :page => params[:page],
-                               :per_page => per_page)
+    @q = Result.search(params[:q])
+    @results = @q.result.paginate(:page => params[:page], :per_page => per_page)
     
     respond_to do |format|
       format.html # index.html.erb
       format.xml do
-        render :xml => @results.to_xml(:include => convert_includes(includes),
-                                       :dasherize => false)
+        render :xml => @results.to_xml(:dasherize => false)
       end
     end
   end
@@ -89,8 +33,7 @@ class ResultsController < ApplicationController
     @result = Result.find(params[:id])
     respond_to do |format|
       format.html # show.html.erb
-      format.xml  { render :xml => @result.to_xml(:include => convert_includes(includes),
-                                                  :dasherize => false) }
+      format.xml  { render :xml => @result.to_xml(:dasherize => false) }
     end
   end
   
