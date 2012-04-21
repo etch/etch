@@ -1,5 +1,5 @@
 Server::Application.routes.draw do
-  match 'files' => 'files#create'
+  post 'files' => 'files#create'
   resources :clients
   resources :etch_configs
   resources :facts
@@ -7,5 +7,5 @@ Server::Application.routes.draw do
   resources :results
   
   root :to => 'dashboard#index'
-  match 'chart' => 'dashboard#chart'
+  get 'chart/:chart' => 'dashboard#chart'
 end
