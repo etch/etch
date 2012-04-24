@@ -285,7 +285,11 @@ class Etch
     end
     
     # Load the config.xml file
-    config_xml = Etch.xmlload(config_xml_file)
+    begin
+      config_xml = Etch.xmlload(config_xml_file)
+    rescue Exception => e
+      raise Etch.wrap_exception(e, "Error loading config.xml for #{file}:\n" + e.message)
+    end
     
     # Filter the config.xml file by looking for attributes
     begin
