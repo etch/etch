@@ -122,7 +122,7 @@ table.styled thead
 	
 }
 
-table.styled thead a { color: #fff; }
+table.styled thead a
 {
 	color: #fff;
 	background-color: #666;
@@ -213,7 +213,7 @@ table.arattributes th { text-align: right; }
 
 .record_view .note
 {
-	color: grey;
+	color: #808080;
 	font-weight: normal;
 }
 
