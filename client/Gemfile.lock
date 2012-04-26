@@ -2,13 +2,9 @@ GEM
   remote: http://rubygems.org/
   specs:
     facter (1.6.5)
-    libxml-ruby (2.2.2)
-    nokogiri (1.5.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
   facter
-  libxml-ruby
-  nokogiri
