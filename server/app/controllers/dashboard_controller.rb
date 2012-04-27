@@ -28,16 +28,16 @@ class DashboardController < ApplicationController
           set_counts
           data = []
           if @healthy_count > 0
-            data << { label: "Healthy: #{@healthy_count}", data: @healthy_count }
+            data << { :label => "Healthy: #{@healthy_count}", :data => @healthy_count }
           end
           if @broken_count > 0
-            data << { label: "Broken: #{@broken_count}", data: @broken_count }
+            data << { :label => "Broken: #{@broken_count}", :data => @broken_count }
           end
           if @disabled_count > 0
-            data << { label: "Disabled: #{@disabled_count}", data: @disabled_count }
+            data << { :label => "Disabled: #{@disabled_count}", :data => @disabled_count }
           end
           if @stale_count > 0
-            data << { label: "Stale: #{@stale_count}", data: @stale_count }
+            data << { :label => "Stale: #{@stale_count}", :data => @stale_count }
           end
           render :json => data and return
         when 'client'
@@ -55,7 +55,7 @@ class DashboardController < ApplicationController
             # Throw in an entry for right now so the graph has current data
             client_counts << [now.to_i * 1000, Client.count]
           end
-          data = [{label: "# of Clients", data: client_counts}]
+          data = [{:label => "# of Clients", :data => client_counts}]
           render :json => data and return
         end
       }
