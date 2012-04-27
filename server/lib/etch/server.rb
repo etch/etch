@@ -231,7 +231,7 @@ class Etch::Server
     # Update the stored facts for this client
     @client = Client.find_or_create_by_name(@fqdn)
     @facts.each do |key, value|
-      fact = Fact.find_or_create_by_client_id_and_key(:client_id => @client.id, :key => key, :value => value)
+      fact = Fact.find_or_create_by_client_id_and_key(:client_id => @client.id, :key => key.dup, :value => value)
       if fact.value != value
         fact.update_attributes(:value => value)
       end
@@ -326,7 +326,7 @@ class Etch::Server
         end
         request[:files][name][:orig] = origpath
         # Update the stored record of the original
-        original = Original.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => name, :sum => sha1)
+        original = Original.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => name.dup, :sum => sha1)
         if original.sum != sha1
           original.update_attributes(:sum => sha1)
         end
@@ -334,7 +334,7 @@ class Etch::Server
       if filehash['sha1sum']
         sha1 = filehash['sha1sum']
         # Update the stored record of the original
-        original = Original.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => name, :sum => sha1)
+        original = Original.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => name.dup, :sum => sha1)
         if original.sum != sha1
           original.update_attributes(:sum => sha1)
         end
@@ -379,7 +379,7 @@ class Etch::Server
         # setup and depend elements that we send to the client to ensure it
         # supplies a proper orig file.
         if !response[:need_orig][file]
-          config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file, :config => config_xml.to_s)
+          config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file.dup, :config => config_xml.to_s)
           if config.config != config_xml.to_s
             config.update_attributes(:config => config_xml.to_s)
           end
@@ -429,7 +429,7 @@ class Etch::Server
       commands_xml = Etch.xmlnewelem('allcommands', response_xml)
       response[:allcommands].each do |commandname, command_xml|
         # Update the stored record of the command
-        config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => commandname, :config => command_xml.to_s)
+        config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => commandname.dup, :config => command_xml.to_s)
         if config.config != command_xml.to_s
           config.update_attributes(:config => command_xml.to_s)
         end
