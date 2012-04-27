@@ -159,7 +159,7 @@ class EtchConfTests < Test::Unit::TestCase
     # these changes.
     Net::HTTP.start('localhost', @server[:port]) do |http|
       # Find our client id
-      response = http.get("/clients.xml?name=#{hostname}")
+      response = http.get("/clients.xml?q[name_eq]=#{hostname}")
       if !response.kind_of?(Net::HTTPSuccess)
         response.error!
       end
@@ -169,8 +169,8 @@ class EtchConfTests < Test::Unit::TestCase
         client_id = response_xml.elements['/clients/client/id'].text
         # If there's an existing "sshrsakey" fact for this client then
         # delete it
-        response = http.get("/facts.xml?search[client_id]=#{client_id}&" +
-          "search[key]=sshrsakey")
+        response = http.get("/facts.xml?q[client_id_eq]=#{client_id}&" +
+          "q[key_eq]=sshrsakey")
         if !response.kind_of?(Net::HTTPSuccess)
           response.error!
         end

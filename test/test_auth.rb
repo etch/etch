@@ -39,7 +39,7 @@ class EtchAuthTests < Test::Unit::TestCase
     hostname = Facter['fqdn'].value
     Net::HTTP.start('localhost', @server[:port]) do |http|
       # Find our client id
-      response = http.get("/clients.xml?name=#{hostname}")
+      response = http.get("/clients.xml?q[name_eq]=#{hostname}")
       if !response.kind_of?(Net::HTTPSuccess)
         response.error!
       end
