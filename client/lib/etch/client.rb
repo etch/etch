@@ -1591,6 +1591,9 @@ class Etch::Client
           guard_result = process_guard(guard, commandname)
           
           if !guard_result
+            # Tell the user what we're going to do
+            puts "Will run command '#{command}'"
+            
             # If the user requested interactive mode ask them for
             # confirmation to proceed.
             if @interactive
