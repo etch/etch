@@ -2315,14 +2315,17 @@ class Etch::Client
         else print "[p|s|q] "
       end
       response = $stdin.gets.chomp
-      if response =~ /p/i || @last_response =~ /p/i
-        @last_response = response if !response.strip.empty?
+      if response.empty?
+        response = @last_response
+      end
+      if response =~ /p/i
+        @last_response = response
         return CONFIRM_PROCEED
-      elsif response =~ /s/i || @last_response =~ /s/i
-        @last_response = response if !response.strip.empty?
+      elsif response =~ /s/i
+        @last_response = response
         return CONFIRM_SKIP
-      elsif response =~ /q/i || @last_response =~ /q/i
-        @last_response = response if !response.strip.empty?
+      elsif response =~ /q/i
+        @last_response = response
         return CONFIRM_QUIT
       end
     end
