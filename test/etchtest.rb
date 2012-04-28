@@ -97,7 +97,6 @@ module EtchTests
     File.symlink(newrepo, server[:repo])
   end
   
-  UNICORN = false
   def start_server(repo='no_repo_yet')
     # We want the running server's notion of the server base to be a symlink
     # that we can easily change later in swap_repository.
@@ -130,10 +129,10 @@ module EtchTests
         raise "Etch server failed to start"
       end
     else
-      if UNICORN
-        exec("cd #{SERVERDIR} && #{RUBY} `which unicorn_rails` -p #{port}")
+      if `cd #{SERVERDIR} && #{RUBY} \`which bundle\` list`.include?('unicorn')
+        exec("cd #{SERVERDIR} && #{RUBY} `which bundle` exec unicorn -p #{port}")
       else
-        exec("cd #{SERVERDIR} && #{RUBY} `which rails` server -p #{port}")
+        exec("cd #{SERVERDIR} && #{RUBY} `which bundle` exec rails server -p #{port}")
       end
     end
     {:port => port, :pid => pid, :repo => serverbase}
