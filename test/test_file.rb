@@ -23,8 +23,7 @@ class EtchFileTests < Test::Unit::TestCase
     #puts "Using #{@testroot} as client working directory"
   end
   
-  def test_files
-
+  def test_plain
     #
     # Run a test of basic file creation
     #
@@ -59,7 +58,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'file')
+  end
 
+  def test_template
     #
     # Test with a template
     #
@@ -95,7 +96,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'template')
+  end
 
+  def test_warning
     #
     # Test using a different warning file
     #
@@ -135,7 +138,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'different warning file')
+  end
 
+  def test_no_warning
     #
     # Test using no warning file
     #
@@ -164,7 +169,9 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'no warning file')
+  end
 
+  def test_comment_line
     #
     # Test using a different line comment string
     #
@@ -200,7 +207,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'different line comment')
+  end
 
+  def test_comment_open_close
     #
     # Test using comment open/close
     #
@@ -239,7 +248,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'comment open/close')
+  end
 
+  def test_warning_on_second_line
     #
     # Test warning on second line
     #
@@ -278,7 +289,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents_remainder
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'warning on second line')
+  end
 
+  def test_no_space_around_warning
     #
     # Test no space around warning
     #
@@ -298,7 +311,7 @@ class EtchFileTests < Test::Unit::TestCase
       EOF
     end
 
-    sourcecontents = "This is a test\n"
+    sourcecontents = "Test #{testname}\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
@@ -313,7 +326,9 @@ class EtchFileTests < Test::Unit::TestCase
     correctcontents << sourcecontents
 
     assert_equal(correctcontents, get_file_contents(@targetfile), 'file')
+  end
 
+  def test_ownership_and_permissions
     #
     # Test ownership and permissions
     #
@@ -333,6 +348,11 @@ class EtchFileTests < Test::Unit::TestCase
         </file>
       </config>
       EOF
+    end
+
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
     end
 
     run_etch(@server, @testroot, :testname => testname)
@@ -370,6 +390,11 @@ class EtchFileTests < Test::Unit::TestCase
       EOF
     end
 
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
     run_etch(@server, @testroot, :testname => testname)
 
     # Verify that the ownership defaulted to UID/GID 0
@@ -381,7 +406,9 @@ class EtchFileTests < Test::Unit::TestCase
     else
       warn "Not running as root, skipping bogus ownership test"
     end
-
+  end
+  
+  def test_always_manage_metadata
     #
     # Run a test of always_manage_metadata
     #
@@ -413,7 +440,9 @@ class EtchFileTests < Test::Unit::TestCase
   
     # And verify that the file contents didn't change
     assert_equal(testcontents, get_file_contents(@targetfile), 'always_manage_metadata contents')
-
+  end
+  
+  def test_duplicate_plain
     #
     # Test duplicate plain instructions
     #
@@ -448,7 +477,9 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate plain instructions')
-
+  end
+  
+  def test_contradictory_plain
     #
     # Test contradictory plain instructions
     #
@@ -486,7 +517,9 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory plain instructions')
-
+  end
+  
+  def test_duplicate_template
     #
     # Test duplicate template instructions
     #
@@ -521,7 +554,9 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate template instructions')
-
+  end
+  
+  def test_contradictory_template
     #
     # Test contradictory template instructions
     #
@@ -559,7 +594,9 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory template instructions')
-
+  end
+  
+  def test_duplicate_script
     #
     # Test duplicate script instructions
     #
@@ -594,7 +631,9 @@ class EtchFileTests < Test::Unit::TestCase
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate script instructions')
-
+  end
+  
+  def test_contradictory_script
     #
     # Test contradictory script instructions
     #
