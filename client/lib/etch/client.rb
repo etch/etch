@@ -839,7 +839,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1104,7 +1103,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1284,7 +1282,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1409,7 +1406,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1616,7 +1612,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
