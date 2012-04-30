@@ -204,7 +204,7 @@ class Etch::Client
     @already_processed = {}
     @exec_already_processed = {}
     @exec_once_per_run = {}
-    @results = []
+    @results = {}
     # See start/stop_output_capture for these
     @output_pipes = []
     
@@ -521,11 +521,11 @@ class Etch::Client
       rails_results << "status=#{CGI.escape(status.to_s)}"
       rails_results << "message=#{CGI.escape(message)}"
       if @detailed_results.include?('SERVER')
-        @results.each do |result|
+        @results.each do |file, result|
           # Strangely enough this works.  Even though the key is not unique to
           # each result the Rails parameter parsing code keeps track of keys it
           # has seen, and if it sees a duplicate it starts a new hash.
-          rails_results << "results[][file]=#{CGI.escape(result['file'])}"
+          rails_results << "results[][file]=#{CGI.escape(file)}"
           rails_results << "results[][success]=#{CGI.escape(result['success'].to_s)}"
           rails_results << "results[][message]=#{CGI.escape(result['message'])}"
         end
@@ -563,8 +563,8 @@ class Etch::Client
               file.puts "Message:\n#{message}\n"
             end
             # Then the detailed results
-            @results.each do |result|
-              file.puts "File #{result['file']}, result #{result['success']}:\n"
+            @results.each do |resultfile, result|
+              file.puts "File #{resultfile}, result #{result['success']}:\n"
               file.puts result['message']
             end
           end
@@ -621,7 +621,6 @@ class Etch::Client
     
     # Prep the results capturing for this file
     result = {}
-    result['file'] = file
     result['success'] = true
     result['message'] = ''
     
@@ -654,13 +653,19 @@ class Etch::Client
         # Process any other files that this file depends on
         config.elements.each('/config/depend') do |depend|
           puts "Processing dependency #{depend.text}" if (@debug)
-          process_file(depend.text, responsedata)
+          continue_processing = process_file(depend.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # Process any commands that this file depends on
         config.elements.each('/config/dependcommand') do |dependcommand|
           puts "Processing command dependency #{dependcommand.text}" if (@debug)
-          process_commands(dependcommand.text, responsedata)
+          continue_processing = process_commands(dependcommand.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # See what type of action the user has requested
@@ -834,7 +839,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1099,7 +1103,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1279,7 +1282,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1404,7 +1406,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1504,7 +1505,7 @@ class Etch::Client
     end
     result['message'] << output
     if save_results
-      @results << result
+      @results[file] = result
     end
     
     if exception
@@ -1542,7 +1543,6 @@ class Etch::Client
     
     # Prep the results capturing for this command
     result = {}
-    result['file'] = commandname
     result['success'] = true
     result['message'] = ''
     
@@ -1575,13 +1575,19 @@ class Etch::Client
         # Process any other commands that this command depends on
         command.elements.each('/commands/depend') do |depend|
           puts "Processing command dependency #{depend.text}" if (@debug)
-          process_commands(depend.text, responsedata)
+          continue_processing = process_commands(depend.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # Process any files that this command depends on
         command.elements.each('/commands/dependfile') do |dependfile|
           puts "Processing file dependency #{dependfile.text}" if (@debug)
-          process_file(dependfile.text, responsedata)
+          continue_processing = process_file(dependfile.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # Perform each step
@@ -1593,6 +1599,9 @@ class Etch::Client
           guard_result = process_guard(guard, commandname)
           
           if !guard_result
+            # Tell the user what we're going to do
+            puts "Will run command '#{command}'"
+            
             # If the user requested interactive mode ask them for
             # confirmation to proceed.
             if @interactive
@@ -1603,7 +1612,6 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               when CONFIRM_QUIT
-                unlock_all_files
                 continue_processing = false
                 save_results = false
                 throw :process_done
@@ -1637,7 +1645,7 @@ class Etch::Client
     end
     result['message'] << output
     if save_results
-      @results << result
+      @results[commandname] = result
     end
     
     if exception
@@ -2314,14 +2322,17 @@ class Etch::Client
         else print "[p|s|q] "
       end
       response = $stdin.gets.chomp
-      if response =~ /p/i || @last_response =~ /p/i
-        @last_response = response if !response.strip.empty?
+      if response.empty?
+        response = @last_response
+      end
+      if response =~ /p/i
+        @last_response = response
         return CONFIRM_PROCEED
-      elsif response =~ /s/i || @last_response =~ /s/i
-        @last_response = response if !response.strip.empty?
+      elsif response =~ /s/i
+        @last_response = response
         return CONFIRM_SKIP
-      elsif response =~ /q/i || @last_response =~ /q/i
-        @last_response = response if !response.strip.empty?
+      elsif response =~ /q/i
+        @last_response = response
         return CONFIRM_QUIT
       end
     end
@@ -2384,9 +2395,9 @@ class Etch::Client
     # Make 30 attempts (1s sleep after each attempt)
     30.times do |i|
       begin
-        fd = IO::sysopen(lockpath, Fcntl::O_WRONLY|Fcntl::O_CREAT|Fcntl::O_EXCL)
+        fd = File.sysopen(lockpath, Fcntl::O_WRONLY|Fcntl::O_CREAT|Fcntl::O_EXCL)
         puts "Lock acquired for #{file}" if (@debug)
-        f = IO.open(fd) { |lockfile| lockfile.puts $$ }
+        File.open(fd) { |lockfile| lockfile.puts $$ }
         @locked_files[file] = true
         return
       rescue Errno::EEXIST
@@ -2459,8 +2470,14 @@ class Etch::Client
     # to the pipe.  The child gathers up anything sent over the pipe and
     # when we close the pipe later it sends the captured output back to us
     # over a second pipe.
-    pread, pwrite = IO.pipe
-    oread, owrite = IO.pipe
+    pread = pwrite = oread = owrite = nil
+    if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
+      pread, pwrite = IO.pipe(Encoding.default_external, 'UTF-8', :invalid => :replace, :undef => :replace)
+      oread, owrite = IO.pipe(Encoding.default_external, 'UTF-8', :invalid => :replace, :undef => :replace)
+    else
+      pread, pwrite = IO.pipe
+      oread, owrite = IO.pipe
+    end
     if fork
       # Parent
       pread.close

@@ -285,7 +285,11 @@ class Etch
     end
     
     # Load the config.xml file
-    config_xml = Etch.xmlload(config_xml_file)
+    begin
+      config_xml = Etch.xmlload(config_xml_file)
+    rescue Exception => e
+      raise Etch.wrap_exception(e, "Error loading config.xml for #{file}:\n" + e.message)
+    end
     
     # Filter the config.xml file by looking for attributes
     begin
@@ -822,6 +826,10 @@ class Etch
       end
     end
     
+    # Earlier we chdir'd into the file's directory in the repository.  It
+    # seems best not to leave this process with that as the cwd.
+    Dir.chdir('/')
+    
     # In addition to successful configs return configs for files that need
     # orig data (generation_status==false) because any setup commands might be
     # needed to create the original file.
@@ -960,6 +968,10 @@ class Etch
       # validity.  For now we declare success if we got this far.
       generation_status = :success
     end
+    
+    # Earlier we chdir'd into the command's directory in the repository.  It
+    # seems best not to leave this process with that as the cwd.
+    Dir.chdir('/')
     
     # If filtering didn't remove all the content then add this to the list of
     # commands to be returned to the client.
