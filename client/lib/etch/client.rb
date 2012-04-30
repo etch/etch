@@ -653,13 +653,19 @@ class Etch::Client
         # Process any other files that this file depends on
         config.elements.each('/config/depend') do |depend|
           puts "Processing dependency #{depend.text}" if (@debug)
-          process_file(depend.text, responsedata)
+          continue_processing = process_file(depend.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # Process any commands that this file depends on
         config.elements.each('/config/dependcommand') do |dependcommand|
           puts "Processing command dependency #{dependcommand.text}" if (@debug)
-          process_commands(dependcommand.text, responsedata)
+          continue_processing = process_commands(dependcommand.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # See what type of action the user has requested
@@ -1573,13 +1579,19 @@ class Etch::Client
         # Process any other commands that this command depends on
         command.elements.each('/commands/depend') do |depend|
           puts "Processing command dependency #{depend.text}" if (@debug)
-          process_commands(depend.text, responsedata)
+          continue_processing = process_commands(depend.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # Process any files that this command depends on
         command.elements.each('/commands/dependfile') do |dependfile|
           puts "Processing file dependency #{dependfile.text}" if (@debug)
-          process_file(dependfile.text, responsedata)
+          continue_processing = process_file(dependfile.text, responsedata)
+          if !continue_processing
+            throw :process_done
+          end
         end
         
         # Perform each step
