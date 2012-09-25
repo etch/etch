@@ -321,7 +321,12 @@ class Etch::Server
           FileUtils.mkdir_p(origdir)
         end
         origpath = "#{origdir}/#{sha1}"
-        File.open(origpath, 'w', 0600) do |origfile|
+        # Note that we write in binary mode because "contents" will have an
+        # "ASCII-8BIT" (aka binary) encoding, and indeed may well contain data
+        # that would not be valid UTF-8.  If we don't use the binary flag to
+        # open then Ruby will attempt to interpret the data as UTF-8, which
+        # may well fail.
+        File.open(origpath, 'wb', 0600) do |origfile|
           origfile.write(contents)
         end
         request[:files][name][:orig] = origpath

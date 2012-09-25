@@ -804,7 +804,7 @@ class Etch::Client
                 # Default is to show a diff of the current file and the
                 # newly generated file.
                 puts "Will make the following changes to #{file}, diff -c:"
-                tempfile = Tempfile.new(File.basename(file))
+                tempfile = Tempfile.new(File.basename(file), encoding: 'ASCII-8BIT')
                 tempfile.write(newcontents)
                 tempfile.close
                 puts "============================================="
@@ -896,7 +896,7 @@ class Etch::Client
                 # Write out the new contents into a temporary file
                 filebase = File.basename(file)
                 filedir = File.dirname(file)
-                newfile = Tempfile.new(filebase, filedir)
+                newfile = Tempfile.new(filebase, filedir, encoding: 'ASCII-8BIT')
 
                 # Set the proper permissions on the file before putting
                 # data into it.
@@ -1663,7 +1663,9 @@ class Etch::Client
     # If the file currently exists and is a regular file then check to see
     # if the new contents are the same.
     if File.file?(file) && !File.symlink?(file)
-      contents = IO.read(file)
+      # As elsewhere we have no idea how arbitrary files that the user is
+      # managing are encoded, so tell Ruby to read the file in binary mode.
+      contents = IO.read(file, encoding: 'ASCII-8BIT')
       if newcontents == contents
         return true
       end
@@ -1696,7 +1698,9 @@ class Etch::Client
     # a regular file, otherwise we send back an empty string.
     if (origpath =~ /\.ORIG$/ || origpath =~ /\.TMP$/) &&
        File.file?(origpath) && !File.symlink?(origpath)
-      orig_contents = IO.read(origpath)
+      # As elsewhere we have no idea how arbitrary files that the user is
+      # managing are encoded, so tell Ruby to read the file in binary mode.
+      orig_contents = IO.read(origpath, encoding: 'ASCII-8BIT')
     else
       orig_contents = ''
     end

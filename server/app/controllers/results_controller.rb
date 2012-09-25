@@ -84,12 +84,6 @@ class ResultsController < ApplicationController
     client.updated_at = Time.now
     client.save
     
-    # NOTE:  This skips over the individual file results recording below
-    # Re-enabled by jheiss, 7-July-2009  We have more disk space on the
-    # servers now, we'll see if they can keep up
-    #render :text => 'Client status recorded, individual file results recording disabled for now, jheiss, 9-May-2009'
-    #return
-    
     success_count = 0
     params[:results].each do |result|
       # The Rails parameter parsing strips out parameters with empty values.
@@ -102,6 +96,17 @@ class ResultsController < ApplicationController
       if !result[:success] && !result[:message]
         result[:message] = ''
       end
+      
+      # The message may have non-UTF8 characters, which will cause an error if
+      # we try to save them to the database.  E.g. the file modified may not
+      # be UTF-8, so the diff in the message might have non-UTF8 characters.
+      # We don't know what the proper encoding should be (since we don't know
+      # the encoding for arbitrary files that the user might manage), so just
+      # force them to UTF-8.  Since ruby thinks the message is UTF-8 we have
+      # to force it to transcode to another encoding and then back to UTF-8 to
+      # detect and replace invalid bytes.
+      result[:message].encode('UTF-16', :invalid => :replace).encode('UTF-8')
+      
       result = Result.new(result.merge({:client => client}))
       if result.save
         success_count += 1
