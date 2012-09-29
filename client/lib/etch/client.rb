@@ -806,7 +806,7 @@ class Etch::Client
                 puts "Will make the following changes to #{file}, diff -c:"
                 tempfile = nil
                 if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
-                  tempfile = Tempfile.new(File.basename(file), encoding: 'ASCII-8BIT')
+                  tempfile = Tempfile.new(File.basename(file), :encoding => 'ASCII-8BIT')
                 else
                   tempfile = Tempfile.new(File.basename(file))
                 end
@@ -903,7 +903,7 @@ class Etch::Client
                 filedir = File.dirname(file)
                 newfile = nil
                 if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
-                  newfile = Tempfile.new(filebase, filedir, encoding: 'ASCII-8BIT')
+                  newfile = Tempfile.new(filebase, filedir, :encoding => 'ASCII-8BIT')
                 else
                   newfile = Tempfile.new(filebase, filedir)
                 end
@@ -1677,7 +1677,7 @@ class Etch::Client
       # managing are encoded, so tell Ruby to read the file in binary mode.
       contents = nil
       if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
-        contents = IO.read(file, encoding: 'ASCII-8BIT')
+        contents = IO.read(file, :encoding => 'ASCII-8BIT')
       else
         contents = IO.read(file)
       end
@@ -1717,7 +1717,7 @@ class Etch::Client
       # managing are encoded, so tell Ruby to read the file in binary mode.
       orig_contents = nil
       if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
-        orig_contents = IO.read(origpath, encoding: 'ASCII-8BIT')
+        orig_contents = IO.read(origpath, :encoding => 'ASCII-8BIT')
       else
         orig_contents = IO.read(origpath)
       end
