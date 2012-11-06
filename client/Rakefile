@@ -168,7 +168,7 @@ task :deb do
   end
   
   sbindir = File.join('usr', 'sbin')
-  libdir = File.join('usr', 'local', 'lib', 'site_ruby', '1.8')
+  libdir = File.join('usr', 'local', 'lib', 'site_ruby')
   mandir = File.join('usr', 'share', 'man')
   etcdir = '/etc'
   crondir = File.join('etc', 'cron.d')
