@@ -105,7 +105,7 @@ class ResultsController < ApplicationController
       # force them to UTF-8.  Since ruby thinks the message is UTF-8 we have
       # to force it to transcode to another encoding and then back to UTF-8 to
       # detect and replace invalid bytes.
-      result[:message].encode('UTF-16', :invalid => :replace).encode('UTF-8')
+      result[:message].encode!('UTF-16', :invalid => :replace).encode!('UTF-8')
       
       result = Result.new(result.merge({:client => client}))
       if result.save
