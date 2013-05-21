@@ -2190,7 +2190,7 @@ class Etch::Client
 
     # Actually run the command unless we're in a dry run, or if we're in
     # a damp run and the command is a setup command.
-    if ! @dryrun || (@dryrun == 'damp' && exectype == 'setup')
+    if ! @dryrun || exectype == 'guard' || (@dryrun == 'damp' && exectype == 'setup')
       etch_priority = nil
 
       if exectype == 'post' || exectype == 'command'
