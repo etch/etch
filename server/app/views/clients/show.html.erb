@@ -16,7 +16,12 @@
     <%- if @timeline == -1 -%>
       <%- # If the user requested everything then set our limit to the oldest entry -%>
       <%- oldest = Result.where('client_id = ?', @client.id).order('results.created_at').first -%>
-      <%- hours = ((Time.now - oldest.created_at) / 60 / 60).to_i + 1 -%>
+      <%- if oldest.nil? -%>
+        <p style="font-style:italic">No results found for this client.</p>
+        <%- hours = -1 -%>
+      <%- else -%>
+        <%- hours = ((Time.now - oldest.created_at) / 60 / 60).to_i + 1 -%>
+      <%- end -%>
     <%- else -%>
       <%- hours = @timeline -%>
     <%- end -%>
