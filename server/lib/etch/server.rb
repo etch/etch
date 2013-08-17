@@ -27,35 +27,20 @@ class Etch::Server
 
   @@auth_enabled = nil
   @@auth_deny_new_clients = nil
-  @@etchdebuglog = nil  
+  @@etchdebuglog = nil
   def self.read_config_file
     config_file = File.join(configbase, 'etchserver.conf')
+    config_items = Hash.new(false)
     if File.exist?(config_file)
-      auth_enabled = false
-      auth_deny_new_clients = false
-      etchdebuglog = nil
       IO.foreach(config_file) do |line|
-        # Skip blank lines and comments
-        next if line =~ /^\s*$/
-        next if line =~ /^\s*#/
-        line.chomp
-        if line =~ /^\s*auth_enabled\s*=\s*(.*)/
-          if $1 == 'true'
-            auth_enabled = true
-          end
-        end
-        if line =~ /^\s*auth_deny_new_clients\s*=\s*(.*)/
-          if $1 == 'true'
-            auth_deny_new_clients = true
-          end
-        end
-        if line =~ /^\s*etchdebuglog\s*=\s*(.*)/
-          etchdebuglog = $1
-        end
+        next if line.lstrip.first == '#'
+        next unless line['=']
+        k,v = line.split('=', 2).map(&:strip)
+        config_items[k] = v
       end
-      @@etchdebuglog = etchdebuglog
-      @@auth_enabled = auth_enabled
-      @@auth_deny_new_clients = auth_deny_new_clients
+      @@etchdebuglog = config_items['etchdebuglog'] || nil
+      @@auth_enabled = config_items['auth_enabled'] == 'true'
+      @@auth_deny_new_clients = config_items['auth_deny_new_clients'] == 'true'
     end
   end
   def self.auth_enabled?
