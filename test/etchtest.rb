@@ -129,10 +129,11 @@ module EtchTests
         raise "Etch server failed to start"
       end
     else
+      serverargs = "-p #{port} --pid #{SERVERDIR}/tmp/pids/#{port}.pid"
       if `cd #{SERVERDIR} && #{RUBY} \`which bundle\` list`.include?('unicorn')
-        exec("cd #{SERVERDIR} && #{RUBY} `which bundle` exec unicorn -p #{port}")
+        exec("cd #{SERVERDIR} && #{RUBY} `which bundle` exec unicorn #{serverargs}")
       else
-        exec("cd #{SERVERDIR} && #{RUBY} `which bundle` exec rails server -p #{port}")
+        exec("cd #{SERVERDIR} && #{RUBY} `which bundle` exec rails server #{serverargs}")
       end
     end
     {:port => port, :pid => pid, :repo => serverbase}
