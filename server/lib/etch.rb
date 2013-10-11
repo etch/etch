@@ -1476,6 +1476,9 @@ class Etch
 end
 
 class EtchExternalSource
+  # Save the original $LOAD_PATH ($:) to be restored later.
+  @@load_path_org = $LOAD_PATH.clone
+
   def initialize(file, original_file, facts, groups, local_requests, sourcebase, commandsbase, sitelibbase, dlogger)
     # The external source is going to be processed within the same Ruby
     # instance as etch.  We want to make it clear what variables we are
@@ -1509,6 +1512,8 @@ class EtchExternalSource
       # Help the user figure out where the exception occurred, otherwise they
       # just get told it happened here, which isn't very helpful.
       raise Etch.wrap_exception(e, "Exception while processing template #{template} for file #{@file}:\n" + e.message)
+    ensure
+      restore_globals
     end
   end
 
@@ -1529,9 +1534,27 @@ class EtchExternalSource
         # just get told it happened here in eval, which isn't very helpful.
         raise Etch.wrap_exception(e, "Exception while processing script #{script} for file #{@file}:\n" + e.message)
       end
+    ensure
+      restore_globals
     end
     @contents
   end
+
+  # Changes made to some global variables by the external sources can cause
+  # serious complications because they are executed repeatedly in a single
+  # worker process.
+  # We need to initialize them after each execution in order to make them
+  # "to act as much like a real script as possible".
+  def restore_globals
+    # Restore the original $LOAD_PATH to negate any changes made.
+    $LOAD_PATH.replace @@load_path_org
+    # Could restore the original $LOADED_FEATURES ($"), but this worker process
+    # acculumates many gems and modules over time and it's not practical to
+    # reload them every time.
+    # So, just deleting those in @sitelibbase or @sourcebase directory.
+    $LOADED_FEATURES.reject! {|x| x.start_with?(@sitelibbase, @sourcebase)}
+  end
+
   # The user might call return within a script.  We want the scripts to act as
   # much like a real script as possible.  Wrapping the eval in an extra method
   # allows us to handle a return within the script seamlessly.  If the user
