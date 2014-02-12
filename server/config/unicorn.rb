@@ -1,4 +1,5 @@
-worker_processes(8)
-stdout_path('log/unicorn_stdout.log')
-stderr_path('log/unicorn_stderr.log')
+worker_processes 8
+pid 'tmp/pids/unicorn.pid'
+stdout_path 'log/unicorn.log'
+stderr_path 'log/unicorn.log'
 
