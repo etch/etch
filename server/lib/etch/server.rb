@@ -4,6 +4,7 @@ require 'openssl'
 require 'time'        # Time.parse
 require 'fileutils'   # mkdir_p
 require 'logger'
+require 'zlib'
 require 'etch'
 
 class Etch::Server
@@ -369,9 +370,11 @@ class Etch::Server
         # setup and depend elements that we send to the client to ensure it
         # supplies a proper orig file.
         if !response[:need_orig][file]
-          config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file.dup, :config => config_xml.to_s)
-          if config.config != config_xml.to_s
-            config.update_attributes(:config => config_xml.to_s)
+          zconfig = Zlib::Deflate.deflate(config_xml.to_s)
+          config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file.dup, :config => zconfig)
+          config.config = zconfig
+          if config.config_changed?
+            config.save!
           end
         end
         # And add the config to the response to return to the client
@@ -419,9 +422,11 @@ class Etch::Server
       commands_xml = Etch.xmlnewelem('allcommands', response_xml)
       response[:allcommands].each do |commandname, command_xml|
         # Update the stored record of the command
-        config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => commandname.dup, :config => command_xml.to_s)
-        if config.config != command_xml.to_s
-          config.update_attributes(:config => command_xml.to_s)
+        zconfig = Zlib::Deflate.deflate(command_xml.to_s)
+        config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => commandname.dup, :config => zconfig)
+        config.config = zconfig
+        if config.config_changed?
+          config.save!
         end
         # Add the command to the response to return to the client
         Etch.xmlcopyelem(Etch.xmlroot(command_xml), commands_xml)
