@@ -162,7 +162,7 @@ class Etch
       pipe.each { |group| externalhash[group.chomp] = true }
     end
     if !$?.success?
-      raise "External node grouper exited with error #{$?.exitstatus}"
+      raise "External node grouper #{File.join(@configdir, 'nodegrouper')} exited with error #{$?.exitstatus}"
     end
     externalhash.keys.each { |external| groupshash[external] = true }
     @dlogger.debug "Added groups for node #{@fqdn} due to external node grouper: #{externalhash.keys.sort.join(',')}"
