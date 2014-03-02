@@ -17,7 +17,7 @@
 <p class="metadata">
   <strong>Created at:</strong> <%= @etch_config.created_at %><br />
   <strong>Updated at:</strong> <%= @etch_config.updated_at %><br />
-  <%= link_to 'Delete', etch_config_path(@etch_config), :confirm => 'Are you sure?', :method => :delete %></p>
+  <%= link_to 'Delete', etch_config_path(@etch_config), :data => {:confirm => 'Are you sure?'}, :method => :delete %></p>
 </p>
 
 </div>

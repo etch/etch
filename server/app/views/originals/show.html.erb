@@ -13,7 +13,7 @@
 <p class="metadata">
   <strong>Created at:</strong> <%= @original.created_at %><br />
   <strong>Updated at:</strong> <%= @original.updated_at %><br />
-  <%= link_to 'Delete', original_path(@original), :confirm => 'Are you sure?', :method => :delete %></p>
+  <%= link_to 'Delete', original_path(@original), :data => {:confirm => 'Are you sure?'}, :method => :delete %></p>
 </p>
 
 </div>

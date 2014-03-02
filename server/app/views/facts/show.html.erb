@@ -17,7 +17,7 @@
 <p class="metadata">
   <strong>Created at:</strong> <%= @fact.created_at %><br />
   <strong>Updated at:</strong> <%= @fact.updated_at %><br />
-  <%= link_to 'Delete', fact_path(@fact), :confirm => 'Are you sure?', :method => :delete %></p>
+  <%= link_to 'Delete', fact_path(@fact), :data => {:confirm => 'Are you sure?'}, :method => :delete %></p>
 </p>
 
 </div>
