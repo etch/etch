@@ -4,7 +4,6 @@ require 'openssl'
 require 'time'        # Time.parse
 require 'fileutils'   # mkdir_p
 require 'logger'
-require 'zlib'
 require 'etch'
 
 class Etch::Server
@@ -215,14 +214,16 @@ class Etch::Server
     end
 
     # Update the stored facts for this client
-    @client = Client.find_or_create_by_name(@fqdn)
+    @client = Client.find_or_create_by(name: @fqdn)
     @facts.each do |key, value|
-      fact = Fact.find_or_create_by_client_id_and_key(:client_id => @client.id, :key => key.dup, :value => value)
+      fact = Fact.find_or_create_by(:client_id => @client.id, :key => key.dup) do |f|
+        f.value = value
+      end
       if fact.value != value
         fact.update_attributes(:value => value)
       end
     end
-    Fact.find_all_by_client_id(@client.id).each do |fact|
+    Fact.where(client_id: @client.id).each do |fact|
       if !@facts.has_key?(fact.key)
         fact.destroy
       end
@@ -317,7 +318,9 @@ class Etch::Server
         end
         request[:files][name][:orig] = origpath
         # Update the stored record of the original
-        original = Original.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => name.dup, :sum => sha1)
+        original = Original.find_or_create_by(:client_id => @client.id, :file => name.dup) do |o|
+          o.sum = sha1
+        end
         if original.sum != sha1
           original.update_attributes(:sum => sha1)
         end
@@ -325,7 +328,9 @@ class Etch::Server
       if filehash['sha1sum']
         sha1 = filehash['sha1sum']
         # Update the stored record of the original
-        original = Original.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => name.dup, :sum => sha1)
+        original = Original.find_or_create_by(:client_id => @client.id, :file => name.dup) do |o|
+          o.sum = sha1
+        end
         if original.sum != sha1
           original.update_attributes(:sum => sha1)
         end
@@ -370,12 +375,11 @@ class Etch::Server
         # setup and depend elements that we send to the client to ensure it
         # supplies a proper orig file.
         if !response[:need_orig][file]
-          zconfig = Zlib::Deflate.deflate(config_xml.to_s)
-          config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => file.dup, :config => zconfig)
-          config.config = zconfig
-          if config.config_changed?
-            config.save!
+          configstr = config_xml.to_s
+          config = EtchConfig.find_or_create_by(:client_id => @client.id, :file => file.dup) do |c|
+            c.config = configstr
           end
+          config.update_attributes(config: configstr)
         end
         # And add the config to the response to return to the client
         Etch.xmlcopyelem(Etch.xmlroot(config_xml), configs_xml)
@@ -422,12 +426,11 @@ class Etch::Server
       commands_xml = Etch.xmlnewelem('allcommands', response_xml)
       response[:allcommands].each do |commandname, command_xml|
         # Update the stored record of the command
-        zconfig = Zlib::Deflate.deflate(command_xml.to_s)
-        config = EtchConfig.find_or_create_by_client_id_and_file(:client_id => @client.id, :file => commandname.dup, :config => zconfig)
-        config.config = zconfig
-        if config.config_changed?
-          config.save!
+        commandstr = command_xml.to_s
+        config = EtchConfig.find_or_create_by(:client_id => @client.id, :file => commandname.dup) do |c|
+          c.config = commandstr
         end
+        config.update_attributes(config: commandstr)
         # Add the command to the response to return to the client
         Etch.xmlcopyelem(Etch.xmlroot(command_xml), commands_xml)
       end
