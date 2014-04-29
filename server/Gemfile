@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
-gem 'rails', '4.0.3'
+gem 'rails', '4.1.0'
 
 # Use sqlite3 as the database for Active Record
 gem 'sqlite3'
@@ -45,9 +45,9 @@ end
 # gem 'debugger', group: [:development, :test]
 
 gem 'will_paginate', '~> 3.0.5'
-gem 'ransack', '~> 1.1.0'
+gem 'ransack', '~> 1.2.2'
 gem 'exception_notification', '~> 4.0.1'
 gem 'nokogiri', '~> 1.6.1'
 
 # Transitioning from Rails 3
-gem 'protected_attributes', '~> 1.0.5'
+gem 'protected_attributes', '~> 1.0.7'
