@@ -1,7 +1,32 @@
-# Read about fixtures at http://ar.rubyonrails.org/classes/Fixtures.html
+one:
+  id: 1
+  name: one.example.com
 
-# one:
-#   column: value
-#
-# two:
-#   column: value
+two:
+  id: 2
+  name: two.example.com
+
+healthy_recent:
+  name: healthy_recent
+  status: 0
+  updated_at: 8.hours.ago
+healthy_old:
+  name: healthy_old
+  status: 0
+  updated_at: 10.days.ago
+broken_recent:
+  name: broken_recent
+  status: 1
+  updated_at: 8.hours.ago
+broken_old:
+  name: broken_old
+  status: 1
+  updated_at: 10.days.ago
+disabled_recent:
+  name: disabled_recent
+  status: 200
+  updated_at: 8.hours.ago
+disabled_old:
+  name: disabled_old
+  status: 200
+  updated_at: 10.days.ago

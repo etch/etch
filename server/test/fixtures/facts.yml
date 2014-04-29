@@ -1,7 +1,9 @@
-# Read about fixtures at http://ar.rubyonrails.org/classes/Fixtures.html
+one:
+  client_id: 1
+  key:       fact1
+  value:     data1
 
-# one:
-#   column: value
-#
-# two:
-#   column: value
+two:
+  client_id: 2
+  key:       fact2
+  value:     data2

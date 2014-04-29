@@ -1,7 +1,11 @@
-# Read about fixtures at http://ar.rubyonrails.org/classes/Fixtures.html
+one:
+  client_id: 1
+  file:      /path/to/file1
+  success:   true
+  message:   Some message goes here
 
-# one:
-#   column: value
-#
-# two:
-#   column: value
+two:
+  client_id: 2
+  file:      /path/to/file2
+  success:   false
+  message:   A different message goes here
