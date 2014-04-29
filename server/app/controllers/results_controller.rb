@@ -71,7 +71,7 @@ class ResultsController < ApplicationController
       render :text => 'results parameter must be supplied in array form', :status => :unprocessable_entity
       return
     end
-    client = Client.find_or_create_by_name(params[:fqdn])
+    client = Client.find_or_create_by(name: params[:fqdn])
     if client.nil?
       render :text => "Unknown client", :status => :unprocessable_entity
       return
