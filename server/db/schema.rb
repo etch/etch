@@ -16,9 +16,9 @@ ActiveRecord::Schema.define(version: 20140302225436) do
   create_table "clients", force: true do |t|
     t.string   "name",       null: false
     t.integer  "status"
+    t.text     "message"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.text     "message"
   end
 
   add_index "clients", ["name"], name: "index_clients_on_name", unique: true, using: :btree
@@ -26,9 +26,9 @@ ActiveRecord::Schema.define(version: 20140302225436) do
   add_index "clients", ["updated_at"], name: "index_clients_on_updated_at", using: :btree
 
   create_table "etch_configs", force: true do |t|
-    t.integer  "client_id",  null: false
-    t.string   "file",       null: false
-    t.binary   "config",     null: false
+    t.integer  "client_id",                     null: false
+    t.string   "file",                          null: false
+    t.binary   "config",     limit: 2147483647, null: false
     t.datetime "created_at"
     t.datetime "updated_at"
   end
