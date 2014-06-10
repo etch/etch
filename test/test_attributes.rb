@@ -24,8 +24,52 @@ class EtchAttributeTests < Test::Unit::TestCase
     @testroot = tempdir
     #puts "Using #{@testroot} as client working directory"
   end
-  
-  def test_group_attributes
+
+  def test_group_attributes_no_entry
+    #
+    # Simple group name comparison with the node not in the nodes file
+    #
+    testname = 'node group comparison, no entry'
+
+    repodir = initialize_repository(nil)
+    server = get_server(repodir)
+
+    # Put some text into the original file so that we can make sure it is
+    # not touched.
+    origcontents = "This is the original text\n"
+    File.chmod(0644, @targetfile)
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain group="testgroup">source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    run_etch(server, @testroot, :testname => testname)
+
+    # Verify that the file was not modified
+    assert_equal(origcontents, get_file_contents(@targetfile), testname)
+
+    remove_repository(repodir)
+  end
+
+  def test_group_attributes_zero_groups
     #
     # Simple group name comparison with the node in 0 groups
     #
@@ -91,28 +135,22 @@ class EtchAttributeTests < Test::Unit::TestCase
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
-    
+  end
+
+  def test_group_attributes_one_group
     #
     # Put the node in one group for the next series of tests
     #
-    hostname = `facter fqdn`.chomp
-    File.open(File.join(@repodir, 'nodes.xml'), 'w') do |file|
-      file.puts <<-EOF
-        <nodes>
-                <node name="#{hostname}">
-                        <group>testgroup</group>
-                </node>
-        </nodes>
-      EOF
-    end
+    repodir = initialize_repository(['testgroup'])
+    server = get_server(repodir)
     
     #
     # Simple group name comparison with the node in 1 group
     #
     testname = 'node group comparison, 1 group'
 
-    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
-    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <file>
@@ -126,11 +164,11 @@ class EtchAttributeTests < Test::Unit::TestCase
     end
 
     sourcecontents = "Test #{testname}\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    run_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -148,8 +186,8 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(origcontents)
     end
     
-    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
-    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <file>
@@ -163,11 +201,11 @@ class EtchAttributeTests < Test::Unit::TestCase
     end
 
     sourcecontents = "Test #{testname}\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    run_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -177,8 +215,8 @@ class EtchAttributeTests < Test::Unit::TestCase
     #
     testname = 'regex node group comparison, 1 group'
 
-    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
-    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <file>
@@ -192,37 +230,32 @@ class EtchAttributeTests < Test::Unit::TestCase
     end
 
     sourcecontents = "Test #{testname}\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    run_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
 
+    remove_repository(repodir)
+  end
+
+  def test_group_attributes_two_groups
     #
     # Put the node in two groups for the next series of tests
     #
-    hostname = `facter fqdn`.chomp
-    File.open(File.join(@repodir, 'nodes.xml'), 'w') do |file|
-      file.puts <<-EOF
-        <nodes>
-                <node name="#{hostname}">
-                        <group>testgroup</group>
-                        <group>second</group>
-                </node>
-        </nodes>
-      EOF
-    end
-    
+    repodir = initialize_repository(['testgroup', 'second'])
+    server = get_server(repodir)
+
     #
     # Simple group name comparison with the node in 2 groups
     #
     testname = 'node group comparison, 2 groups'
 
-    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
-    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <file>
@@ -236,11 +269,11 @@ class EtchAttributeTests < Test::Unit::TestCase
     end
 
     sourcecontents = "Test #{testname}\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    run_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -258,8 +291,8 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(origcontents)
     end
     
-    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
-    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <file>
@@ -273,11 +306,11 @@ class EtchAttributeTests < Test::Unit::TestCase
     end
 
     sourcecontents = "Test #{testname}\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    run_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -287,8 +320,8 @@ class EtchAttributeTests < Test::Unit::TestCase
     #
     testname = 'regex node group comparison, 2 groups'
 
-    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
-    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
       file.puts <<-EOF
         <config>
           <file>
@@ -302,14 +335,16 @@ class EtchAttributeTests < Test::Unit::TestCase
     end
 
     sourcecontents = "Test #{testname}\n"
-    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    run_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+
+    remove_repository(repodir)
   end
   
   def test_fact_attributes
@@ -592,10 +627,42 @@ class EtchAttributeTests < Test::Unit::TestCase
 
   end
   
+  def test_nodes_xml
+    testname = 'node group comparison, 1 group, nodes.xml'
+
+    repodir = initialize_repository(['testgroup'], :xml)
+    server = get_server(repodir)
+
+    FileUtils.mkdir_p("#{repodir}/source/#{@targetfile}")
+    File.open("#{repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <plain group="testgroup">source</plain>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.write(sourcecontents)
+    end
+
+    run_etch(server, @testroot, :testname => testname)
+
+    # Verify that the file was created properly
+    assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+
+    remove_repository(repodir)
+  end
+
   def teardown
     remove_repository(@repodir)
     FileUtils.rm_rf(@testroot)
     FileUtils.rm_rf(@targetfile)
   end
 end
-

@@ -10,6 +10,7 @@ Silently.silently do
   require 'fileutils'   # mkdir_p
   require 'erb'
   require 'logger'
+  require 'yaml'
 end
 require 'versiontype' # Version
 
@@ -98,7 +99,6 @@ class Etch
     @config_dtd_file   = "#{@configdir}/config.dtd"
     @commands_dtd_file = "#{@configdir}/commands.dtd"
     @defaults_file     = "#{@configdir}/defaults.xml"
-    @nodes_file        = "#{@configdir}/nodes.xml"
     @nodegroups_file   = "#{@configdir}/nodegroups.xml"
     
     #
@@ -119,16 +119,15 @@ class Etch
     # Load the nodes file
     #
 
-    @nodes_xml = Etch.xmlload(@nodes_file)
-    # Extract the groups for this node
-    thisnodeelem = Etch.xmlfindfirst(@nodes_xml, "/nodes/node[@name='#{@fqdn}']")
     groupshash = {}
-    if thisnodeelem
-      Etch.xmleach(thisnodeelem, 'group') { |group| groupshash[Etch.xmltext(group)] = true }
+    @nodes, nodesfile = load_nodes
+    # Extract the groups for this node
+    if @nodes[@fqdn]
+      @nodes[@fqdn].each{|group| groupshash[group] = true}
     else
-      @logger.warn "No entry found for node #{@fqdn} in nodes.xml"
+      @logger.warn "No entry found for node #{@fqdn} in #{nodesfile}"
       # Some folks might want to terminate here
-      #raise "No entry found for node #{@fqdn} in nodes.xml"
+      #raise "No entry found for node #{@fqdn} in #{nodesfile}"
     end
     @dlogger.debug "Native groups for node #{@fqdn}: #{groupshash.keys.sort.join(',')}"
 
@@ -247,6 +246,31 @@ class Etch
   # Private subroutines
   #
   private
+
+  def load_nodes
+    yamlnodes = "#{@configdir}/nodes.yml"
+    xmlnodes = "#{@configdir}/nodes.xml"
+    if File.exist?(yamlnodes)
+      @dlogger.debug "Loading native groups from #{yamlnodes}"
+      nodesfile = 'nodes.yml'
+      nodes = YAML.load(File.read(yamlnodes))
+    elsif File.exist?(xmlnodes)
+      @dlogger.debug "Loading native groups from #{xmlnodes}"
+      nodesfile = 'nodes.xml'
+      nodes_xml = Etch.xmlload(xmlnodes)
+      nodes = {}
+      Etch.xmleach(nodes_xml, '/nodes/node') do |node|
+        name = Etch.xmlattrvalue(node, 'name')
+        nodes[name] ||= []
+        Etch.xmleach(node, 'group') do |group|
+          nodes[name] << Etch.xmltext(group)
+        end
+      end
+    else
+      raise "Neither nodes.yml nor nodes.xml exists"
+    end
+    [nodes, nodesfile]
+  end
 
   # Recursive method to get all of the parents of a node group
   def get_parent_nodegroups(group)

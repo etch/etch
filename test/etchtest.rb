@@ -45,7 +45,7 @@ module EtchTests
     tmpdir
   end
   
-  def initialize_repository(nodegroups=[])
+  def initialize_repository(nodegroups=[], format=:yml)
     # Generate a temp directory to put our test repository into
     repo = tempdir
     
@@ -54,16 +54,27 @@ module EtchTests
     FileUtils.cp_r(Dir.glob("#{File.dirname(__FILE__)}/testrepo/*"), repo, :preserve => true)
     
     hostname = `facter fqdn`.chomp
-    nodegroups_string = ''
-    nodegroups.each { |ng| nodegroups_string << "<group>#{ng}</group>\n" }
-    File.open(File.join(repo, 'nodes.xml'), 'w') do |file|
-      file.puts <<-EOF
-      <nodes>
-        <node name="#{hostname}">
-          #{nodegroups_string}
-        </node>
-      </nodes>
-      EOF
+    case format
+    when :yml
+      nodes = {}
+      if nodegroups
+        nodes[hostname] = nodegroups
+      end
+      File.open(File.join(repo, 'nodes.yml'), 'w') do |file|
+        file.write nodes.to_yaml
+      end
+    when :xml
+      nodegroups_string = ''
+      nodegroups.each { |ng| nodegroups_string << "<group>#{ng}</group>\n" }
+      File.open(File.join(repo, 'nodes.xml'), 'w') do |file|
+        file.puts <<-EOF
+        <nodes>
+          <node name="#{hostname}">
+            #{nodegroups_string}
+          </node>
+        </nodes>
+        EOF
+      end
     end
     
     puts "Created repository #{repo}"
