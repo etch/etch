@@ -15,7 +15,6 @@ class EtchNodeGroupTests < Test::Unit::TestCase
     #puts "Using #{@targetfile} as target file"
     
     # Generate a directory for our test repository
-    #  Specify that the node should be put into 'testgroup' in nodes.xml
     @repodir = initialize_repository(['testgroup'])
     @server = get_server(@repodir)
     
@@ -24,11 +23,18 @@ class EtchNodeGroupTests < Test::Unit::TestCase
     #puts "Using #{@testroot} as client working directory"
   end
   
-  def test_group
+  def test_group_hierarchy_yml
     #
-    # Run a test of file creation based on a group
+    # Test group hierarchy
     #
-    testname = 'basic node group'
+    testname = 'node group hierarchy yml'
+
+    File.open(File.join(@repodir, 'nodegroups.yml'), 'w') do |file|
+      file.puts <<-EOF
+testparent:
+  - testgroup
+EOF
+    end
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
@@ -37,14 +43,14 @@ class EtchNodeGroupTests < Test::Unit::TestCase
           <file>
             <warning_file/>
             <source>
-              <plain group="testgroup">source</plain>
+              <plain group="testparent">source</plain>
             </source>
           </file>
         </config>
       EOF
     end
 
-    sourcecontents = "This is a test\n"
+    sourcecontents = "This is a test of group hierarchy\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
@@ -53,11 +59,12 @@ class EtchNodeGroupTests < Test::Unit::TestCase
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
-
+  end
+  def test_group_hierarchy_xml
     #
     # Test group hierarchy
     #
-    testname = 'node group hierarchy'
+    testname = 'node group hierarchy xml'
 
     File.open(File.join(@repodir, 'nodegroups.xml'), 'w') do |file|
       file.puts <<-EOF
@@ -92,7 +99,8 @@ class EtchNodeGroupTests < Test::Unit::TestCase
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
-
+  end
+  def test_external_grouper
     #
     # Test external grouper
     #
@@ -131,11 +139,20 @@ echo "grouper_group2"
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
-    
+  end
+  def test_external_grouper_error
     #
     # Test external grouper exiting with error
     #
     testname = 'external node grouper failing'
+
+    # Put some text into the original file so that we can make sure it is
+    # not touched.
+    origcontents = "This is the original text\n"
+    File.chmod(0644, @targetfile)
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
 
     File.open(File.join(@repodir, 'nodegrouper'), 'w') do |file|
       file.puts <<-EOF
@@ -163,7 +180,6 @@ echo "grouper_group2"
       EOF
     end
 
-    oldsourcecontents = sourcecontents
     sourcecontents = "This is a test of the external grouper failing\n"
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
@@ -172,7 +188,7 @@ echo "grouper_group2"
     run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file wasn't modified
-    assert_equal(oldsourcecontents, get_file_contents(@targetfile), testname)
+    assert_equal(origcontents, get_file_contents(@targetfile), testname)
   end
   
   def teardown

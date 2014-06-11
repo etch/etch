@@ -7,6 +7,7 @@ require 'tempfile'
 require 'fileutils'
 require 'net/http'
 require 'rbconfig'
+require 'yaml'
 
 RUBY = File.join(*RbConfig::CONFIG.values_at("bindir", "ruby_install_name")) + RbConfig::CONFIG["EXEEXT"]
 

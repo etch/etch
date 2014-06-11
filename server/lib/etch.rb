@@ -11,6 +11,7 @@ Silently.silently do
   require 'erb'
   require 'logger'
   require 'yaml'
+  require 'set'
 end
 require 'versiontype' # Version
 
@@ -135,27 +136,20 @@ class Etch
     # Load the node groups file
     #
 
-    @nodegroups_xml = Etch.xmlload(@nodegroups_file)
-
-    # Extract the node group hierarchy into a hash for easy reference
-    @group_hierarchy = {}
-    Etch.xmleach(@nodegroups_xml, '/nodegroups/nodegroup') do |parent|
-      Etch.xmleach(parent, 'child') do |child|
-        @group_hierarchy[Etch.xmltext(child)] = [] if !@group_hierarchy[Etch.xmltext(child)]
-        @group_hierarchy[Etch.xmltext(child)] << Etch.xmlattrvalue(parent, 'name')
-      end
-    end
+    @group_hierarchy = load_nodegroups
 
     # Fill out the list of groups for this node with any parent groups
-    parentshash = {}
+    parents = Set.new
     groupshash.keys.each do |group|
-      parents = get_parent_nodegroups(group)
-      parents.each { |parent| parentshash[parent] = true }
+      parents.merge get_parent_nodegroups(group)
     end
-    parentshash.keys.each { |parent| groupshash[parent] = true }
-    @dlogger.debug "Added groups for node #{@fqdn} due to node group hierarchy: #{parentshash.keys.sort.join(',')}"
+    parents.each{|parent| groupshash[parent] = true}
+    @dlogger.debug "Added groups for node #{@fqdn} due to node group hierarchy: #{parents.sort.join(',')}"
 
+    #
     # Run the external node grouper
+    #
+
     externalhash = {}
     IO.popen(File.join(@configdir, 'nodegrouper') + ' ' + @fqdn) do |pipe|
       pipe.each { |group| externalhash[group.chomp] = true }
@@ -271,18 +265,39 @@ class Etch
     end
     [nodes, nodesfile]
   end
+  def load_nodegroups
+    yamlnodegroups = "#{@configdir}/nodegroups.yml"
+    xmlnodegroups = "#{@configdir}/nodegroups.xml"
+    if File.exist?(yamlnodegroups)
+      @dlogger.debug "Loading node group hierarchy from #{yamlnodegroups}"
+      group_hierarchy = YAML.load(File.read(yamlnodegroups))
+    elsif File.exist?(xmlnodegroups)
+      @dlogger.debug "Loading node group hierarchy from #{xmlnodegroups}"
+      nodegroups_xml = Etch.xmlload(xmlnodegroups)
+      group_hierarchy = {}
+      Etch.xmleach(nodegroups_xml, '/nodegroups/nodegroup') do |parent|
+        parentname = Etch.xmlattrvalue(parent, 'name')
+        group_hierarchy[parentname] ||= []
+        Etch.xmleach(parent, 'child') do |child|
+          group_hierarchy[parentname] << Etch.xmltext(child)
+        end
+      end
+    else
+      raise "Neither nodegroups.yml nor nodegroups.xml exists"
+    end
+    group_hierarchy
+  end
 
   # Recursive method to get all of the parents of a node group
   def get_parent_nodegroups(group)
-    parentshash = {}
-    if @group_hierarchy[group]
-      @group_hierarchy[group].each do |parent|
-        parentshash[parent] = true
-        grandparents = get_parent_nodegroups(parent)
-        grandparents.each { |gp| parentshash[gp] = true }
+    parents = Set.new
+    @group_hierarchy.each do |parent, children|
+      if children.include?(group)
+        parents << parent
+        parents.merge get_parent_nodegroups(parent)
       end
     end
-    parentshash.keys.sort
+    parents
   end
   
   # Returns the value of the generation_status variable, see comments in
