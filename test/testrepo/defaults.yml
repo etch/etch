@@ -1,0 +1,16 @@
+file:
+  owner: 0
+  group: 0
+  perms: 444
+  warning_file: warning.txt
+  comment_open:
+  comment_line: "# "
+  comment_close:
+link:
+  owner: 0
+  group: 0
+  perms: 555
+directory:
+  owner: 0
+  group: 0
+  perms: 755

@@ -99,8 +99,6 @@ class Etch
     @sitelibbase       = "#{@configdir}/sitelibs"
     @config_dtd_file   = "#{@configdir}/config.dtd"
     @commands_dtd_file = "#{@configdir}/commands.dtd"
-    @defaults_file     = "#{@configdir}/defaults.xml"
-    @nodegroups_file   = "#{@configdir}/nodegroups.xml"
     
     #
     # Load the DTD which is used to validate config.xml files
@@ -110,11 +108,11 @@ class Etch
     @commands_dtd = Etch.xmlloaddtd(@commands_dtd_file)
     
     #
-    # Load the defaults.xml file which sets defaults for parameters that the
+    # Load the defaults file which sets defaults for parameters that the
     # users don't specify in their config.xml files.
     #
     
-    @defaults_xml = Etch.xmlload(@defaults_file)
+    @defaults = load_defaults
     
     #
     # Load the nodes file
@@ -241,6 +239,42 @@ class Etch
   #
   private
 
+  def load_defaults
+    yamldefaults = "#{@configdir}/defaults.yml"
+    xmldefaults = "#{@configdir}/defaults.xml"
+    if File.exist?(yamldefaults)
+      @dlogger.debug "Loading defaults from #{yamldefaults}"
+      defaults = symbolize_keys(YAML.load(File.read(yamldefaults)))
+    elsif File.exist?(xmldefaults)
+      @dlogger.debug "Loading defaults from #{xmldefaults}"
+      defaults = {}
+      defaults_xml = Etch.xmlload(xmldefaults)
+      Etch.xmleach(defaults_xml, '/config/*') do |node|
+        section = node.name.to_sym
+        defaults[section] ||= {}
+        Etch.xmleachall(node) do |entry|
+          value = Etch.xmltext(entry).strip
+          # Convert things that look like numbers to match how YAML is parsed
+          if value.to_i.to_s == value
+            value = value.to_i
+          end
+          defaults[section][entry.name.to_sym] = value
+        end
+      end
+    else
+      raise "Neither defaults.yml nor defaults.xml exists"
+    end
+    # Ensure the top level sections exist
+    [:file, :link, :directory].each{|top| defaults[top] ||= {}}
+    defaults
+  end
+  def symbolize_keys(hash)
+    if hash.kind_of? Hash
+      Hash[hash.collect{|k,v| [k.to_sym, symbolize_keys(v)]}]
+    else
+      hash
+    end
+  end
   def load_nodes
     yamlnodes = "#{@configdir}/nodes.yml"
     xmlnodes = "#{@configdir}/nodes.xml"
@@ -248,6 +282,7 @@ class Etch
       @dlogger.debug "Loading native groups from #{yamlnodes}"
       nodesfile = 'nodes.yml'
       nodes = YAML.load(File.read(yamlnodes))
+      nodes ||= {}
     elsif File.exist?(xmlnodes)
       @dlogger.debug "Loading native groups from #{xmlnodes}"
       nodesfile = 'nodes.xml'
@@ -273,8 +308,8 @@ class Etch
       group_hierarchy = YAML.load(File.read(yamlnodegroups))
     elsif File.exist?(xmlnodegroups)
       @dlogger.debug "Loading node group hierarchy from #{xmlnodegroups}"
-      nodegroups_xml = Etch.xmlload(xmlnodegroups)
       group_hierarchy = {}
+      nodegroups_xml = Etch.xmlload(xmlnodegroups)
       Etch.xmleach(nodegroups_xml, '/nodegroups/nodegroup') do |parent|
         parentname = Etch.xmlattrvalue(parent, 'name')
         group_hierarchy[parentname] ||= []
@@ -282,10 +317,8 @@ class Etch
           group_hierarchy[parentname] << Etch.xmltext(child)
         end
       end
-    else
-      raise "Neither nodegroups.yml nor nodegroups.xml exists"
     end
-    group_hierarchy
+    group_hierarchy || {}
   end
 
   # Recursive method to get all of the parents of a node group
@@ -526,10 +559,8 @@ class Etch
               if !Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/warning_file')).empty?
                 warning_file = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/warning_file'))
               end
-            elsif Etch.xmlfindfirst(@defaults_xml, '/config/file/warning_file')
-              if !Etch.xmltext(Etch.xmlfindfirst(@defaults_xml, '/config/file/warning_file')).empty?
-                warning_file = Etch.xmltext(Etch.xmlfindfirst(@defaults_xml, '/config/file/warning_file'))
-              end
+            else
+              warning_file = @defaults[:file][:warning_file]
             end
             if warning_file
               warning = ''
@@ -538,8 +569,8 @@ class Etch
               comment_open = nil
               if Etch.xmlfindfirst(config_xml, '/config/file/comment_open')
                 comment_open = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/comment_open'))
-              elsif Etch.xmlfindfirst(@defaults_xml, '/config/file/comment_open')
-                comment_open = Etch.xmltext(Etch.xmlfindfirst(@defaults_xml, '/config/file/comment_open'))
+              else
+                comment_open = @defaults[:file][:comment_open]
               end
               if comment_open && !comment_open.empty?
                 warning << comment_open << "\n"
@@ -549,8 +580,8 @@ class Etch
               comment_line = '# '
               if Etch.xmlfindfirst(config_xml, '/config/file/comment_line')
                 comment_line = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/comment_line'))
-              elsif Etch.xmlfindfirst(@defaults_xml, '/config/file/comment_line')
-                comment_line = Etch.xmltext(Etch.xmlfindfirst(@defaults_xml, '/config/file/comment_line'))
+              else
+                comment_line = @defaults[:file][:comment_line]
               end
 
               warnpath = Pathname.new(warning_file)
@@ -568,8 +599,8 @@ class Etch
               comment_close = nil
               if Etch.xmlfindfirst(config_xml, '/config/file/comment_close')
                 comment_close = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/comment_close'))
-              elsif Etch.xmlfindfirst(@defaults_xml, '/config/file/comment_close')
-                comment_close = Etch.xmltext(Etch.xmlfindfirst(@defaults_xml, '/config/file/comment_close'))
+              else
+                comment_close = @defaults[:file][:comment_close]
               end
               if comment_close && !comment_close.empty?
                 warning << comment_close << "\n"
@@ -621,30 +652,24 @@ class Etch
           # If the XML doesn't contain ownership and permissions entries
           # then add appropriate ones based on the defaults
           if !Etch.xmlfindfirst(config_xml, '/config/file/owner')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/file/owner')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/file/owner'),
-                Etch.xmlfindfirst(config_xml, '/config/file'))
+            if @defaults[:file][:owner]
+              Etch.xmladd(config_xml, '/config/file', 'owner', @defaults[:file][:owner])
             else
-              raise "defaults.xml needs /config/file/owner"
+              raise "defaults needs file->owner"
             end
           end
           if !Etch.xmlfindfirst(config_xml, '/config/file/group')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/file/group')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/file/group'),
-                Etch.xmlfindfirst(config_xml, '/config/file'))
+            if @defaults[:file][:group]
+              Etch.xmladd(config_xml, '/config/file', 'group', @defaults[:file][:group])
             else
-              raise "defaults.xml needs /config/file/group"
+              raise "defaults needs file->group"
             end
           end
           if !Etch.xmlfindfirst(config_xml, '/config/file/perms')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/file/perms')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/file/perms'),
-                Etch.xmlfindfirst(config_xml, '/config/file'))
+            if @defaults[:file][:perms]
+              Etch.xmladd(config_xml, '/config/file', 'perms', @defaults[:file][:perms])
             else
-              raise "defaults.xml needs /config/file/perms"
+              raise "defaults needs file->perms"
             end
           end
       
@@ -705,30 +730,24 @@ class Etch
           # If the XML doesn't contain ownership and permissions entries
           # then add appropriate ones based on the defaults
           if !Etch.xmlfindfirst(config_xml, '/config/link/owner')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/link/owner')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/link/owner'),
-                Etch.xmlfindfirst(config_xml, '/config/link'))
+            if @defaults[:link][:owner]
+              Etch.xmladd(config_xml, '/config/link', 'owner', @defaults[:link][:owner])
             else
-              raise "defaults.xml needs /config/link/owner"
+              raise "defaults needs link->owner"
             end
           end
           if !Etch.xmlfindfirst(config_xml, '/config/link/group')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/link/group')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/link/group'),
-                Etch.xmlfindfirst(config_xml, '/config/link'))
+            if @defaults[:link][:group]
+              Etch.xmladd(config_xml, '/config/link', 'group', @defaults[:link][:group])
             else
-              raise "defaults.xml needs /config/link/group"
+              raise "defaults needs link->group"
             end
           end
           if !Etch.xmlfindfirst(config_xml, '/config/link/perms')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/link/perms')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/link/perms'),
-                Etch.xmlfindfirst(config_xml, '/config/link'))
+            if @defaults[:link][:perms]
+              Etch.xmladd(config_xml, '/config/link', 'perms', @defaults[:link][:perms])
             else
-              raise "defaults.xml needs /config/link/perms"
+              raise "defaults needs link->perms"
             end
           end
       
@@ -782,28 +801,22 @@ class Etch
           # If the XML doesn't contain ownership and permissions entries
           # then add appropriate ones based on the defaults
           if !Etch.xmlfindfirst(config_xml, '/config/directory/owner')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/directory/owner')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/directory/owner'),
-                Etch.xmlfindfirst(config_xml, '/config/directory'))
+            if @defaults[:directory][:owner]
+              Etch.xmladd(config_xml, '/config/directory', 'owner', @defaults[:directory][:owner])
             else
               raise "defaults.xml needs /config/directory/owner"
             end
           end
           if !Etch.xmlfindfirst(config_xml, '/config/directory/group')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/directory/group')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/directory/group'),
-                Etch.xmlfindfirst(config_xml, '/config/directory'))
+            if @defaults[:directory][:group]
+              Etch.xmladd(config_xml, '/config/directory', 'group', @defaults[:directory][:group])
             else
               raise "defaults.xml needs /config/directory/group"
             end
           end
           if !Etch.xmlfindfirst(config_xml, '/config/directory/perms')
-            if Etch.xmlfindfirst(@defaults_xml, '/config/directory/perms')
-              Etch.xmlcopyelem(
-                Etch.xmlfindfirst(@defaults_xml, '/config/directory/perms'),
-                Etch.xmlfindfirst(config_xml, '/config/directory'))
+            if @defaults[:directory][:perms]
+              Etch.xmladd(config_xml, '/config/directory', 'perms', @defaults[:directory][:perms])
             else
               raise "defaults.xml needs /config/directory/perms"
             end

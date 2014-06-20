@@ -1008,7 +1008,7 @@ class Etch::Client
     
           # lchown and lchmod are not supported on many platforms.  The server
           # always includes ownership and permissions settings with any link
-          # (pulling them from defaults.xml if the user didn't specify them in
+          # (pulling them from defaults if the user didn't specify them in
           # the config.xml file.)  As such link management would always fail
           # on systems which don't support lchown/lchmod, which seems like bad
           # behavior.  So instead we check to see if they are implemented, and
