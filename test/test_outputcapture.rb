@@ -139,7 +139,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     testname = 'output capture timeout'
     
     if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
-      skip('This test is not normally run because the timeout is so long.')
+      omit('This test is not normally run because the timeout is so long.')
     else
       return
     end
