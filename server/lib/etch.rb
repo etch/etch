@@ -118,17 +118,17 @@ class Etch
     # Load the nodes file
     #
 
-    groupshash = {}
+    groups = Set.new
     @nodes, nodesfile = load_nodes
     # Extract the groups for this node
     if @nodes[@fqdn]
-      @nodes[@fqdn].each{|group| groupshash[group] = true}
+      @nodes[@fqdn].each{|group| groups << group}
     else
       @logger.warn "No entry found for node #{@fqdn} in #{nodesfile}"
       # Some folks might want to terminate here
       #raise "No entry found for node #{@fqdn} in #{nodesfile}"
     end
-    @dlogger.debug "Native groups for node #{@fqdn}: #{groupshash.keys.sort.join(',')}"
+    @dlogger.debug "Native groups for node #{@fqdn}: #{groups.sort.join(',')}"
 
     #
     # Load the node groups file
@@ -138,27 +138,27 @@ class Etch
 
     # Fill out the list of groups for this node with any parent groups
     parents = Set.new
-    groupshash.keys.each do |group|
+    groups.each do |group|
       parents.merge get_parent_nodegroups(group)
     end
-    parents.each{|parent| groupshash[parent] = true}
+    parents.each{|parent| groups << parent}
     @dlogger.debug "Added groups for node #{@fqdn} due to node group hierarchy: #{parents.sort.join(',')}"
 
     #
     # Run the external node grouper
     #
 
-    externalhash = {}
+    externals = Set.new
     IO.popen(File.join(@configdir, 'nodegrouper') + ' ' + @fqdn) do |pipe|
-      pipe.each { |group| externalhash[group.chomp] = true }
+      pipe.each{|group| externals << group.chomp}
     end
     if !$?.success?
       raise "External node grouper #{File.join(@configdir, 'nodegrouper')} exited with error #{$?.exitstatus}"
     end
-    externalhash.keys.each { |external| groupshash[external] = true }
-    @dlogger.debug "Added groups for node #{@fqdn} due to external node grouper: #{externalhash.keys.sort.join(',')}"
+    groups.merge externals
+    @dlogger.debug "Added groups for node #{@fqdn} due to external node grouper: #{externals.sort.join(',')}"
 
-    @groups = groupshash.keys.sort
+    @groups = groups.sort
     @dlogger.debug "Total groups for node #{@fqdn}: #{@groups.join(',')}"
 
     #
