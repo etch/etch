@@ -138,11 +138,8 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     #
     testname = 'output capture timeout'
     
-    if RUBY_VERSION.split('.')[0..1].join('.').to_f >= 1.9
-      omit('This test is not normally run because the timeout is so long.')
-    else
-      return
-    end
+    warn "The output capture timeout test is not normally run because the timeout is so long" if (EtchTests::VERBOSE == :debug)
+    return
     
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
     File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|

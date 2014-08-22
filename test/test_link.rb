@@ -209,7 +209,7 @@ class EtchLinkTests < Test::Unit::TestCase
       assert_equal(5000, File.lstat(@targetfile).uid, 'link uid')
       assert_equal(6000, File.lstat(@targetfile).gid, 'link gid')
     else
-      warn "Not running as root, skipping link ownership test"
+      warn "Not running as root, skipping link ownership test" if (EtchTests::VERBOSE == :debug)
     end
     # Verify that the link permissions got set correctly
     perms = File.lstat(@targetfile).mode & 07777

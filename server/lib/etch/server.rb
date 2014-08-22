@@ -4,6 +4,8 @@ require 'openssl'
 require 'time'        # Time.parse
 require 'fileutils'   # mkdir_p
 require 'logger'
+require 'yaml'
+require 'set'
 require 'etch'
 
 class Etch::Server
@@ -207,9 +209,9 @@ class Etch::Server
       @dlogger.level = Logger::INFO
     end
 
-    @fqdn = @facts['fqdn']
-
-    if !@fqdn
+    if @facts && @facts['fqdn']
+      @fqdn = @facts['fqdn']
+    else
       raise "fqdn fact not supplied"
     end
 
@@ -274,7 +276,7 @@ class Etch::Server
     @origbase          = "#{@configbase}/orig"
   end
 
-  def generate(files, commands)
+  def generate(files, commands, format=:yaml)
     #
     # Build up a list of files to generate, either from the request or from
     # the source repository if the request is for all files
@@ -341,7 +343,11 @@ class Etch::Server
         end
       end
       if filehash['local_requests']
-        request[:files][name][:local_requests] = filehash['local_requests']
+        # The client puts these into hash-style params with arbitrary keys in order to
+        # make it easier to feed them into the Ruby HTTP client form parameter encoding.
+        # We want to throw away the arbitary keys and recover the requests (the hash
+        # values) as an array.
+        request[:files][name][:local_requests] = filehash['local_requests'].values
       end
     end
     
@@ -358,39 +364,41 @@ class Etch::Server
     response = etch.generate(@tagbase, @facts, request)
     
     #
+    # Update database records
+    #
+    
+    response[:configs] && response[:configs].each do |file, config|
+      # Update the stored record of the config
+      # Exclude configs which correspond to files for which we're requesting
+      # an orig.  In that case any config is just a partial config with
+      # setup and depend elements that we send to the client to ensure it
+      # supplies a proper orig file.
+      if !response[:need_orig].include?(file)
+        yaml = config.to_yaml
+        ec = EtchConfig.find_or_create_by(:client_id => @client.id, :file => file.dup) do |c|
+          c.config = yaml
+        end
+        ec.update_attributes(config: yaml)
+      end
+    end
+    response[:commands] && response[:commands].each do |commandname, command|
+      # Update the stored record of the command
+      yaml = command.to_yaml
+      ec = EtchConfig.find_or_create_by(:client_id => @client.id, :file => commandname.dup) do |c|
+        c.config = yaml
+      end
+      ec.update_attributes(config: yaml)
+    end
+    
+    #
     # Assemble our response to the client and return it
     #
     
-    # Generate the XML document to return to the client
-    response_xml = Etch.xmlnewdoc
-    responseroot = Etch.xmlnewelem('files', response_xml)
-    Etch.xmlsetroot(response_xml, responseroot)
-    # Add configs for files we generated
-    if response[:configs]
-      configs_xml = Etch.xmlnewelem('configs', response_xml)
-      response[:configs].each do |file, config_xml|
-        # Update the stored record of the config
-        # Exclude configs which correspond to files for which we're requesting
-        # an orig.  In that case any config is just a partial config with
-        # setup and depend elements that we send to the client to ensure it
-        # supplies a proper orig file.
-        if !response[:need_orig][file]
-          configstr = config_xml.to_s
-          config = EtchConfig.find_or_create_by(:client_id => @client.id, :file => file.dup) do |c|
-            c.config = configstr
-          end
-          config.update_attributes(config: configstr)
-        end
-        # And add the config to the response to return to the client
-        Etch.xmlcopyelem(Etch.xmlroot(config_xml), configs_xml)
-      end
-      responseroot << configs_xml
-    end
     # Add the files for which we need original sums or contents
+    need_sum = []
+    need_orig = []
     if response[:need_orig]
-      need_sum = []
-      need_orig = []
-      response[:need_orig].each_key do |need|
+      response[:need_orig].each do |need|
         # If the client already sent us the sum then we must be missing the
         # orig contents, otherwise start by requesting the sum.
         if files[need] && files[need]['sha1sum']
@@ -399,40 +407,79 @@ class Etch::Server
           need_sum << need
         end
       end
-      if !need_sum.empty?
-        need_sums_xml = Etch.xmlnewelem('need_sums', response_xml)
-        need_sum.each do |need|
-          need_xml = Etch.xmlnewelem('need_sum', response_xml)
-          Etch.xmlsettext(need_xml, need)
-          need_sums_xml << need_xml
-        end
-        responseroot << need_sums_xml
+    end
+    
+    case format
+    when :yaml
+      yamlresponse(response, need_sum, need_orig)
+    when :xml
+      xmlresponse(response, need_sum, need_orig)
+    else
+      raise "Unsupported format #{format}"
+    end
+  end
+  def yamlresponse(response, need_sum, need_orig)
+    # Generate the YAML to return to the client
+    response_yaml = {}
+    if response[:configs]
+      response_yaml[:configs] = response[:configs]
+    end
+    if !need_sum.empty?
+      response_yaml[:need_sum] = need_sum
+    end
+    if !need_orig.empty?
+      response_yaml[:need_orig] = need_orig
+    end
+    if response[:commands]
+      response_yaml[:commands] = response[:commands]
+    end
+    if response[:retrycommands]
+      response_yaml[:retrycommands] = response[:retrycommands]
+    end
+    yaml = response_yaml.to_yaml
+    @dlogger.debug "Returning #{yaml}"
+    yaml
+  end
+  def xmlresponse(response, need_sum, need_orig)
+    # Generate the XML document to return to the client
+    response_xml = Etch.xmlnewdoc
+    responseroot = Etch.xmlnewelem('files', response_xml)
+    Etch.xmlsetroot(response_xml, responseroot)
+    # Add configs for files we generated
+    if response[:configs]
+      configs_xml = Etch.xmlnewelem('configs', response_xml)
+      response[:configs].each do |file, config|
+        configs_xml << config_hash_to_xml(config)
       end
-      if !need_orig.empty?
-        need_origs_xml = Etch.xmlnewelem('need_origs', response_xml)
-        need_orig.each do |need|
-          need_xml = Etch.xmlnewelem('need_orig', response_xml)
-          Etch.xmlsettext(need_xml, need)
-          need_origs_xml << need_xml
-        end
-        responseroot << need_origs_xml
+      responseroot << configs_xml
+    end
+    # Add the files for which we need original sums or contents
+    if !need_sum.empty?
+      need_sums_xml = Etch.xmlnewelem('need_sums', response_xml)
+      need_sum.each do |need|
+        need_xml = Etch.xmlnewelem('need_sum', response_xml)
+        Etch.xmlsettext(need_xml, need)
+        need_sums_xml << need_xml
       end
+      responseroot << need_sums_xml
+    end
+    if !need_orig.empty?
+      need_origs_xml = Etch.xmlnewelem('need_origs', response_xml)
+      need_orig.each do |need|
+        need_xml = Etch.xmlnewelem('need_orig', response_xml)
+        Etch.xmlsettext(need_xml, need)
+        need_origs_xml << need_xml
+      end
+      responseroot << need_origs_xml
     end
     # Add commands we generated
     # The root XML element in each commands.xml is already the plural
     # "commands", so we have to use something different here as the XML
     # element we insert all of those into as part of the response.
-    if response[:allcommands]
-      commands_xml = Etch.xmlnewelem('allcommands', response_xml)
-      response[:allcommands].each do |commandname, command_xml|
-        # Update the stored record of the command
-        commandstr = command_xml.to_s
-        config = EtchConfig.find_or_create_by(:client_id => @client.id, :file => commandname.dup) do |c|
-          c.config = commandstr
-        end
-        config.update_attributes(config: commandstr)
-        # Add the command to the response to return to the client
-        Etch.xmlcopyelem(Etch.xmlroot(command_xml), commands_xml)
+    if response[:commands]
+      commands_xml = Etch.xmlnewelem('commands', response_xml)
+      response[:commands].each do |commandname, command|
+        commands_xml << Etch.command_hash_to_xml(command)
       end
       responseroot << commands_xml
     end
@@ -446,25 +493,6 @@ class Etch::Server
       responseroot << retrycommands_xml
     end
     
-    # Clean up XML formatting
-    # But only if we're in debug mode, in regular mode nobody but the
-    # machines will see the XML and they don't care if it is pretty.
-    # FIXME: Tidy's formatting breaks things, it inserts leading/trailing whitespace into text nodes
-    if @debug && false
-      require 'tidy'
-      Tidy.path = '/sw/lib/libtidy.dylib'
-      Tidy.open(:show_warnings=>true) do |tidy|
-        tidy.options.input_xml = true
-        tidy.options.output_xml = true
-        # Screws up the Base64 contents data
-        #tidy.options.indent = true
-        tidy.options.hide_comments = true
-        response_xml = tidy.clean(response_xml.to_s)
-        puts tidy.errors
-        puts tidy.diagnostics if (@debug)
-      end
-    end
-
     @dlogger.debug "Returning #{response_xml}"
     response_xml
   end

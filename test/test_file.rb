@@ -364,7 +364,7 @@ class EtchFileTests < Test::Unit::TestCase
       assert_equal(5000, File.lstat(@targetfile).uid, 'file uid')
       assert_equal(6000, File.lstat(@targetfile).gid, 'file gid')
     else
-      warn "Not running as root, skipping file ownership test"
+      warn "Not running as root, skipping file ownership test" if (EtchTests::VERBOSE == :debug)
     end
     # Verify that the file permissions got set correctly
     perms = File.lstat(@targetfile).mode & 07777
@@ -404,7 +404,7 @@ class EtchFileTests < Test::Unit::TestCase
       assert_equal(0, File.lstat(@targetfile).uid, 'file uid w/ bogus owner')
       assert_equal(0, File.lstat(@targetfile).gid, 'file gid w/ bogus group')
     else
-      warn "Not running as root, skipping bogus ownership test"
+      warn "Not running as root, skipping bogus ownership test" if (EtchTests::VERBOSE == :debug)
     end
   end
   

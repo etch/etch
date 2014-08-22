@@ -16,6 +16,9 @@ module EtchTests
   SERVERDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/server"
   CLIENTDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/client"
   
+  # :quiet, :normal, :debug
+  VERBOSE = :quiet
+  
   # Creates a temporary file via Tempfile, capture the filename, tell Tempfile
   # to clean up, then return the path.  This gives the caller a filename that
   # they should be able to write to, that was recently unused and unique, and
@@ -78,7 +81,7 @@ module EtchTests
       end
     end
     
-    puts "Created repository #{repo}"
+    puts "Created repository #{repo}" if (VERBOSE != :quiet)
     
     repo
   end
@@ -142,6 +145,10 @@ module EtchTests
       end
     else
       serverargs = "-p #{port} --pid #{SERVERDIR}/tmp/pids/#{port}.pid"
+      case VERBOSE
+      when :quiet
+        serverargs += ' > /dev/null 2>&1'
+      end
       if `cd #{SERVERDIR} && #{RUBY} \`which bundle\` list`.include?('unicorn')
         exec("cd #{SERVERDIR} && RAILS_ENV=test #{RUBY} `which bundle` exec unicorn #{serverargs}")
       else
@@ -167,7 +174,12 @@ module EtchTests
     if options[:extra_args]
       extra_args += options[:extra_args]
     end
-    # extra_args += " --debug"
+    case VERBOSE
+    when :debug
+      extra_args += ' --debug'
+    when :quiet
+      extra_args += ' > /dev/null 2>&1'
+    end
     
     port = server[:port]
     if options[:port]
@@ -184,7 +196,7 @@ module EtchTests
       key = options[:key]
     end
     
-    if options[:errors_expected]
+    if options[:errors_expected] && VERBOSE != :quiet
       # Warn the user that errors are expected.  Otherwise it can be
       # disconcerting if you're watching the tests run and see errors.
       #sleep 3

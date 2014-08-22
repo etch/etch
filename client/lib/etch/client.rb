@@ -29,7 +29,6 @@ Silently.silently do
   require 'uri'
   require 'net/http'
   require 'net/https'
-  require 'rexml/document'
   require 'fileutils'   # copy, mkpath, rmtree
   require 'fcntl'       # Fcntl::O_*
   require 'etc'         # getpwnam, getgrnam
@@ -286,10 +285,8 @@ class Etch::Client
               files.each do |file|
                 request["files[#{CGI.escape(file)}][sha1sum]"] =
                   get_orig_sum(file)
-                local_requests = get_local_requests(file)
-                if local_requests
-                  request["files[#{CGI.escape(file)}][local_requests]"] =
-                    local_requests
+                get_local_requests(file).each_with_index do |lr, i|
+                  request["files[#{CGI.escape(file)}][local_requests][i]"] = lr
                 end
               end
             end
@@ -325,84 +322,43 @@ class Etch::Client
           # Send request to server
           #
           
-          responsedata = {}
           if @local
-            results = @etch.generate(@local, @facts, request)
-            # FIXME: Etch#generate returns parsed XML using whatever XML
-            # library it happens to use.  In order to avoid re-parsing
-            # the XML we'd have to use the XML abstraction code from Etch
-            # everwhere here.
-            # Until then re-parse the XML using REXML.
-            #responsedata[:configs] = results[:configs]
-            responsedata[:configs] = {}
-            results[:configs].each {|f,c| responsedata[:configs][f] = REXML::Document.new(c.to_s) }
-            responsedata[:need_sums] = {}
-            responsedata[:need_origs] = results[:need_orig]
-            #responsedata[:allcommands] = results[:allcommands]
-            responsedata[:allcommands] = {}
-            results[:allcommands].each {|cn,c| responsedata[:allcommands][cn] = REXML::Document.new(c.to_s) }
-            responsedata[:retrycommands] = results[:retrycommands]
+            response = @etch.generate(@local, @facts, request)
           else
             puts "Sending request to server #{@filesuri}: #{request.inspect}" if (@debug)
             post = Net::HTTP::Post.new(@filesuri.path)
             post.set_form_data(request)
+            post['Accept'] = 'application/x-yaml'
             sign_post!(post, @key)
-            response = http.request(post)
-            if !response.kind_of?(Net::HTTPSuccess)
-              $stderr.puts response.body
+            httpresponse = http.request(post)
+            if !httpresponse.kind_of?(Net::HTTPSuccess)
+              $stderr.puts httpresponse.body
               # error! raises an exception
-              response.error!
+              httpresponse.error!
             end
-            puts "Response from server:\n'#{response.body}'" if (@debug)
-            if !response.body.nil? && !response.body.empty?
-              response_xml = REXML::Document.new(response.body)
-              responsedata[:configs] = {}
-              response_xml.elements.each('/files/configs/config') do |config|
-                file = config.attributes['filename']
-                # We have to make a new document so that XPath paths are
-                # referenced relative to the configuration for this
-                # specific file.
-                #responsedata[:configs][file] = REXML::Document.new(response_xml.elements["/files/configs/config[@filename='#{file}']"].to_s)
-                responsedata[:configs][file] = REXML::Document.new(config.to_s)
-              end
-              responsedata[:need_sums] = {}
-              response_xml.elements.each('/files/need_sums/need_sum') do |ns|
-                responsedata[:need_sums][ns.text] = true
-              end
-              responsedata[:need_origs] = {}
-              response_xml.elements.each('/files/need_origs/need_orig') do |no|
-                responsedata[:need_origs][no.text] = true
-              end
-              responsedata[:allcommands] = {}
-              response_xml.elements.each('/files/allcommands/commands') do |command|
-                commandname = command.attributes['commandname']
-                # We have to make a new document so that XPath paths are
-                # referenced relative to the configuration for this
-                # specific file.
-                #responsedata[:allcommands][commandname] = REXML::Document.new(response_xml.root.elements["/files/allcommands/commands[@commandname='#{commandname}']"].to_s)
-                responsedata[:allcommands][commandname] = REXML::Document.new(command.to_s)
-              end
-              responsedata[:retrycommands] = {}
-              response_xml.elements.each('/files/retrycommands/retrycommand') do |rc|
-                responsedata[:retrycommands][rc.text] = true
-              end
-            else
+            puts "Response from server:\n'#{httpresponse.body}'" if (@debug)
+            if httpresponse['Content-Type'].split(';').first != 'application/x-yaml'
+              raise "MIME type #{httpresponse['Content-Type']} is not yaml"
+            end
+            if httpresponse.body.nil? || httpresponse.body.empty?
               puts "  Response is empty" if (@debug)
               break
             end
+            response = YAML.load(httpresponse.body)
           end
 
           #
           # Process the response from the server
           #
 
-          # Prep a clean request hash
+          # Prep a clean request hash in case we need to make a
+          # followup request
           if @local
             request = {}
-            if !responsedata[:need_origs].empty?
+            if response[:need_orig] && !response[:need_orig].empty?
               request[:files] = {}
             end
-            if !responsedata[:retrycommands].empty?
+            if response[:retrycommands] && !response[:retrycommands].empty?
               request[:commands] = {}
             end
           else
@@ -418,10 +374,10 @@ class Etch::Client
           reset_already_processed
           # Process configs first, as they may contain setup entries that are
           # needed to create the original files.
-          responsedata[:configs].each_key do |file|
+          response[:configs].each_key do |file|
             puts "Processing config for #{file}" if (@debug)
             if !@listfiles
-              continue_processing = process_file(file, responsedata)
+              continue_processing = process_file(file, response)
               if !continue_processing
                 throw :stop_processing
               end
@@ -429,7 +385,7 @@ class Etch::Client
               files_to_list[file] = true
             end
           end
-          responsedata[:need_sums].each_key do |need_sum|
+          response[:need_sum] && response[:need_sum].each do |need_sum|
             puts "Processing request for sum of #{need_sum}" if (@debug)
             if @local
               # If this happens we screwed something up, the local mode
@@ -444,13 +400,14 @@ class Etch::Client
               if @local
                 request[:files][need_sum][:local_requests] = local_requests
               else
-                request["files[#{CGI.escape(need_sum)}][local_requests]"] =
-                  local_requests
+                local_requests.each_with_index do |lr, i|
+                  request["files[#{CGI.escape(need_sum)}][local_requests][i]"] = lr
+                end
               end
             end
             need_to_loop = true
           end
-          responsedata[:need_origs].each_key do |need_orig|
+          response[:need_orig] && response[:need_orig].each do |need_orig|
             puts "Processing request for contents of #{need_orig}" if (@debug)
             if @local
               request[:files][need_orig] = {:orig => save_orig(need_orig)}
@@ -465,20 +422,21 @@ class Etch::Client
               if @local
                 request[:files][need_orig][:local_requests] = local_requests
               else
-                request["files[#{CGI.escape(need_orig)}][local_requests]"] =
-                  local_requests
+                local_requests.each_with_index do |lr, i|
+                  request["files[#{CGI.escape(need_orig)}][local_requests][i]"] = lr
+                end
               end
             end
             need_to_loop = true
           end
-         responsedata[:allcommands].each_key do |commandname|
+         response[:commands] && response[:commands].each_key do |commandname|
             puts "Processing commands #{commandname}" if (@debug)
-            continue_processing = process_commands(commandname, responsedata)
+            continue_processing = process_commands(commandname, response)
             if !continue_processing
               throw :stop_processing
             end
           end
-          responsedata[:retrycommands].each_key do |commandname|
+          response[:retrycommands] && response[:retrycommands].each_key do |commandname|
             puts "Processing request to retry command #{commandname}" if (@debug)
             if @local
               request[:commands][commandname] = true
@@ -598,7 +556,7 @@ class Etch::Client
   # Raises an exception if any fatal error is encountered
   # Returns a boolean, true unless the user indicated in interactive mode
   # that further processing should be halted
-  def process_file(file, responsedata)
+  def process_file(file, response)
     continue_processing = true
     save_results = true
     exception = nil
@@ -606,7 +564,7 @@ class Etch::Client
     # We may not have configuration for this file, if it does not apply
     # to this host.  The server takes care of detecting any errors that
     # might involve, so here we can just silently return.
-    config = responsedata[:configs][file]
+    config = response[:configs][file]
     if !config
       puts "No configuration for #{file}, skipping" if (@debug)
       return continue_processing
@@ -651,18 +609,18 @@ class Etch::Client
         lock_file(file)
         
         # Process any other files that this file depends on
-        config.elements.each('/config/depend') do |depend|
-          puts "Processing dependency #{depend.text}" if (@debug)
-          continue_processing = process_file(depend.text, responsedata)
+        config[:depend] && config[:depend].each do |depend|
+          puts "Processing dependency #{depend}" if (@debug)
+          continue_processing = process_file(depend, response)
           if !continue_processing
             throw :process_done
           end
         end
         
         # Process any commands that this file depends on
-        config.elements.each('/config/dependcommand') do |dependcommand|
-          puts "Processing command dependency #{dependcommand.text}" if (@debug)
-          continue_processing = process_commands(dependcommand.text, responsedata)
+        config[:dependcommand] && config[:dependcommand].each do |dependcommand|
+          puts "Processing command dependency #{dependcommand}" if (@debug)
+          continue_processing = process_commands(dependcommand, response)
           if !continue_processing
             throw :process_done
           end
@@ -672,7 +630,7 @@ class Etch::Client
 
         # Check to see if the user has requested that we revert back to the
         # original file.
-        if config.elements['/config/revert']
+        if config[:revert]
           origpathbase = File.join(@origbase, file)
           origpath = nil
 
@@ -729,20 +687,18 @@ class Etch::Client
         # install a package containing a sample config file which we
         # then edit with a script, and thus doing the install in <pre>
         # is too late.
-        if config.elements['/config/setup']
-          process_setup(file, config)
-        end
+        process_setup(file, config)
 
-        if config.elements['/config/file']  # Regular file
+        if config[:file]  # Regular file
           newcontents = nil
-          if config.elements['/config/file/contents']
-            newcontents = Base64.decode64(config.elements['/config/file/contents'].text)
+          if config[:file][:contents]
+            newcontents = Base64.decode64(config[:file][:contents])
           end
 
-          permstring = config.elements['/config/file/perms'].text
+          permstring = config[:file][:perms].to_s
           perms = permstring.oct
-          owner = config.elements['/config/file/owner'].text
-          group = config.elements['/config/file/group'].text
+          owner = config[:file][:owner]
+          group = config[:file][:group]
           uid = lookup_uid(owner)
           gid = lookup_gid(group)
 
@@ -853,9 +809,7 @@ class Etch::Client
             end
 
             # Perform any pre-action commands that the user has requested
-            if config.elements['/config/pre']
-              process_pre(file, config)
-            end
+            process_pre(file, config)
 
             # If the original "file" is a directory and the user hasn't
             # specifically told us we can overwrite it then raise an exception.
@@ -865,7 +819,7 @@ class Etch::Client
             # originals which are directories.  So we don't check until
             # after any pre commands are run.
             if File.directory?(file) && !File.symlink?(file) &&
-               !config.elements['/config/file/overwrite_directory']
+               !config[:file][:overwrite_directory]
               raise "Can't proceed, original of #{file} is a directory,\n" +
                     "  consider the overwrite_directory flag if appropriate."
             end
@@ -888,8 +842,7 @@ class Etch::Client
             # only use the backup to roll back if the test fails), so don't
             # bother to create a backup unless there is a test command defined.
             backup = nil
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               backup = make_backup(file)
               puts "Created backup #{backup}"
             end
@@ -954,33 +907,26 @@ class Etch::Client
             end
 
             # Perform any test_before_post commands that the user has requested
-            if config.elements['/config/test_before_post']
-              if !process_test_before_post(file, config)
-                restore_backup(file, backup)
-                raise "test_before_post failed"
-              end
+            if !process_test_before_post(file, config)
+              restore_backup(file, backup)
+              raise "test_before_post failed"
             end
 
             # Perform any post-action commands that the user has requested
-            if config.elements['/config/post']
-              process_post(file, config)
-            end
+            process_post(file, config)
 
             # Perform any test commands that the user has requested
-            if config.elements['/config/test']
+            if config[:test]
               if !process_test(file, config)
                 restore_backup(file, backup)
 
                 # Re-run any post commands
-                if config.elements['/config/post']
-                  process_post(file, config)
-                end
+                process_post(file, config)
               end
             end
 
             # Clean up the backup, we don't need it anymore
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               puts "Removing backup #{backup}"
               remove_file(backup) if (!@dryrun)
             end
@@ -992,29 +938,29 @@ class Etch::Client
           end
         end
 
-        if config.elements['/config/link']  # Symbolic link
+        if config[:link]  # Symbolic link
 
-          dest = config.elements['/config/link/dest'].text
+          dest = config[:link][:dest]
 
           set_link_destination = !compare_link_destination(file, dest)
           absdest = File.expand_path(dest, File.dirname(file))
 
-          permstring = config.elements['/config/link/perms'].text
+          permstring = config[:link][:perms].to_s
           perms = permstring.oct
-          owner = config.elements['/config/link/owner'].text
-          group = config.elements['/config/link/group'].text
+          owner = config[:link][:owner]
+          group = config[:link][:group]
           uid = lookup_uid(owner)
           gid = lookup_gid(group)
     
           # lchown and lchmod are not supported on many platforms.  The server
           # always includes ownership and permissions settings with any link
           # (pulling them from defaults if the user didn't specify them in
-          # the config.xml file.)  As such link management would always fail
+          # the config file.)  As such link management would always fail
           # on systems which don't support lchown/lchmod, which seems like bad
           # behavior.  So instead we check to see if they are implemented, and
           # if not just ignore ownership/permissions settings.  I suppose the
           # ideal would be for the server to tell the client whether the
-          # ownership/permissions were specifically requested (in config.xml)
+          # ownership/permissions were specifically requested (in the config)
           # rather than just defaults, and then for the client to always try to
           # manage ownership/permissions if the settings are not defaults (and
           # fail in the event that they aren't implemented.)
@@ -1087,7 +1033,7 @@ class Etch::Client
           # expand_path should handle paths that are already absolute
           # properly.
           elsif ! File.exist?(absdest) && ! File.symlink?(absdest) &&
-                ! config.elements['/config/link/allow_nonexistent_dest']
+                ! config[:link][:allow_nonexistent_dest]
             puts "Destination #{dest} for link #{file} does not exist," +
                  "  consider the allow_nonexistent_dest flag if appropriate."
             throw :process_done
@@ -1122,9 +1068,7 @@ class Etch::Client
             end
 
             # Perform any pre-action commands that the user has requested
-            if config.elements['/config/pre']
-              process_pre(file, config)
-            end
+            process_pre(file, config)
 
             # If the original "file" is a directory and the user hasn't
             # specifically told us we can overwrite it then raise an exception.
@@ -1134,7 +1078,7 @@ class Etch::Client
             # originals which are directories.  So we don't check until
             # after any pre commands are run.
             if File.directory?(file) && !File.symlink?(file) &&
-               !config.elements['/config/link/overwrite_directory']
+               !config[:link][:overwrite_directory]
               raise "Can't proceed, original of #{file} is a directory,\n" +
                     "  consider the overwrite_directory flag if appropriate."
             end
@@ -1157,8 +1101,7 @@ class Etch::Client
             # only use the backup to roll back if the test fails), so don't
             # bother to create a backup unless there is a test command defined.
             backup = nil
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               backup = make_backup(file)
               puts "Created backup #{backup}"
             end
@@ -1195,33 +1138,26 @@ class Etch::Client
             end
 
             # Perform any test_before_post commands that the user has requested
-            if config.elements['/config/test_before_post']
-              if !process_test_before_post(file, config)
-                restore_backup(file, backup)
-                raise "test_before_post failed"
-              end
+            if !process_test_before_post(file, config)
+              restore_backup(file, backup)
+              raise "test_before_post failed"
             end
 
             # Perform any post-action commands that the user has requested
-            if config.elements['/config/post']
-              process_post(file, config)
-            end
+            process_post(file, config)
 
             # Perform any test commands that the user has requested
-            if config.elements['/config/test']
+            if config[:test]
               if !process_test(file, config)
                 restore_backup(file, backup)
 
                 # Re-run any post commands
-                if config.elements['/config/post']
-                  process_post(file, config)
-                end
+                process_post(file, config)
               end
             end
 
             # Clean up the backup, we don't need it anymore
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               puts "Removing backup #{backup}"
               remove_file(backup) if (!@dryrun)
             end
@@ -1233,16 +1169,17 @@ class Etch::Client
           end
         end
 
-        if config.elements['/config/directory']  # Directory
+        if config[:directory]  # Directory
   
           # A little safety check
-          create = config.elements['/config/directory/create']
-          raise "No create element found in directory section" if !create
+          if !config[:directory][:create]
+            raise "No create element found in directory section"
+          end
   
-          permstring = config.elements['/config/directory/perms'].text
+          permstring = config[:directory][:perms].to_s
           perms = permstring.oct
-          owner = config.elements['/config/directory/owner'].text
-          group = config.elements['/config/directory/group'].text
+          owner = config[:directory][:owner]
+          group = config[:directory][:group]
           uid = lookup_uid(owner)
           gid = lookup_gid(group)
 
@@ -1301,9 +1238,7 @@ class Etch::Client
             end
 
             # Perform any pre-action commands that the user has requested
-            if config.elements['/config/pre']
-              process_pre(file, config)
-            end
+            process_pre(file, config)
 
             # Give save_orig a definitive answer on whether or not to save the
             # contents of an original directory.
@@ -1323,8 +1258,7 @@ class Etch::Client
             # only use the backup to roll back if the test fails), so don't
             # bother to create a backup unless there is a test command defined.
             backup = nil
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               backup = make_backup(file)
               puts "Created backup #{backup}"
             end
@@ -1355,33 +1289,26 @@ class Etch::Client
             end
 
             # Perform any test_before_post commands that the user has requested
-            if config.elements['/config/test_before_post']
-              if !process_test_before_post(file, config)
-                restore_backup(file, backup)
-                raise "test_before_post failed"
-              end
+            if !process_test_before_post(file, config)
+              restore_backup(file, backup)
+              raise "test_before_post failed"
             end
 
             # Perform any post-action commands that the user has requested
-            if config.elements['/config/post']
-              process_post(file, config)
-            end
+            process_post(file, config)
 
             # Perform any test commands that the user has requested
-            if config.elements['/config/test']
+            if config[:test]
               if !process_test(file, config)
                 restore_backup(file, backup)
 
                 # Re-run any post commands
-                if config.elements['/config/post']
-                  process_post(file, config)
-                end
+                process_post(file, config)
               end
             end
 
             # Clean up the backup, we don't need it anymore
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               puts "Removing backup #{backup}"
               remove_file(backup) if (!@dryrun)
             end
@@ -1393,11 +1320,12 @@ class Etch::Client
           end
         end
 
-        if config.elements['/config/delete']  # Delete whatever is there
+        if config[:delete]  # Delete whatever is there
 
           # A little safety check
-          proceed = config.elements['/config/delete/proceed']
-          raise "No proceed element found in delete section" if !proceed
+          if !config[:delete][:proceed]
+            raise "No proceed element found in delete section"
+          end
 
           # Proceed only if the file currently exists
           if !File.exist?(file) && !File.symlink?(file)
@@ -1425,9 +1353,7 @@ class Etch::Client
             end
 
             # Perform any pre-action commands that the user has requested
-            if config.elements['/config/pre']
-              process_pre(file, config)
-            end
+            process_pre(file, config)
 
             # If the original "file" is a directory and the user hasn't
             # specifically told us we can overwrite it then raise an exception.
@@ -1437,7 +1363,7 @@ class Etch::Client
             # originals which are directories.  So we don't check until
             # after any pre commands are run.
             if File.directory?(file) && !File.symlink?(file) &&
-               !config.elements['/config/delete/overwrite_directory']
+               !config[:delete][:overwrite_directory]
               raise "Can't proceed, original of #{file} is a directory,\n" +
                     "  consider the overwrite_directory flag if appropriate."
             end
@@ -1453,8 +1379,7 @@ class Etch::Client
             # only use the backup to roll back if the test fails), so don't
             # bother to create a backup unless there is a test command defined.
             backup = nil
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               backup = make_backup(file)
               puts "Created backup #{backup}"
             end
@@ -1463,33 +1388,26 @@ class Etch::Client
             remove_file(file) if (!@dryrun)
 
             # Perform any test_before_post commands that the user has requested
-            if config.elements['/config/test_before_post']
-              if !process_test_before_post(file, config)
-                restore_backup(file, backup)
-                raise "test_before_post failed"
-              end
+            if !process_test_before_post(file, config)
+              restore_backup(file, backup)
+              raise "test_before_post failed"
             end
 
             # Perform any post-action commands that the user has requested
-            if config.elements['/config/post']
-              process_post(file, config)
-            end
+            process_post(file, config)
 
             # Perform any test commands that the user has requested
-            if config.elements['/config/test']
+            if config[:test]
               if !process_test(file, config)
                 restore_backup(file, backup)
 
                 # Re-run any post commands
-                if config.elements['/config/post']
-                  process_post(file, config)
-                end
+                process_post(file, config)
               end
             end
 
             # Clean up the backup, we don't need it anymore
-            if config.elements['/config/test_before_post'] ||
-               config.elements['/config/test']
+            if config[:test_before_post] || config[:test]
               puts "Removing backup #{backup}"
               remove_file(backup) if (!@dryrun)
             end
@@ -1530,7 +1448,7 @@ class Etch::Client
   # Raises an exception if any fatal error is encountered
   # Returns a boolean, true unless the user indicated in interactive mode
   # that further processing should be halted
-  def process_commands(commandname, responsedata)
+  def process_commands(commandname, response)
     continue_processing = true
     save_results = true
     exception = nil
@@ -1538,7 +1456,7 @@ class Etch::Client
     # We may not have configuration for this file, if it does not apply
     # to this host.  The server takes care of detecting any errors that
     # might involve, so here we can just silently return.
-    command = responsedata[:allcommands][commandname]
+    command = response[:commands][commandname]
     if !command
       puts "No configuration for command #{commandname}, skipping" if (@debug)
       return continue_processing
@@ -1583,60 +1501,67 @@ class Etch::Client
         lock_file(commandname)
         
         # Process any other commands that this command depends on
-        command.elements.each('/commands/depend') do |depend|
-          puts "Processing command dependency #{depend.text}" if (@debug)
-          continue_processing = process_commands(depend.text, responsedata)
+        command[:depend] && command[:depend].each do |depend|
+          puts "Processing command dependency #{depend}" if (@debug)
+          continue_processing = process_commands(depend, response)
           if !continue_processing
             throw :process_done
           end
         end
         
         # Process any files that this command depends on
-        command.elements.each('/commands/dependfile') do |dependfile|
-          puts "Processing file dependency #{dependfile.text}" if (@debug)
-          continue_processing = process_file(dependfile.text, responsedata)
+        command[:dependfile] && command[:dependfile].each do |dependfile|
+          puts "Processing file dependency #{dependfile}" if (@debug)
+          continue_processing = process_file(dependfile, response)
           if !continue_processing
             throw :process_done
           end
         end
         
         # Perform each step
-        command.elements.each('/commands/step') do |step|
-          guard = step.elements['guard/exec'].text
-          command = step.elements['command/exec'].text
-          
-          # Run guard, display only in debug (a la setup)
-          guard_result = process_guard(guard, commandname)
-          
-          if !guard_result
-            # Tell the user what we're going to do
-            puts "Will run command '#{command}'"
-            
-            # If the user requested interactive mode ask them for
-            # confirmation to proceed.
-            if @interactive
-              case get_user_confirmation()
-              when CONFIRM_PROCEED
-                # No need to do anything
-              when CONFIRM_SKIP
-                save_results = false
-                throw :process_done
-              when CONFIRM_QUIT
-                continue_processing = false
-                save_results = false
-                throw :process_done
-              else
-                raise "Unexpected result from get_user_confirmation()"
-              end
+        command[:steps] && command[:steps].each do |outerstep|
+          if step = outerstep[:step]
+            # Run guards, display only in debug (a la setup)
+            guard_result = true
+            step[:guard] && step[:guard].each do |guard|
+              guard_result &= process_guard(guard, commandname)
             end
+          
+            if !guard_result
+              # Tell the user what we're going to do
+              puts "Will run command '#{step[:command].join('; ')}'"
             
-            # Run command, always display (a la pre/post)
-            process_command(command, commandname)
+              # If the user requested interactive mode ask them for
+              # confirmation to proceed.
+              if @interactive
+                case get_user_confirmation()
+                when CONFIRM_PROCEED
+                  # No need to do anything
+                when CONFIRM_SKIP
+                  save_results = false
+                  throw :process_done
+                when CONFIRM_QUIT
+                  continue_processing = false
+                  save_results = false
+                  throw :process_done
+                else
+                  raise "Unexpected result from get_user_confirmation()"
+                end
+              end
             
-            # Re-run guard, always display, abort if fails
-            guard_recheck_result = process_guard(guard, commandname)
-            if !guard_recheck_result
-              raise "Guard #{guard} still fails for #{commandname} after running command #{command}"
+              # Run command, always display (a la pre/post)
+              step[:command] && step[:command].each do |cmd|
+                process_command(cmd, commandname)
+              end
+            
+              # Re-run guard, always display, abort if fails
+              guard_recheck_result = true
+              step[:guard] && step[:guard].each do |guard|
+                guard_recheck_result &= process_guard(guard, commandname)
+              end
+              if !guard_recheck_result
+                raise "Guard #{step[:guard].join('; ')} still fails for #{commandname} after running command #{step[:command].join('; ')}"
+              end
             end
           end
         end
@@ -1994,32 +1919,14 @@ class Etch::Client
   
   def get_local_requests(file)
     requestdir = File.join(@requestbase, file)
-    requestlist = []
+    requests = []
     if File.directory?(requestdir)
       Dir.foreach(requestdir) do |entry|
         next if entry == '.'
         next if entry == '..'
         requestfile = File.join(requestdir, entry)
-        request = IO.read(requestfile)
-        # Make sure it is valid XML
-        begin
-          request_xml = REXML::Document.new(request)
-        rescue REXML::ParseException => e
-          warn "Local request file #{requestfile} is not valid XML and will be ignored:\n" + e.message
-          next
-        end
-        # Make sure the root element is <request>
-        if request_xml.root.name != 'request'
-          warn "Local request file #{requestfile} is not properly formatted and will be ignored, XML root element is not <request>"
-          next
-        end
-        # Add it to the queue
-        requestlist << request
+        requests << IO.read(requestfile)
       end
-    end
-    requests = nil
-    if !requestlist.empty?
-      requests = "<requests>\n#{requestlist.join('')}\n</requests>"
     end
     requests
   end
@@ -2088,96 +1995,105 @@ class Etch::Client
   end
 
   def process_setup(file, config)
-    exectype = 'setup'
-    # Because the setup commands are processed every time etch runs
-    # (rather than just when the file has changed, as with pre/post) we
-    # don't want to print a message for them unless we're in debug mode.
-    puts "Processing #{exectype} commands" if (@debug)
-    config.elements.each("/config/#{exectype}/exec") do |setup|
-      r = process_exec(exectype, setup.text, file)
-      # process_exec currently raises an exception if a setup or pre command
-      # fails.  In case that ever changes make sure we propagate
-      # the error.
-      return r if (!r)
+    if config[:setup]
+      # Because the setup commands are processed every time etch runs
+      # (rather than just when the file has changed, as with pre/post) we
+      # don't want to print a message for them unless we're in debug mode.
+      puts "Processing setup commands" if (@debug)
+      config[:setup].each do |setup|
+        r = process_exec(:setup, setup, file)
+        # process_exec currently raises an exception if a setup or pre command
+        # fails.  In case that ever changes make sure we propagate
+        # the error.
+        return r if (!r)
+      end
     end
+    true
   end
   def process_pre(file, config)
-    exectype = 'pre'
-    puts "Processing #{exectype} commands"
-    config.elements.each("/config/#{exectype}/exec") do |pre|
-      r = process_exec(exectype, pre.text, file)
-      # process_exec currently raises an exception if a setup or pre command
-      # fails.  In case that ever changes make sure we propagate
-      # the error.
-      return r if (!r)
+    if config[:pre]
+      puts "Processing pre commands"
+      config[:pre].each do |pre|
+        r = process_exec(:pre, pre, file)
+        # process_exec currently raises an exception if a setup or pre command
+        # fails.  In case that ever changes make sure we propagate
+        # the error.
+        return r if (!r)
+      end
     end
+    true
   end
   def process_post(file, config)
-    exectype = 'post'
     execs = []
-    puts "Processing #{exectype} commands"
 
-    # Add the "exec once" items into the list of commands to process
+    if [:post, :post_once, :post_once_per_run].any?{|p| config[p]}
+      puts "Processing post commands"
+    end
+
+    # Add the "post once" items into the list of commands to process
     # if this is the first time etch has updated this file, and if
     # we haven't already run the command.
-    if @first_update[file]
-      config.elements.each("/config/#{exectype}/exec_once") do |exec_once|
-        if !@exec_already_processed.has_key?(exec_once.text)
-          execs << exec_once.text
-          @exec_already_processed[exec_once] = true
+    if @first_update[file] && config[:post_once]
+      config[:post_once].each do |once|
+        if !@exec_already_processed.has_key?(once)
+          execs << once
+          @exec_already_processed[once] = true
         else
-          puts "Skipping '#{exec_once.text}', it has already " +
+          puts "Skipping '#{once}', it has already " +
             "been executed once this run" if (@debug)
         end
       end
     end
 
-    # Add in the regular exec items as well
-    config.elements.each("/config/#{exectype}/exec") do |exec|
-      execs << exec.text
+    # Add in the regular post items
+    if config[:post]
+      execs.concat config[:post]
     end
   
     # post failures are considered non-fatal, so we ignore the
     # return value from process_exec (it takes care of warning
     # the user).
-    execs.each { |exec| process_exec(exectype, exec, file) }
+    execs.each { |exec| process_exec(:post, exec, file) }
   
-    config.elements.each("/config/#{exectype}/exec_once_per_run") do |eopr|
-      # Stuff the "exec once per run" nodes into the global hash to
-      # be run after we've processed all files.
-      puts "Adding '#{eopr.text}' to 'exec once per run' list" if (@debug)
-      @exec_once_per_run[eopr.text] = true
+    if config[:post_once_per_run]
+      config[:post_once_per_run].each do |popr|
+        # Stuff the "post once per run" nodes into the global hash to
+        # be run after we've processed all files.
+        puts "Adding '#{popr}' to 'post once per run' list" if (@debug)
+        @exec_once_per_run[popr] = true
+      end
     end
   end
   def process_test_before_post(file, config)
-    exectype = 'test_before_post'
-    puts "Processing #{exectype} commands"
-    config.elements.each("/config/#{exectype}/exec") do |test_before_post|
-      r = process_exec(exectype, test_before_post.text, file)
-      # If the test failed we need to propagate that error
-      return r if (!r)
+    if config[:test_before_post]
+      puts "Processing test_before_post commands"
+      config[:test_before_post].each do |tbp|
+        r = process_exec(:test_before_post, tbp, file)
+        # If the test failed we need to propagate that error
+        return r if (!r)
+      end
     end
+    true
   end
   def process_test(file, config)
-    exectype = 'test'
-    puts "Processing #{exectype} commands"
-    config.elements.each("/config/#{exectype}/exec") do |test|
-      r = process_exec(exectype, test.text, file)
-      # If the test failed we need to propagate that error
-      return r if (!r)
+    if config[:test]
+      puts "Processing test commands"
+      config[:test].each do |test|
+        r = process_exec(:test, test, file)
+        # If the test failed we need to propagate that error
+        return r if (!r)
+      end
     end
   end
   def process_guard(guard, commandname)
-    exectype = 'guard'
     # Because the guard commands are processed every time etch runs we don't
     # want to print a message for them unless we're in debug mode.
-    puts "Processing #{exectype}" if (@debug)
-    process_exec(exectype, guard, commandname)
+    puts "Processing guard" if (@debug)
+    process_exec(:guard, guard, commandname)
   end
   def process_command(command, commandname)
-    exectype = 'command'
-    puts "Processing #{exectype}"
-    process_exec(exectype, command, commandname)
+    puts "Processing command"
+    process_exec(:command, command, commandname)
   end
   
   def process_exec(exectype, exec, file='')
@@ -2186,14 +2102,14 @@ class Etch::Client
     # Because the setup and guard commands are processed every time (rather
     # than just when the file has changed as with pre/post) we don't want to
     # print a message for them.
-    puts "  Executing '#{exec}'" if ((exectype != 'setup' && exectype != 'guard') || @debug)
+    puts "  Executing '#{exec}'" if (![:setup, :guard].include?(exectype) || @debug)
 
     # Actually run the command unless we're in a dry run, or if we're in
     # a damp run and the command is a setup command.
-    if ! @dryrun || exectype == 'guard' || (@dryrun == 'damp' && exectype == 'setup')
+    if ! @dryrun || exectype == :guard || (@dryrun == 'damp' && exectype == :setup)
       etch_priority = nil
 
-      if exectype == 'post' || exectype == 'command'
+      if [:post, :command].include?(exectype)
         # Etch is likely running at a lower priority than normal.
         # However, we don't want to run post commands at that
         # priority.  If they restart processes (for example,
@@ -2213,7 +2129,7 @@ class Etch::Client
       # "FOO=bar myprogram" works.
       r = system('/bin/sh', '-c', exec)
 
-      if exectype == 'post' || exectype == 'command'
+      if [:post, :command].include?(exectype)
         if etch_priority != 0
           puts "  Returning priority to #{etch_priority}" if (@debug)
           Process.setpriority(Process::PRIO_USER, 0, etch_priority)
@@ -2228,7 +2144,7 @@ class Etch::Client
       # what's going on if it fails.  So include the command in the message if
       # there was a failure.
       execmsg = ''
-      execmsg = "'#{exec}' " if (exectype == 'setup' || exectype == 'guard')
+      execmsg = "'#{exec}' " if ([:setup, :guard].include?(exectype))
 
       # Normally we include the filename of the file that this command
       # is associated with in the messages we print.  But for "exec once
@@ -2242,21 +2158,21 @@ class Etch::Client
       # software prerequisites, and bad things generally happen if
       # those software installs fail.  So consider it a fatal error if
       # that occurs.
-      if exectype == 'setup' || exectype == 'pre'
+      if [:setup, :pre].include?(exectype)
         raise "    Setup/Pre command " + execmsg + filemsg +
           "exited with non-zero value"
       # Post commands are generally used to restart services.  While
       # it is unfortunate if they fail, there is little to be gained
       # by having etch exit if they do so.  So simply warn if a post
       # command fails.
-      elsif exectype == 'post'
+      elsif exectype == :post
         puts "    Post command " + execmsg + filemsg +
           "exited with non-zero value"
       # process_commands takes the appropriate action when guards and commands
       # fail, so we just warn of any failures here.
-      elsif exectype == 'guard'
+      elsif exectype == :guard
         puts "    Guard " + execmsg + filemsg + "exited with non-zero value"
-      elsif exectype == 'command'
+      elsif exectype == :command
         puts "    Command " + execmsg + filemsg + "exited with non-zero value"
       # For test commands we need to warn the user and then return a
       # value indicating the failure so that a rollback can be
@@ -2271,10 +2187,9 @@ class Etch::Client
   end
 
   def lookup_uid(user)
-    uid = nil
-    if user =~ /^\d+$/
+    if user.to_i.to_s == user.to_s
       # If the user was specified as a numeric UID, use it directly.
-      uid = user
+      uid = user.to_i
     else
       # Otherwise attempt to look up the username to get a UID.
       # Default to UID 0 if the username can't be found.
@@ -2282,19 +2197,17 @@ class Etch::Client
         pw = Etc.getpwnam(user)
         uid = pw.uid
       rescue ArgumentError
-        puts "config.xml requests user #{user}, but that user can't be found.  Using UID 0." if @debug
+        puts "config requests user #{user}, but that user can't be found.  Using UID 0." if @debug
         uid = 0
       end
     end
-
-    uid.to_i
+    uid
   end
 
   def lookup_gid(group)
-    gid = nil
-    if group =~ /^\d+$/
+    if group.to_i.to_s == group.to_s
       # If the group was specified as a numeric GID, use it directly.
-      gid = group
+      gid = group.to_i
     else
       # Otherwise attempt to look up the group to get a GID.  Default
       # to GID 0 if the group can't be found.
@@ -2302,12 +2215,11 @@ class Etch::Client
         gr = Etc.getgrnam(group)
         gid = gr.gid
       rescue ArgumentError
-        puts "config.xml requests group #{group}, but that group can't be found.  Using GID 0." if @debug
+        puts "config requests group #{group}, but that group can't be found.  Using GID 0." if @debug
         gid = 0
       end
     end
-
-    gid.to_i
+    gid
   end
 
   # Returns true if the permissions of the given file match the given

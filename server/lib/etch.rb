@@ -109,7 +109,7 @@ class Etch
     
     #
     # Load the defaults file which sets defaults for parameters that the
-    # users don't specify in their config.xml files.
+    # users don't specify in their config files.
     #
     
     @defaults = load_defaults
@@ -171,9 +171,11 @@ class Etch
       @dlogger.debug "Building complete file list for request from #{@fqdn}"
       if File.exist?(@sourcebase)
         Find.find(@sourcebase) do |path|
-          if File.directory?(path) && File.exist?(File.join(path, 'config.xml'))
+          if File.directory?(path) &&
+             (File.exist?(File.join(path, 'config.xml')) ||
+              File.exist?(File.join(path, 'config.yml')))
             # Strip @sourcebase from start of path
-            filelist << path.sub(Regexp.new('^' + Regexp.escape(@sourcebase)), '')
+            filelist << path.sub(Regexp.new('\A' + Regexp.escape(@sourcebase)), '')
           end
         end
       end
@@ -191,8 +193,8 @@ class Etch
     @already_generated = {}
     @generation_status = {}
     @configs = {}
-    @need_orig = {}
-    @allcommands = {}
+    @need_orig = []
+    @commands = {}
     @retrycommands = {}
     
     filelist.each do |file|
@@ -230,7 +232,7 @@ class Etch
     
     {:configs => @configs,
      :need_orig => @need_orig,
-     :allcommands => @allcommands,
+     :commands => @commands,
      :retrycommands => @retrycommands}
   end
 
@@ -351,31 +353,7 @@ class Etch
     end
     @filestack[file] = true
     
-    config_xml_file = File.join(@sourcebase, file, 'config.xml')
-    if !File.exist?(config_xml_file)
-      raise "config.xml for #{file} does not exist"
-    end
-    
-    # Load the config.xml file
-    begin
-      config_xml = Etch.xmlload(config_xml_file)
-    rescue Exception => e
-      raise Etch.wrap_exception(e, "Error loading config.xml for #{file}:\n" + e.message)
-    end
-    
-    # Filter the config.xml file by looking for attributes
-    begin
-      configfilter!(Etch.xmlroot(config_xml))
-    rescue Exception => e
-      raise Etch.wrap_exception(e, "Error filtering config.xml for #{file}:\n" + e.message)
-    end
-    
-    # Validate the filtered file against config.dtd
-    begin
-      Etch.xmlvalidate(config_xml, @config_dtd)
-    rescue Exception => e
-      raise Etch.wrap_exception(e, "Filtered config.xml for #{file} fails validation:\n" + e.message)
-    end
+    config = load_config(file)
     
     generation_status = :unknown
     # As we go through the process of generating the file we'll end up with
@@ -385,7 +363,7 @@ class Etch
     #          generally the original file
     # success: we successfully processed a valid configuration
     # unknown: no valid configuration nor errors encountered, probably because
-    #          filtering removed everything from the config.xml file.  This
+    #          filtering removed everything from the config file.  This
     #          should be considered a successful outcome, it indicates the
     #          caller/client provided us with all required data and our result
     #          is that no action needs to be taken.
@@ -394,18 +372,16 @@ class Etch
     # If we encounter either failure or success we set it to false or :success.
     catch :generate_done do
       # Generate any other files that this file depends on
-      depends = []
       proceed = true
-      Etch.xmleach(config_xml, '/config/depend') do |depend|
-        @dlogger.debug "Generating dependency #{Etch.xmltext(depend)}"
-        depends << Etch.xmltext(depend)
-        r = generate_file(Etch.xmltext(depend), request)
+      config[:depend] && config[:depend].each do |depend|
+        @dlogger.debug "Generating dependency #{depend}"
+        r = generate_file(depend, request)
         proceed = proceed && r
       end
       # Also generate any commands that this file depends on
-      Etch.xmleach(config_xml, '/config/dependcommand') do |dependcommand|
-        @dlogger.debug "Generating command dependency #{Etch.xmltext(dependcommand)}"
-        r = generate_commands(Etch.xmltext(dependcommand), request)
+      config[:dependcommand] && config[:dependcommand].each do |dependcommand|
+        @dlogger.debug "Generating command dependency #{dependcommand}"
+        r = generate_commands(dependcommand, request)
         proceed = proceed && r
       end
       
@@ -436,13 +412,13 @@ class Etch
         # bfile and afile.  This repeats forever as the server isn't smart enough
         # to ask for everything it needs and the client isn't smart enough to send
         # everything.
-        depends.each { |depend| @need_orig[depend] = true }
+        config[:depend] && config[:depend].each {|depend| @need_orig << depend}
         
         # Tell the client to request this file again
-        @need_orig[file] = true
+        @need_orig << file
         
         # Strip this file's config down to the bare necessities
-        filter_xml_completely!(config_xml, ['depend', 'setup'])
+        filter_config_completely!(config, [:depend, :setup])
         
         # And hit the eject button
         generation_status = false
@@ -457,23 +433,23 @@ class Etch
 
       # Check to see if the user has requested that we revert back to the
       # original file.
-      if Etch.xmlfindfirst(config_xml, '/config/revert')
+      if config[:revert]
         # Pass the revert action back to the client
-        filter_xml!(config_xml, ['revert'])
+        filter_config!(config, [:revert])
         generation_status = :success
         throw :generate_done
       end
   
       # Perform any server setup commands
-      if Etch.xmlfindfirst(config_xml, '/config/server_setup')
+      if config[:server_setup]
         @dlogger.debug "Processing server setup commands"
-        Etch.xmleach(config_xml, '/config/server_setup/exec') do |cmd|
-          @dlogger.debug "  Executing #{Etch.xmltext(cmd)}"
+        config[:server_setup].each do |cmd|
+          @dlogger.debug "  Executing #{cmd}"
           # Explicitly invoke using /bin/sh so that syntax like
           # "FOO=bar myprogram" works.
-          success = system('/bin/sh', '-c', Etch.xmltext(cmd))
+          success = system('/bin/sh', '-c', cmd)
           if !success
-            raise "Server setup command #{Etch.xmltext(cmd)} for file #{file} exited with non-zero value"
+            raise "Server setup command #{cmd} for file #{file} exited with non-zero value"
           end
         end
       end
@@ -488,42 +464,47 @@ class Etch
       # Regular file
       #
 
-      if Etch.xmlfindfirst(config_xml, '/config/file')
+      if config[:file]
         #
         # Assemble the contents for the file
         #
         newcontents = ''
-      
-        if Etch.xmlfindfirst(config_xml, '/config/file/source/plain')
-          plain_elements = Etch.xmlarray(config_xml, '/config/file/source/plain')
-          if check_for_inconsistency(plain_elements)
-            raise "Inconsistent 'plain' entries for #{file}"
+        if config[:file][:plain]
+          if config[:file][:plain].kind_of?(Array)
+            if check_for_inconsistency(config[:file][:plain])
+              raise "Inconsistent 'plain' entries for #{file}"
+            end
+            plain = config[:file][:plain].first
+          else
+            plain = config[:file][:plain]
           end
-        
           # Just slurp the file in
-          plain_file = Etch.xmltext(plain_elements.first)
-          newcontents = IO.read(plain_file)
-        elsif Etch.xmlfindfirst(config_xml, '/config/file/source/template')
-          template_elements = Etch.xmlarray(config_xml, '/config/file/source/template')
-          if check_for_inconsistency(template_elements)
-            raise "Inconsistent 'template' entries for #{file}"
+          newcontents = IO.read(plain)
+        elsif config[:file][:template]
+          if config[:file][:template].kind_of?(Array)
+            if check_for_inconsistency(config[:file][:template])
+              raise "Inconsistent 'template' entries for #{file}"
+            end
+            template = config[:file][:template].first
+          else
+            template = config[:file][:template]
           end
-        
           # Run the template through ERB to generate the file contents
-          template = Etch.xmltext(template_elements.first)
           external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @commandsbase, @sitelibbase, @dlogger)
           newcontents = external.process_template(template)
-        elsif Etch.xmlfindfirst(config_xml, '/config/file/source/script')
-          script_elements = Etch.xmlarray(config_xml, '/config/file/source/script')
-          if check_for_inconsistency(script_elements)
-            raise "Inconsistent 'script' entries for #{file}"
+        elsif config[:file][:script]
+          if config[:file][:script].kind_of?(Array)
+            if check_for_inconsistency(config[:file][:script])
+              raise "Inconsistent 'script' entries for #{file}"
+            end
+            script = config[:file][:script].first
+          else
+            script = config[:file][:script]
           end
-        
           # Run the script to generate the file contents
-          script = Etch.xmltext(script_elements.first)
           external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @commandsbase, @sitelibbase, @dlogger)
           newcontents = external.run_script(script)
-        elsif Etch.xmlfindfirst(config_xml, '/config/file/always_manage_metadata')
+        elsif config[:file][:always_manage_metadata]
           # always_manage_metadata is a special case where we proceed
           # even if we don't have any source for file contents.
         else
@@ -542,8 +523,8 @@ class Etch
         # keep empty files or always manage the metadata, then assume
         # this file is not applicable to this node and do nothing.
         if newcontents == '' &&
-            ! Etch.xmlfindfirst(config_xml, '/config/file/allow_empty') &&
-            ! Etch.xmlfindfirst(config_xml, '/config/file/always_manage_metadata')
+            ! config[:file][:allow_empty] &&
+            ! config[:file][:always_manage_metadata]
           @dlogger.debug "New contents for file #{file} empty, doing nothing"
         else
           # Finish assembling the file contents as long as we're not
@@ -551,43 +532,33 @@ class Etch
           # proceeding based only on always_manage_metadata we want to make
           # sure that the only action we'll take is to manage metadata, not
           # muck with the file's contents.
-          if !(newcontents == '' &&
-               Etch.xmlfindfirst(config_xml, '/config/file/always_manage_metadata'))
+          if !(newcontents == '' && config[:file][:always_manage_metadata])
             # Add the warning message (if defined)
             warning_file = nil
-            if Etch.xmlfindfirst(config_xml, '/config/file/warning_file')
-              if !Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/warning_file')).empty?
-                warning_file = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/warning_file'))
-              end
-            else
+            if config[:file][:warning_file] && !config[:file][:warning_file].empty?
+              warning_file = config[:file][:warning_file]
+            # This allows the user to set warning_file to false or an empty string in their
+            # config file to prevent the use of the default warning file
+            elsif !config[:file].include?(:warning_file)
               warning_file = @defaults[:file][:warning_file]
             end
             if warning_file
+              warnpath = Pathname.new(warning_file)
+              if !File.exist?(warning_file) && !warnpath.absolute?
+                warning_file = File.expand_path(warning_file, @configdir)
+              end
+            end
+            if warning_file && File.exist?(warning_file)
               warning = ''
 
               # First the comment opener
-              comment_open = nil
-              if Etch.xmlfindfirst(config_xml, '/config/file/comment_open')
-                comment_open = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/comment_open'))
-              else
-                comment_open = @defaults[:file][:comment_open]
-              end
+              comment_open = config[:file][:comment_open] || @defaults[:file][:comment_open]
               if comment_open && !comment_open.empty?
                 warning << comment_open << "\n"
               end
 
               # Then the message
-              comment_line = '# '
-              if Etch.xmlfindfirst(config_xml, '/config/file/comment_line')
-                comment_line = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/comment_line'))
-              else
-                comment_line = @defaults[:file][:comment_line]
-              end
-
-              warnpath = Pathname.new(warning_file)
-              if !File.exist?(warning_file) && !warnpath.absolute?
-                warning_file = File.expand_path(warning_file, @configdir)
-              end
+              comment_line = config[:file][:comment_line] || @defaults[:file][:comment_line] || '# '
 
               File.open(warning_file) do |warnfile|
                 while line = warnfile.gets
@@ -596,12 +567,7 @@ class Etch
               end
 
               # And last the comment closer
-              comment_close = nil
-              if Etch.xmlfindfirst(config_xml, '/config/file/comment_close')
-                comment_close = Etch.xmltext(Etch.xmlfindfirst(config_xml, '/config/file/comment_close'))
-              else
-                comment_close = @defaults[:file][:comment_close]
-              end
+              comment_close = config[:file][:comment_close] || @defaults[:file][:comment_close]
               if comment_close && !comment_close.empty?
                 warning << comment_close << "\n"
               end
@@ -611,20 +577,20 @@ class Etch
               # scripts) have a special first line.  The user can flag
               # those files to have the warning inserted starting at the
               # second line.
-              if !Etch.xmlfindfirst(config_xml, '/config/file/warning_on_second_line')
+              if !config[:file][:warning_on_second_line]
                 # And then other files (notably Solaris crontabs) can't
                 # have any blank lines.  Normally we insert a blank
                 # line between the warning message and the generated
                 # file to improve readability.  The user can flag us to
                 # not insert that blank line.
-                if !Etch.xmlfindfirst(config_xml, '/config/file/no_space_around_warning')
-                  newcontents = warning + "\n" + newcontents
+                if !config[:file][:no_space_around_warning]
+                  newcontents = warning << "\n" << newcontents
                 else
-                  newcontents = warning + newcontents
+                  newcontents = warning << newcontents
                 end
               else
                 parts = newcontents.split("\n", 2)
-                if !Etch.xmlfindfirst(config_xml, '/config/file/no_space_around_warning')
+                if !config[:file][:no_space_around_warning]
                   newcontents = parts[0] << "\n\n" << warning << "\n" << parts[1]
                 else
                   newcontents = parts[0] << warning << parts[1]
@@ -633,48 +599,48 @@ class Etch
             end # if warning_file
     
             # Add the generated file contents to the XML
-            Etch.xmladd(config_xml, '/config/file', 'contents', Base64.encode64(newcontents))
+            config[:file][:contents] = Base64.encode64(newcontents)
           end
 
-          # Remove the source configuration from the XML, the
+          # Remove the source configuration from the config, the
           # client won't need to see it
-          Etch.xmlremovepath(config_xml, '/config/file/source')
+          config[:file].delete(:source)
 
-          # Remove all of the warning related elements from the XML, the
+          # Remove all of the warning related elements from the config, the
           # client won't need to see them
-          Etch.xmlremovepath(config_xml, '/config/file/warning_file')
-          Etch.xmlremovepath(config_xml, '/config/file/warning_on_second_line')
-          Etch.xmlremovepath(config_xml, '/config/file/no_space_around_warning')
-          Etch.xmlremovepath(config_xml, '/config/file/comment_open')
-          Etch.xmlremovepath(config_xml, '/config/file/comment_line')
-          Etch.xmlremovepath(config_xml, '/config/file/comment_close')
+          config[:file].delete(:warning_file)
+          config[:file].delete(:warning_on_second_line)
+          config[:file].delete(:no_space_around_warning)
+          config[:file].delete(:comment_open)
+          config[:file].delete(:comment_line)
+          config[:file].delete(:comment_close)
         
-          # If the XML doesn't contain ownership and permissions entries
+          # If the config doesn't contain ownership and permissions entries
           # then add appropriate ones based on the defaults
-          if !Etch.xmlfindfirst(config_xml, '/config/file/owner')
+          if !config[:file][:owner]
             if @defaults[:file][:owner]
-              Etch.xmladd(config_xml, '/config/file', 'owner', @defaults[:file][:owner])
+              config[:file][:owner] = @defaults[:file][:owner]
             else
               raise "defaults needs file->owner"
             end
           end
-          if !Etch.xmlfindfirst(config_xml, '/config/file/group')
+          if !config[:file][:group]
             if @defaults[:file][:group]
-              Etch.xmladd(config_xml, '/config/file', 'group', @defaults[:file][:group])
+              config[:file][:group] = @defaults[:file][:group]
             else
               raise "defaults needs file->group"
             end
           end
-          if !Etch.xmlfindfirst(config_xml, '/config/file/perms')
+          if !config[:file][:perms]
             if @defaults[:file][:perms]
-              Etch.xmladd(config_xml, '/config/file', 'perms', @defaults[:file][:perms])
+              config[:file][:perms] = @defaults[:file][:perms]
             else
               raise "defaults needs file->perms"
             end
           end
       
           # Send the file contents and metadata to the client
-          filter_xml!(config_xml, ['file'])
+          filter_config!(config, [:file])
       
           generation_status = :success
           throw :generate_done
@@ -685,33 +651,34 @@ class Etch
       # Symbolic link
       #
   
-      if Etch.xmlfindfirst(config_xml, '/config/link')
+      if config[:link]
         dest = nil
-    
-        if Etch.xmlfindfirst(config_xml, '/config/link/dest')
-          dest_elements = Etch.xmlarray(config_xml, '/config/link/dest')
-          if check_for_inconsistency(dest_elements)
-            raise "Inconsistent 'dest' entries for #{file}"
+        if config[:link][:dest]
+          if config[:link][:dest].kind_of?(Array)
+            if check_for_inconsistency(config[:link][:dest])
+              raise "Inconsistent 'dest' entries for #{file}"
+            end
+            dest = config[:link][:dest].first
+          else
+            dest = config[:link][:dest]
           end
-      
-          dest = Etch.xmltext(dest_elements.first)
-        elsif Etch.xmlfindfirst(config_xml, '/config/link/script')
+        elsif config[:link][:script]
           # The user can specify a script to perform more complex
           # testing to decide whether to create the link or not and
           # what its destination should be.
-        
-          script_elements = Etch.xmlarray(config_xml, '/config/link/script')
-          if check_for_inconsistency(script_elements)
-            raise "Inconsistent 'script' entries for #{file}"
+          if config[:link][:script].kind_of?(Array)
+            if check_for_inconsistency(config[:link][:script])
+              raise "Inconsistent 'script' entries for #{file}"
+            end
+            script = config[:link][:script].first
+          else
+            script = config[:link][:script]
           end
-        
-          script = Etch.xmltext(script_elements.first)
           external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @commandsbase, @sitelibbase, @dlogger)
           dest = external.run_script(script)
-        
-          # Remove the script element(s) from the XML, the client won't need
-          # to see them
-          script_elements.each { |se| Etch.xmlremove(config_xml, se) }
+          # Remove the script entry from the config, the client won't need
+          # to see it
+          config[:link].delete(:script)
         else
           # If the filtering has removed the destination for the link,
           # that means it doesn't apply to this node.
@@ -721,38 +688,34 @@ class Etch
         if !dest || dest.empty?
           @dlogger.debug "Destination for link #{file} empty, doing nothing"
         else
-          # If there isn't a dest element in the XML (if the user used a
-          # script) then insert one for the benefit of the client
-          if !Etch.xmlfindfirst(config_xml, '/config/link/dest')
-            Etch.xmladd(config_xml, '/config/link', 'dest', dest)
-          end
+          config[:link][:dest] = dest
 
-          # If the XML doesn't contain ownership and permissions entries
+          # If the config doesn't contain ownership and permissions entries
           # then add appropriate ones based on the defaults
-          if !Etch.xmlfindfirst(config_xml, '/config/link/owner')
+          if !config[:link][:owner]
             if @defaults[:link][:owner]
-              Etch.xmladd(config_xml, '/config/link', 'owner', @defaults[:link][:owner])
+              config[:link][:owner] = @defaults[:link][:owner]
             else
               raise "defaults needs link->owner"
             end
           end
-          if !Etch.xmlfindfirst(config_xml, '/config/link/group')
+          if !config[:link][:group]
             if @defaults[:link][:group]
-              Etch.xmladd(config_xml, '/config/link', 'group', @defaults[:link][:group])
+              config[:link][:group] = @defaults[:link][:group]
             else
               raise "defaults needs link->group"
             end
           end
-          if !Etch.xmlfindfirst(config_xml, '/config/link/perms')
+          if !config[:link][:perms]
             if @defaults[:link][:perms]
-              Etch.xmladd(config_xml, '/config/link', 'perms', @defaults[:link][:perms])
+              config[:link][:perms] = @defaults[:link][:perms]
             else
               raise "defaults needs link->perms"
             end
           end
       
           # Send the file contents and metadata to the client
-          filter_xml!(config_xml, ['link'])
+          filter_config!(config, [:link])
 
           generation_status = :success
           throw :generate_done
@@ -763,26 +726,34 @@ class Etch
       # Directory
       #
   
-      if Etch.xmlfindfirst(config_xml, '/config/directory')
+      if config[:directory]
         create = false
-        if Etch.xmlfindfirst(config_xml, '/config/directory/create')
-          create = true
-        elsif Etch.xmlfindfirst(config_xml, '/config/directory/script')
+        if config[:directory][:create]
+          if config[:directory][:create].kind_of?(Array)
+            if check_for_inconsistency(config[:directory][:create])
+              raise "Inconsistent 'create' entries for #{file}"
+            end
+            create = config[:directory][:create].first
+          else
+            create = config[:directory][:create]
+          end
+        elsif config[:directory][:script]
           # The user can specify a script to perform more complex testing
           # to decide whether to create the directory or not.
-          script_elements = Etch.xmlarray(config_xml, '/config/directory/script')
-          if check_for_inconsistency(script_elements)
-            raise "Inconsistent 'script' entries for #{file}"
+          if config[:directory][:script].kind_of?(Array)
+            if check_for_inconsistency(config[:directory][:script])
+              raise "Inconsistent 'script' entries for #{file}"
+            end
+            script = config[:directory][:script].first
+          else
+            script = config[:directory][:script]
           end
-        
-          script = Etch.xmltext(script_elements.first)
           external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @commandsbase, @sitelibbase, @dlogger)
           create = external.run_script(script)
           create = false if create.empty?
-        
-          # Remove the script element(s) from the XML, the client won't need
-          # to see them
-          script_elements.each { |se| Etch.xmlremove(config_xml, se) }
+          # Remove the script entry from the config, the client won't need
+          # to see it
+          config[:directory].delete(:script)
         else
           # If the filtering has removed the directive to create this
           # directory, that means it doesn't apply to this node.
@@ -792,38 +763,34 @@ class Etch
         if !create
           @dlogger.debug "Directive to create directory #{file} false, doing nothing"
         else
-          # If there isn't a create element in the XML (if the user used a
-          # script) then insert one for the benefit of the client
-          if !Etch.xmlfindfirst(config_xml, '/config/directory/create')
-            Etch.xmladd(config_xml, '/config/directory', 'create', nil)
-          end
+          config[:directory][:create] = create
 
-          # If the XML doesn't contain ownership and permissions entries
+          # If the config doesn't contain ownership and permissions entries
           # then add appropriate ones based on the defaults
-          if !Etch.xmlfindfirst(config_xml, '/config/directory/owner')
+          if !config[:directory][:owner]
             if @defaults[:directory][:owner]
-              Etch.xmladd(config_xml, '/config/directory', 'owner', @defaults[:directory][:owner])
+              config[:directory][:owner] = @defaults[:directory][:owner]
             else
-              raise "defaults.xml needs /config/directory/owner"
+              raise "defaults.xml needs directory->owner"
             end
           end
-          if !Etch.xmlfindfirst(config_xml, '/config/directory/group')
+          if !config[:directory][:group]
             if @defaults[:directory][:group]
-              Etch.xmladd(config_xml, '/config/directory', 'group', @defaults[:directory][:group])
+              config[:directory][:group] = @defaults[:directory][:group]
             else
-              raise "defaults.xml needs /config/directory/group"
+              raise "defaults.xml needs directory->group"
             end
           end
-          if !Etch.xmlfindfirst(config_xml, '/config/directory/perms')
+          if !config[:directory][:perms]
             if @defaults[:directory][:perms]
-              Etch.xmladd(config_xml, '/config/directory', 'perms', @defaults[:directory][:perms])
+              config[:directory][:perms] = @defaults[:directory][:perms]
             else
-              raise "defaults.xml needs /config/directory/perms"
+              raise "defaults.xml needs directory->perms"
             end
           end
       
           # Send the file contents and metadata to the client
-          filter_xml!(config_xml, ['directory'])
+          filter_config!(config, [:directory])
       
           generation_status = :success
           throw :generate_done
@@ -834,26 +801,34 @@ class Etch
       # Delete whatever is there
       #
 
-      if Etch.xmlfindfirst(config_xml, '/config/delete')
+      if config[:delete]
         proceed = false
-        if Etch.xmlfindfirst(config_xml, '/config/delete/proceed')
-          proceed = true
-        elsif Etch.xmlfindfirst(config_xml, '/config/delete/script')
+        if config[:delete][:proceed]
+          if config[:delete][:proceed].kind_of?(Array)
+            if check_for_inconsistency(config[:delete][:proceed])
+              raise "Inconsistent 'proceed' entries for #{file}"
+            end
+            proceed = config[:delete][:proceed].first
+          else
+            proceed = config[:delete][:proceed]
+          end
+        elsif config[:delete][:script]
           # The user can specify a script to perform more complex testing
           # to decide whether to delete the file or not.
-          script_elements = Etch.xmlarray(config_xml, '/config/delete/script')
-          if check_for_inconsistency(script_elements)
-            raise "Inconsistent 'script' entries for #{file}"
+          if config[:delete][:script].kind_of?(Array)
+            if check_for_inconsistency(config[:delete][:script])
+              raise "Inconsistent 'script' entries for #{file}"
+            end
+            script = config[:delete][:script].first
+          else
+            script = config[:delete][:script]
           end
-        
-          script = Etch.xmltext(script_elements.first)
           external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @commandsbase, @sitelibbase, @dlogger)
           proceed = external.run_script(script)
           proceed = false if proceed.empty?
-        
-          # Remove the script element(s) from the XML, the client won't need
-          # to see them
-          script_elements.each { |se| Etch.xmlremove(config_xml, se) }
+          # Remove the script entry from the config, the client won't need
+          # to see it
+          config[:delete].delete(:script)
         else
           # If the filtering has removed the directive to remove this
           # file, that means it doesn't apply to this node.
@@ -863,14 +838,10 @@ class Etch
         if !proceed
           @dlogger.debug "Directive to delete #{file} false, doing nothing"
         else
-          # If there isn't a proceed element in the XML (if the user used a
-          # script) then insert one for the benefit of the client
-          if !Etch.xmlfindfirst(config_xml, '/config/delete/proceed')
-            Etch.xmladd(config_xml, '/config/delete', 'proceed', nil)
-          end
+          config[:delete][:proceed] = true
 
           # Send the file contents and metadata to the client
-          filter_xml!(config_xml, ['delete'])
+          filter_config!(config, [:delete])
       
           generation_status = :success
           throw :generate_done
@@ -885,12 +856,8 @@ class Etch
     # In addition to successful configs return configs for files that need
     # orig data (generation_status==false) because any setup commands might be
     # needed to create the original file.
-    if generation_status != :unknown &&
-       Etch.xmlfindfirst(config_xml, '/config/*')
-      # The client needs this attribute to know to which file
-      # this chunk of XML refers
-      Etch.xmlattradd(Etch.xmlroot(config_xml), 'filename', file)
-      @configs[file] = config_xml
+    if generation_status != :unknown && !config.empty?
+      @configs[file] = config
     end
   
     @already_generated[file] = true
@@ -900,6 +867,44 @@ class Etch
     generation_status
   end
   
+  def load_config(file)
+    yamlconfig = "#{@sourcebase}/#{file}/config.yml"
+    xmlconfig = "#{@sourcebase}/#{file}/config.xml"
+    if File.exist?(yamlconfig)
+      config = symbolize_keys(YAML.load(File.read(yamlconfig)))
+      config ||= {}
+      begin
+        yamlfilter!(config)
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Error filtering config.yml for #{file}:\n" + e.message)
+      end
+    elsif File.exist?(xmlconfig)
+      # Load the config.xml file
+      config_xml = nil
+      begin
+        config_xml = Etch.xmlload(xmlconfig)
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Error loading config.xml for #{file}:\n" + e.message)
+      end
+      # Filter the config.xml file by looking for attributes
+      begin
+        xmlfilter!(Etch.xmlroot(config_xml))
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Error filtering config.xml for #{file}:\n" + e.message)
+      end
+      # Validate the filtered file against config.dtd
+      begin
+        Etch.xmlvalidate(config_xml, @config_dtd)
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Filtered config.xml for #{file} fails validation:\n" + e.message)
+      end
+      config = config_xml_to_hash(config_xml)
+    else
+      raise "config.yml or config.xml for #{file} does not exist"
+    end
+    config
+  end
+
   # Returns the value of the generation_status variable, see comments in
   # method for possible values.
   def generate_commands(command, request)
@@ -917,27 +922,7 @@ class Etch
     end
     @filestack[command] = true
     
-    commands_xml_file = File.join(@commandsbase, command, 'commands.xml')
-    if !File.exist?(commands_xml_file)
-      raise "commands.xml for #{command} does not exist"
-    end
-    
-    # Load the commands.xml file
-    commands_xml = Etch.xmlload(commands_xml_file)
-    
-    # Filter the commands.xml file by looking for attributes
-    begin
-      configfilter!(Etch.xmlroot(commands_xml))
-    rescue Exception => e
-      raise Etch.wrap_exception(e, "Error filtering commands.xml for #{command}:\n" + e.message)
-    end
-    
-    # Validate the filtered file against commands.dtd
-    begin
-      Etch.xmlvalidate(commands_xml, @commands_dtd)
-    rescue Exception => e
-      raise Etch.wrap_exception(e, "Filtered commands.xml for #{command} fails validation:\n" + e.message)
-    end
+    cmd = load_command(command)
     
     generation_status = :unknown
     # As we go through the process of generating the command we'll end up with
@@ -958,17 +943,21 @@ class Etch
       # Generate any other commands that this command depends on
       dependfiles = []
       proceed = true
-      Etch.xmleach(commands_xml, '/commands/depend') do |depend|
-        @dlogger.debug "Generating command dependency #{Etch.xmltext(depend)}"
-        r = generate_commands(Etch.xmltext(depend), request)
-        proceed = proceed && r
+      if cmd[:depends]
+        cmd[:depends].each do |depend|
+          @dlogger.debug "Generating command dependency #{depend}"
+          r = generate_commands(depend, request)
+          proceed = proceed && r
+        end
       end
       # Also generate any files that this command depends on
-      Etch.xmleach(commands_xml, '/commands/dependfile') do |dependfile|
-        @dlogger.debug "Generating file dependency #{Etch.xmltext(dependfile)}"
-        dependfiles << Etch.xmltext(dependfile)
-        r = generate_file(Etch.xmltext(dependfile), request)
-        proceed = proceed && r
+      if cmd[:dependfile]
+        cmd[:dependfile].each do |dependfile|
+          @dlogger.debug "Generating file dependency #{dependfile}"
+          dependfiles << dependfile
+          r = generate_file(dependfile, request)
+          proceed = proceed && r
+        end
       end
       if !proceed
         @dlogger.debug "One or more dependencies of #{command} need data from client"
@@ -976,7 +965,7 @@ class Etch
         # contents from the client) then we need to tell the client to request
         # all of the files in the dependency tree again.  See the big comment
         # in generate_file for further explanation.
-        dependfiles.each { |dependfile| @need_orig[dependfile] = true }
+        dependfiles.each { |dependfile| @need_orig << dependfile }
         # Try again next time
         @retrycommands[command] = true
         generation_status = false
@@ -988,35 +977,41 @@ class Etch
       Dir.chdir "#{@commandsbase}/#{command}"
       
       # Check that the resulting document is consistent after filtering
-      remove = []
-      Etch.xmleach(commands_xml, '/commands/step') do |step|
-        guard_exec_elements = Etch.xmlarray(step, 'guard/exec')
-        if check_for_inconsistency(guard_exec_elements)
-          raise "Inconsistent guard 'exec' entries for #{command}: " +
-            guard_exec_elements.collect {|elem| Etch.xmltext(elem)}.join(',')
+      if cmd[:step]
+        remove = []
+        cmd[:step].each do |step|
+          if step[:guard]
+            if step[:guard].kind_of?(Array)
+              if check_for_inconsistency(step[:guard])
+                raise "Inconsistent guard entries for #{command}"
+              end
+              step[:guard] = step[:guard].first
+            end
+          end
+          if step[:command]
+            if step[:command].kind_of?(Array)
+              if check_for_inconsistency(step[:command])
+                raise "Inconsistent command entries for #{command}"
+              end
+              step[:command] = step[:command].first
+            end
+          end
+          # If filtering has removed both the guard and command elements
+          # we can remove this step.
+          if !step[:guard] && !step[:command]
+            remove << step
+          # If filtering has removed the guard but not the command or vice
+          # versa that's an error.
+          elsif !step[:guard]
+            raise "Filtering removed guard, but left command: #{step[:command].first}"
+          elsif !step[:command]
+            raise "Filtering removed command, but left guard: #{step[:guard].first}"
+          end
         end
-        command_exec_elements = Etch.xmlarray(step, 'command/exec')
-        if check_for_inconsistency(command_exec_elements)
-          raise "Inconsistent command 'exec' entries for #{command}: " +
-            command_exec_elements.collect {|elem| Etch.xmltext(elem)}.join(',')
-        end
-        # If filtering has removed both the guard and command elements
-        # we can remove this step.
-        if guard_exec_elements.empty? && command_exec_elements.empty?
-          remove << step
-        # If filtering has removed the guard but not the command or vice
-        # versa that's an error.
-        elsif guard_exec_elements.empty?
-          raise "Filtering removed guard, but left command: " +
-            Etch.xmltext(command_exec_elements.first)
-        elsif command_exec_elements.empty?
-          raise "Filtering removed command, but left guard: " +
-            Etch.xmltext(guard_exec_elements.first)
-        end
+        remove.each{|step| cmd[:step].delete(step)}
       end
-      remove.each { |elem| Etch.xmlremove(commands_xml, elem) }
       
-      # I'm not sure if we'd benefit from further checking the XML for
+      # I'm not sure if we'd benefit from further checking the config for
       # validity.  For now we declare success if we got this far.
       generation_status = :success
     end
@@ -1027,12 +1022,11 @@ class Etch
     
     # If filtering didn't remove all the content then add this to the list of
     # commands to be returned to the client.
-    if generation_status && generation_status != :unknown &&
-       Etch.xmlfindfirst(commands_xml, '/commands/*')
+    if generation_status && generation_status != :unknown && !cmd.empty?
       # Include the commands directory name to aid troubleshooting on the
       # client side.
-      Etch.xmlattradd(Etch.xmlroot(commands_xml), 'commandname', command)
-      @allcommands[command] = commands_xml
+      cmd[:commandname] = command
+      @commands[command] = cmd
     end
     
     @already_generated[command] = true
@@ -1042,22 +1036,140 @@ class Etch
     generation_status
   end
   
-  ALWAYS_KEEP = ['depend', 'setup', 'pre', 'test_before_post', 'post', 'test']
-  def filter_xml_completely!(config_xml, keepers=[])
-    remove = []
-    Etch.xmleachall(config_xml) do |elem|
-      if !keepers.include?(elem.name)
-        remove << elem
+  def load_command(command)
+    yamlcommand = "#{@commandsbase}/#{command}/commands.yml"
+    xmlcommand = "#{@commandsbase}/#{command}/commands.xml"
+    if File.exist?(yamlcommand)
+      cmd = symbolize_keys(YAML.load(File.read(yamlcommand)))
+      cmd ||= {}
+      begin
+        yamlfilter!(cmd)
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Error filtering commands.yml for #{command}:\n" + e.message)
       end
+    elsif File.exist?(xmlcommand)
+      # Load the commands.xml file
+      begin
+        command_xml = Etch.xmlload(xmlcommand)
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Error loading commands.xml for #{command}:\n" + e.message)
+      end
+      # Filter the commands.xml file by looking for attributes
+      begin
+        xmlfilter!(Etch.xmlroot(command_xml))
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Error filtering commands.xml for #{command}:\n" + e.message)
+      end
+      # Validate the filtered file against commands.dtd
+      begin
+        Etch.xmlvalidate(command_xml, @commands_dtd)
+      rescue Exception => e
+        raise Etch.wrap_exception(e, "Filtered commands.xml for #{command} fails validation:\n" + e.message)
+      end
+      # Convert the filtered XML to a hash
+      cmd = command_xml_to_hash(command_xml)
+    else
+      raise "commands.yml or commands.xml for #{command} does not exist"
     end
-    remove.each { |elem| Etch.xmlremove(config_xml, elem) }
-    # FIXME: strip comments
-  end
-  def filter_xml!(config_xml, keepers=[])
-    filter_xml_completely!(config_xml, keepers.concat(ALWAYS_KEEP))
+    cmd
   end
 
-  def configfilter!(element)
+  ALWAYS_KEEP = [:depend, :setup, :pre, :test_before_post, :post, :post_once, :post_once_per_run, :test]
+  def filter_config_completely!(config, keepers=[])
+    config.reject!{|k,v| !keepers.include?(k)}
+  end
+  def filter_config!(config, keepers=[])
+    filter_config_completely!(config, keepers.concat(ALWAYS_KEEP))
+  end
+
+  def yamlfilter!(yaml)
+    result = false
+    case yaml
+    when Hash
+      remove = []
+      yaml.each do |k,v|
+        if v.kind_of?(Hash) &&
+           v.length == 1 &&
+           v.keys.first =~ /\Awhere (.*)/
+          if eval_yaml_condition($1)
+            yaml[k] = v.values.first
+          else
+            remove << k
+          end
+        end
+        yamlfilter!(v)
+      end
+      remove.each{|k| yaml.delete(k)}
+    when Array
+      remove = []
+      yaml.each_with_index do |e, i|
+        if e.kind_of?(Hash) &&
+           e.length == 1 &&
+           e.keys.first =~ /\Awhere (.*)/
+          if eval_yaml_condition($1)
+            yaml[i] = v.values.first
+          else
+            remove << i
+          end
+        end
+        yamlfilter!(e)
+      end
+      remove.each{|i| yaml.delete_at(i)}
+    end
+  end
+  # Examples:
+  # operatingsystem==Solaris
+  # operatingsystem=~/RedHat|CentOS/ and group==bar
+  # operatingsystem=~/RedHat|CentOS/ or kernel == SunOS and group==bar
+  def eval_yaml_condition(condition)
+    exprs = condition.split(/\s+(and|or)\s+/)
+    prevcond = nil
+    result = nil
+    exprs.each do |expr|
+      case expr
+      when 'and'
+        prevcond = :and
+      when 'or'
+        prevcond = :or
+      else
+        value = nil
+        case
+        when expr =~ /(.+?)\s*=~\s*(.+)/
+          comps = comparables($1)
+          regexp = Regexp.new($2)
+          value = comps.any?{|c| c =~ regexp}
+        when expr =~ /(.+?)\s*!~\s*(.+)/
+          comps = comparables($1)
+          regexp = Regexp.new($2)
+          value = comps.any?{|c| c !~ regexp}
+        when expr =~ /(.+?)\s*(<|<=|>=|>)\s*(.+)/
+          comps = comparables($1)
+          operator = $2.to_sym
+          valueversion = Version.new($3)
+          value = comps.any?{|c| Version.new(c).send(operator, valueversion)}
+        when expr =~ /(.+?)\s*==\s*(.+)/
+          comps = comparables($1)
+          value = comps.include?($2)
+        else
+          raise "Unable to parse '#{condition}'"
+        end
+        case prevcond
+        when :and
+          result = result && value
+          # False ands short circuit
+          if !result
+            return result
+          end
+        when :or
+          result = result || value
+        else
+          result = value
+        end
+      end
+    end
+    result
+  end
+  def xmlfilter!(element)
     elem_remove = []
     Etch.xmleachall(element) do |elem|
       catch :next_element do
@@ -1072,12 +1184,19 @@ class Etch
         end
         attr_remove.each { |attribute| Etch.xmlattrremove(element, attribute) }
         # Then check any children of this element
-        configfilter!(elem)
+        xmlfilter!(elem)
       end
     end
     elem_remove.each { |elem| Etch.xmlremove(element, elem) }
   end
 
+  def comparables(name)
+    if name == 'group'
+      @groups
+    elsif @facts[name]
+      [@facts[name]]
+    end
+  end
   # Used when parsing each config.xml to filter out any elements which
   # don't match the configuration of this node.  If the attribute matches
   # then we just remove the attribute but leave the element it is attached
@@ -1091,13 +1210,6 @@ class Etch
   # Not yet:
   # - Flow control (if/else)
   def check_attribute(name, value)
-    comparables = []
-    if name == 'group'
-      comparables = @groups
-    elsif @facts[name]
-      comparables = [@facts[name]]
-    end
-    
     result = false
     negate = false
     
@@ -1108,7 +1220,7 @@ class Etch
       value.sub!(/^\!/, '')  # Strip off the bang
     end
     
-    comparables.each do |comp|
+    comparables(name).each do |comp|
       # Numerical comparisons
       # i.e. <plain os="SunOS" osversion=">=5.8"></plain>
       # Note that the standard for XML requires that the < character be
@@ -1144,6 +1256,387 @@ class Etch
     end
   end
   
+  def config_xml_to_hash(config_xml)
+    config = {}
+
+    if Etch.xmlfindfirst(config_xml, '/config/revert')
+      config[:revert] = true
+    end
+
+    Etch.xmleach(config_xml, '/config/depend') do |depend|
+      config[:depend] ||= []
+      config[:depend] << Etch.xmltext(depend)
+    end
+    Etch.xmleach(config_xml, '/config/dependcommand') do |dependcommand|
+      config[:dependcommand] ||= []
+      config[:dependcommand] << Etch.xmltext(dependcommand)
+    end
+
+    Etch.xmleach(config_xml, '/config/server_setup/exec') do |cmd|
+      config[:server_setup] ||= []
+      config[:server_setup] << Etch.xmltext(cmd)
+    end
+    Etch.xmleach(config_xml, '/config/setup/exec') do |cmd|
+      config[:setup] ||= []
+      config[:setup] << Etch.xmltext(cmd)
+    end
+    Etch.xmleach(config_xml, '/config/pre/exec') do |cmd|
+      config[:pre] ||= []
+      config[:pre] << Etch.xmltext(cmd)
+    end
+
+    if Etch.xmlfindfirst(config_xml, '/config/file')
+      config[:file] = {}
+    end
+    [:owner, :group, :perms, :warning_file, :comment_open,
+     :comment_line, :comment_close].each do |meta|
+      if metaelem = Etch.xmlfindfirst(config_xml, "/config/file/#{meta}")
+        config[:file][meta] = Etch.xmltext(metaelem)
+      end
+    end
+    [:always_manage_metadata, :warning_on_second_line,
+     :no_space_around_warning, :allow_empty,
+     :overwrite_directory].each do |bool|
+      if Etch.xmlfindfirst(config_xml, "/config/file/#{bool}")
+        config[:file][bool] = true
+      end
+    end
+    [:plain, :template, :script].each do |sourcetype|
+      Etch.xmleach(config_xml, "/config/file/source/#{sourcetype}") do |sourceelem|
+        config[:file][sourcetype] ||= []
+        config[:file][sourcetype] << Etch.xmltext(sourceelem)
+      end
+    end
+
+    if Etch.xmlfindfirst(config_xml, '/config/link')
+      config[:link] = {}
+    end
+    [:owner, :group, :perms].each do |meta|
+      if metaelem = Etch.xmlfindfirst(config_xml, "/config/link/#{meta}")
+        config[:link][meta] = Etch.xmltext(metaelem)
+      end
+    end
+    [:allow_nonexistent_dest, :overwrite_directory].each do |bool|
+      if Etch.xmlfindfirst(config_xml, "/config/link/#{bool}")
+        config[:link][bool] = true
+      end
+    end
+    [:dest, :script].each do |sourcetype|
+      Etch.xmleach(config_xml, "/config/link/#{sourcetype}") do |sourceelem|
+        config[:link][sourcetype] ||= []
+        config[:link][sourcetype] << Etch.xmltext(sourceelem)
+      end
+    end
+
+    if Etch.xmlfindfirst(config_xml, '/config/directory')
+      config[:directory] = {}
+    end
+    [:owner, :group, :perms].each do |meta|
+      if metaelem = Etch.xmlfindfirst(config_xml, "/config/directory/#{meta}")
+        config[:directory][meta] = Etch.xmltext(metaelem)
+      end
+    end
+    [:create].each do |bool|
+      if Etch.xmlfindfirst(config_xml, "/config/directory/#{bool}")
+        config[:directory][bool] = true
+      end
+    end
+    [:script].each do |sourcetype|
+      Etch.xmleach(config_xml, "/config/directory/#{sourcetype}") do |sourceelem|
+        config[:directory][sourcetype] ||= []
+        config[:directory][sourcetype] << Etch.xmltext(sourceelem)
+      end
+    end
+
+    if Etch.xmlfindfirst(config_xml, '/config/delete')
+      config[:delete] = {}
+    end
+    [:overwrite_directory, :proceed].each do |bool|
+      if Etch.xmlfindfirst(config_xml, "/config/delete/#{bool}")
+        config[:delete][bool] = true
+      end
+    end
+    [:script].each do |sourcetype|
+      Etch.xmleach(config_xml, "/config/delete/#{sourcetype}") do |sourceelem|
+        config[:delete][sourcetype] ||= []
+        config[:delete][sourcetype] << Etch.xmltext(sourceelem)
+      end
+    end
+
+    Etch.xmleach(config_xml, '/config/test_before_post/exec') do |cmd|
+      config[:test_before_post] ||= []
+      config[:test_before_post] << Etch.xmltext(cmd)
+    end
+    Etch.xmleach(config_xml, '/config/post/exec') do |cmd|
+      config[:post] ||= []
+      config[:post] << Etch.xmltext(cmd)
+    end
+    Etch.xmleach(config_xml, '/config/post/exec_once') do |cmd|
+      config[:post_once] ||= []
+      config[:post_once] << Etch.xmltext(cmd)
+    end
+    Etch.xmleach(config_xml, '/config/post/exec_once_per_run') do |cmd|
+      config[:post_once_per_run] ||= []
+      config[:post_once_per_run] << Etch.xmltext(cmd)
+    end
+    Etch.xmleach(config_xml, '/config/test/exec') do |cmd|
+      config[:test] ||= []
+      config[:test] << Etch.xmltext(cmd)
+    end
+
+    config
+  end
+  def config_hash_to_xml(config)
+    doc = Etch.xmlnewdoc
+    root = Etch.xmlnewelem('config', doc)
+    Etch.xmlsetroot(doc, root)
+    if config[:revert]
+      root << Etch.xmlnewelem('revert', doc)
+    end
+    if config[:depend]
+      config[:depend].each do |depend|
+        depelem = Etch.xmlnewelem('depend', doc)
+        Etch.xmlsettext(depelem, depend)
+        root << depelem
+      end
+    end
+    if config[:dependcommand]
+      config[:dependcommand].each do |dependcommand|
+        depelem = Etch.xmlnewelem('dependcommand', doc)
+        Etch.xmlsettext(depelem, dependcommand)
+        root << depelem
+      end
+    end
+    if config[:server_setup]
+      elem = Etch.xmlnewelem('server_setup', doc)
+      config[:server_setup].each do |exec|
+        execelem = Etch.xmlnewelem('exec', doc)
+        Etch.xmlsettext(execelem, exec)
+        elem << execelem
+      end
+      root << elem
+    end
+    if config[:setup]
+      elem = Etch.xmlnewelem('setup', doc)
+      config[:setup].each do |exec|
+        execelem = Etch.xmlnewelem('exec', doc)
+        Etch.xmlsettext(execelem, exec)
+        elem << execelem
+      end
+      root << elem
+    end
+    if config[:pre]
+      elem = Etch.xmlnewelem('pre', doc)
+      config[:pre].each do |exec|
+        execelem = Etch.xmlnewelem('exec', doc)
+        Etch.xmlsettext(execelem, exec)
+        elem << execelem
+      end
+      root << elem
+    end
+    if config[:file]
+      fileelem = Etch.xmlnewelem('file', doc)
+      root << fileelem
+      [:owner, :group, :perms, :warning_file, :comment_open,
+       :comment_line, :comment_close].each do |meta|
+        if config[:file][meta]
+          metaelem = Etch.xmlnewelem(meta.to_s, doc)
+          Etch.xmlsettext(metaelem, config[:file][meta])
+          fileelem << metaelem
+        end
+      end
+      [:always_manage_metadata, :warning_on_second_line,
+       :no_space_around_warning, :allow_empty,
+       :overwrite_directory].each do |bool|
+        if config[:file][bool]
+          boolelem = Etch.xmlnewelem(bool.to_s, doc)
+          fileelem << boolelem
+        end
+      end
+      [:plain, :template, :script].each do |sourcetype|
+        sourceelem = nil
+        if config[:file][sourcetype]
+          if !sourceelem
+            sourceelem = Etch.xmlnewelem('source', doc)
+            fileelem << sourceelem
+          end
+          sourcetypeelem = Etch.xmlnewelem(sourcetype.to_s, doc)
+          Etch.xmlsettext(sourcetypeelem, config[:file][sourcetype])
+          sourceelem << sourcetypeelem
+        end
+      end
+    end
+    if config[:link]
+      linkelem = Etch.xmlnewelem('link', doc)
+      root << linkelem
+      [:owner, :group, :perms].each do |meta|
+        if config[:link][meta]
+          metaelem = Etch.xmlnewelem(meta.to_s, doc)
+          Etch.xmlsettext(metaelem, config[:link][meta])
+          linkelem << metaelem
+        end
+      end
+      [:allow_nonexistent_dest, :overwrite_directory].each do |bool|
+        if config[:link][bool]
+          boolelem = Etch.xmlnewelem(bool.to_s, doc)
+          linkelem << boolelem
+        end
+      end
+      [:dest, :script].each do |source|
+        if config[:link][source]
+          sourceelem = Etch.xmlnewelem(source.to_s, doc)
+          Etch.xmlsettext(sourceelem, config[:link][source])
+          linkelem << sourceelem
+        end
+      end
+    end
+    if config[:directory]
+      direlem = Etch.xmlnewelem('directory', doc)
+      root << direlem
+      [:owner, :group, :perms].each do |meta|
+        if config[:directory][meta]
+          metaelem = Etch.xmlnewelem(meta.to_s, doc)
+          Etch.xmlsettext(metaelem, config[:directory][meta])
+          direlem << metaelem
+        end
+      end
+      [:create].each do |bool|
+        if config[:directory][bool]
+          boolelem = Etch.xmlnewelem(bool.to_s, doc)
+          direlem << boolelem
+        end
+      end
+      [:script].each do |source|
+        if config[:directory][source]
+          sourceelem = Etch.xmlnewelem(source.to_s, doc)
+          Etch.xmlsettext(sourceelem, config[:directory][source])
+          direlem << sourceelem
+        end
+      end
+    end
+    if config[:delete]
+      deleteelem = Etch.xmlnewelem('delete', doc)
+      root << deleteelem
+      [:overwrite_directory, :proceed].each do |bool|
+        if config[:delete][bool]
+          boolelem = Etch.xmlnewelem(bool.to_s, doc)
+          deleteelem << boolelem
+        end
+      end
+      [:script].each do |source|
+        if config[:delete][source]
+          sourceelem = Etch.xmlnewelem(source.to_s, doc)
+          Etch.xmlsettext(sourceelem, config[:delete][source])
+          deleteelem << sourceelem
+        end
+      end
+    end
+    if config[:test_before_post]
+      elem = Etch.xmlnewelem('test_before_post', doc)
+      config[:test_before_post].each do |exec|
+        execelem = Etch.xmlnewelem('exec', doc)
+        Etch.xmlsettext(execelem, exec)
+        elem << execelem
+      end
+      root << elem
+    end
+    postelem = nil
+    {
+      :post_once => :exec_once,
+      :post_once_per_run => :exec_once_per_run,
+      :post => :exec,
+        }.each do |posttype, xmltype|
+      if config[posttype]
+        if !postelem
+          postelem = Etch.xmlnewelem('post', doc)
+          root << postelem
+        end
+        config[posttype].each do |postexec|
+          execelem = Etch.xmlnewelem(xmltype.to_s, doc)
+          Etch.xmlsettext(execelem, postexec)
+          postelem << execelem
+        end
+      end
+    end
+    if config[:test]
+      elem = Etch.xmlnewelem('test', doc)
+      config[:test].each do |exec|
+        execelem = Etch.xmlnewelem('exec', doc)
+        Etch.xmlsettext(execelem, exec)
+        elem << execelem
+      end
+      root << elem
+    end
+    doc
+  end
+  def command_xml_to_hash(command_xml)
+    cmd = {}
+    Etch.xmleach(command_xml, '/commands/depend') do |depend|
+      cmd[:depend] ||= []
+      cmd[:depend] << Etch.xmltext(depend)
+    end
+    Etch.xmleach(command_xml, '/commands/dependfile') do |dependfile|
+      cmd[:dependfile] ||= []
+      cmd[:dependfile] << Etch.xmltext(dependfile)
+    end
+    Etch.xmleach(command_xml, '/commands/step') do |step_xml|
+      cmd[:steps] ||= []
+      step = {}
+      cmd[:steps] << {step: step}
+      Etch.xmleach(step_xml, 'guard/exec') do |gexec|
+        step[:guard] ||= []
+        step[:guard] << Etch.xmltext(gexec)
+      end
+      Etch.xmleach(step_xml, 'command/exec') do |cexec|
+        step[:command] ||= []
+        step[:command] << Etch.xmltext(cexec)
+      end
+    end
+    cmd
+  end
+  def command_hash_to_xml(cmd)
+    doc = Etch.xmlnewdoc
+    root = Etch.xmlnewelem('commands', doc)
+    Etch.xmlsetroot(doc, root)
+    if cmd[:depend]
+      cmd[:depend].each do |depend|
+        depelem = Etch.xmlnewelem('depend', doc)
+        Etch.xmlsettext(depelem, depend)
+        root << depelem
+      end
+    end
+    if cmd[:dependfile]
+      cmd[:dependfile].each do |dependfile|
+        depelem = Etch.xmlnewelem('dependfile', doc)
+        Etch.xmlsettext(depelem, dependfile)
+        root << depelem
+      end
+    end
+    if cmd[:steps]
+      cmd[:steps].each do |outerstep|
+        if step = outerstep[:step]
+          stepelem = Etch.xmlnewelem('step', doc)
+          guardelem = Etch.xmlnewelem('guard', doc)
+          step[:guard] && step[:guard].each do |exec|
+            execelem = Etch.xmlnewelem('exec', doc)
+            Etch.xmlsettext(execelem, exec)
+            guardelem << execelem
+          end
+          stepelem << guardelem
+          commandelem = Etch.xmlnewelem('command', doc)
+          step[:command] && step[:command].each do |exec|
+            execelem = Etch.xmlnewelem('exec', doc)
+            Etch.xmlsettext(execelem, exec)
+            commandelem << execelem
+          end
+          stepelem << commandelem
+          root << stepelem
+        end
+      end
+    end
+    doc
+  end
+
   # We let users specify a source multiple times in a config.xml.  This is
   # necessary if multiple groups require the same file, for example.
   # However, the user needs to be consistent.  So this is valid on a
@@ -1161,12 +1654,7 @@ class Etch
   # This subroutine checks a list of XML elements to determine if they all
   # contain the same value.  Returns true if there is inconsistency.
   def check_for_inconsistency(elements)
-    elements_as_text = elements.collect { |elem| Etch.xmltext(elem) }
-    if elements_as_text.uniq.length > 1
-      return true
-    else
-      return false
-    end
+    elements.any?{|e| e != elements.first}
   end
   
   # These methods provide an abstraction from the underlying XML library in
@@ -1207,6 +1695,24 @@ class Etch
       doc.root = root
     when :rexml
       doc << root
+    else
+      raise "Unknown XML library #{Etch.xmllib}"
+    end
+  end
+  
+  def self.xmlloadstr(string)
+    case Etch.xmllib
+    when :libxml
+      LibXML::XML::Document.string(string)
+    when :nokogiri
+      Nokogiri::XML(string) do |config|
+        # Nokogiri is tolerant of malformed documents by default.  Good when
+        # parsing HTML, but there's no reason for us to tolerate errors.  We
+        # want to ensure that the user's instructions to us are clear.
+        config.options = Nokogiri::XML::ParseOptions::STRICT
+      end
+    when :rexml
+      REXML::Document.new(string)
     else
       raise "Unknown XML library #{Etch.xmllib}"
     end
@@ -1540,7 +2046,15 @@ class EtchExternalSource
     @original_file = original_file
     @facts = facts
     @groups = groups
-    @local_requests = local_requests
+    # In the olden days all local requests were XML snippits that the etch client
+    # smashed into a single XML document to send over the wire.  This supports
+    # scripts expecting the old interface.
+    @local_requests = nil
+    if local_requests
+      @local_requests = "<requests>\n#{local_requests.join('')}\n</requests>"
+    end
+    # And this is a new interface where we just pass them as an array
+    @local_requests_array = local_requests || []
     @sourcebase = sourcebase
     @commandsbase = commandsbase
     @sitelibbase = sitelibbase
@@ -1591,6 +2105,11 @@ class EtchExternalSource
     end
     @contents
   end
+
+  #
+  # Private subroutines
+  #
+  private
 
   # Changes made to some global variables by the external sources can cause
   # serious complications because they are executed repeatedly in a single

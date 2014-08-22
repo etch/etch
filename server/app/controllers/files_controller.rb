@@ -21,8 +21,10 @@ class FilesController < ApplicationController
       if params[:commands]
         commands = params[:commands].inject({}) { |h, (command, value)| h[CGI.unescape(command)] = value; h }
       end
-      response = etchserver.generate(files, commands)
-      render :text => response
+      respond_to do |format|
+        format.xml { render :xml => etchserver.generate(files, commands, :xml) }
+        format.yaml { render body: etchserver.generate(files, commands, :yaml), content_type: "application/x-yaml" }
+      end
     rescue Exception => e
       logger.error e.message
       logger.info e.backtrace.join("\n") if params[:debug]

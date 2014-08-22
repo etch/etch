@@ -207,7 +207,7 @@ class EtchAuthTests < Test::Unit::TestCase
     # Add this client to the server so that it will now be considered
     # an existing client
     #
-    puts "# Starting a second copy of the server and adding this client to the database"
+    puts "# Starting a second copy of the server and adding this client to the database" if (EtchTests::VERBOSE == :debug)
     sleep 3
     repodir2 = initialize_repository
     server2 = start_server(repodir2)

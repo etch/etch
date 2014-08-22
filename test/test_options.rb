@@ -448,7 +448,8 @@ class EtchOptionTests < Test::Unit::TestCase
     
     # Set up a web server which redirects to the test server
     redirect_port = 3500
-    server = WEBrick::HTTPServer.new(:Port => redirect_port)
+    # http://tomlea.co.uk/posts/shut-the-fuck-up-webrick/
+    server = WEBrick::HTTPServer.new(:Port => redirect_port, :AccessLog => [], :Logger => WEBrick::Log::new("/dev/null", 7))
     # Trap signals to invoke the shutdown procedure cleanly
     ['INT', 'TERM'].each do |signal|
        trap(signal){ server.shutdown }
