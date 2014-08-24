@@ -72,6 +72,49 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
   end
   
+  def test_local_requests_array_script
+    testname = 'local request array with script'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <script>source.script</script>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    # Create the local request files
+    requestdir = File.join(@testroot, 'var', 'etch', 'requests', @targetfile)
+    requestfiles = ['testrequest1', 'testrequest2'].collect{|r| File.join(requestdir, r)}
+    FileUtils.mkdir_p(requestdir)
+    requestdata = []
+    requestfiles.each do |rf|
+      rd = "local request #{rf}"
+      requestdata << rd
+      File.open(rf, 'w') do |file|
+        file.write rd
+      end
+    end
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source.script", 'w') do |file|
+      file.puts <<-EOF
+        @contents << @local_requests_array.join(';')
+      EOF
+    end
+    
+    run_etch(@server, @testroot, :testname => testname)
+    
+    # Verify that the file was created properly
+    assert_equal(requestdata.join(';'), get_file_contents(@targetfile), testname)
+  end
+  
   def test_local_requests_template
     #
     # Run a test with a local request and a template
@@ -123,6 +166,52 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
     # pass both strings through strip so we just compare the meat at the
     # center.
     assert_equal(sourcecontents.strip, get_file_contents(@targetfile).strip, testname)
+  end
+  
+  def test_local_requests_array_template
+    testname = 'local request array with template'
+    
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.xml", 'w') do |file|
+      file.puts <<-EOF
+        <config>
+          <file>
+            <warning_file/>
+            <source>
+              <template>source.template</template>
+            </source>
+          </file>
+        </config>
+      EOF
+    end
+    
+    # Create the local request files
+    requestdir = File.join(@testroot, 'var', 'etch', 'requests', @targetfile)
+    requestfiles = ['testrequest1', 'testrequest2'].collect{|r| File.join(requestdir, r)}
+    FileUtils.mkdir_p(requestdir)
+    requestdata = []
+    requestfiles.each do |rf|
+      rd = "local request #{rf}"
+      requestdata << rd
+      File.open(rf, 'w') do |file|
+        file.write rd
+      end
+    end
+    
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source.template", 'w') do |file|
+      file.puts <<-EOF
+        preamble <%= @local_requests_array.join(':') %> conclusion
+      EOF
+    end
+    
+    run_etch(@server, @testroot, :testname => testname)
+    
+    # Verify that the file was created properly
+    # Our whitespace in the heredoc above gets added to the generated file, so
+    # pass both strings through strip so we just compare the meat at the
+    # center.
+    assert_equal("preamble #{requestdata.join(':')} conclusion", get_file_contents(@targetfile).strip, testname)
   end
   
   def teardown

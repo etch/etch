@@ -286,7 +286,7 @@ class Etch::Client
                 request["files[#{CGI.escape(file)}][sha1sum]"] =
                   get_orig_sum(file)
                 get_local_requests(file).each_with_index do |lr, i|
-                  request["files[#{CGI.escape(file)}][local_requests][i]"] = lr
+                  request["files[#{CGI.escape(file)}][local_requests][#{i}]"] = lr
                 end
               end
             end
@@ -401,7 +401,7 @@ class Etch::Client
                 request[:files][need_sum][:local_requests] = local_requests
               else
                 local_requests.each_with_index do |lr, i|
-                  request["files[#{CGI.escape(need_sum)}][local_requests][i]"] = lr
+                  request["files[#{CGI.escape(need_sum)}][local_requests][#{i}]"] = lr
                 end
               end
             end
@@ -423,7 +423,7 @@ class Etch::Client
                 request[:files][need_orig][:local_requests] = local_requests
               else
                 local_requests.each_with_index do |lr, i|
-                  request["files[#{CGI.escape(need_orig)}][local_requests][i]"] = lr
+                  request["files[#{CGI.escape(need_orig)}][local_requests][#{i}]"] = lr
                 end
               end
             end
