@@ -449,7 +449,7 @@ class Etch::Server
     if response[:configs]
       configs_xml = Etch.xmlnewelem('configs', response_xml)
       response[:configs].each do |file, config|
-        configs_xml << config_hash_to_xml(config)
+        configs_xml << Etch.config_hash_to_xml(config, file).root
       end
       responseroot << configs_xml
     end
@@ -479,7 +479,7 @@ class Etch::Server
     if response[:commands]
       commands_xml = Etch.xmlnewelem('commands', response_xml)
       response[:commands].each do |commandname, command|
-        commands_xml << Etch.command_hash_to_xml(command)
+        commands_xml << Etch.command_hash_to_xml(command, commandname).root
       end
       responseroot << commands_xml
     end

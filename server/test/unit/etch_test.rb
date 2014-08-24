@@ -47,6 +47,7 @@ EOF
         <file>
           <owner>1</owner>
           <warning_file>warning.txt</warning_file>
+          <comment_line># </comment_line>
         </file>
       </config>
       EOF
@@ -54,6 +55,7 @@ EOF
     defaults = @etch.send :load_defaults
     assert_equal(1, defaults[:file][:owner])
     assert_equal('warning.txt', defaults[:file][:warning_file])
+    assert_equal('# ', defaults[:file][:comment_line])
     assert_equal({}, defaults[:link])
   end
   test 'symbolize keys' do
@@ -76,7 +78,7 @@ EOF
     File.open("#{@configdir}/source/test/config.xml", 'w') do |file|
       file.write '<config><file><source><plain>plainfile</plain></source></file></config>'
     end
-    assert_equal({file: {plain: ['plainfile']}}, @etch.send(:load_config, 'test'))
+    assert_equal({file: {plain: 'plainfile'}}, @etch.send(:load_config, 'test'))
   end
   test 'load_config empty' do
     FileUtils.mkdir_p("#{@configdir}/source/test")
@@ -267,7 +269,6 @@ EOF
         <source>
           <plain>plainfile</plain>
           <plain>plainfile</plain>
-          <plain>plainfile2</plain>
         </source>
       </file>
       <link>
@@ -307,44 +308,6 @@ EOF
         owner: 'nobody',
         perms: '755',
         warning_on_second_line: true,
-        plain: ['plainfile', 'plainfile', 'plainfile2'],
-      },
-      link: {
-        group: 'someone',
-        perms: '600',
-        overwrite_directory: true,
-        script: ['linkscript'],
-      },
-      directory: {
-        owner: 'nouser',
-        perms: '750',
-        create: true,
-      },
-      delete: {
-        overwrite_directory: true,
-        proceed: true,
-      },
-      test_before_post: ['tbp'],
-      post: ['postone', 'posttwo'],
-      post_once: ['postonce'],
-      post_once_per_run: ['postonceperone', 'postoncepertwo'],
-      test: ['testone', 'testtwo'],
-    }
-    testdoc = Etch.xmlloadstr(testconfig)
-    assert_equal(expected, @etch.send(:config_xml_to_hash, testdoc))
-  end
-  test 'config_hash_to_xml' do
-    testhash = {
-      revert: true,
-      depend: ['depone', 'deptwo'],
-      dependcommand: ['depcmd'],
-      server_setup: ['ssetup'],
-      setup: ['setupone', 'setuptwo'],
-      pre: ['prething'],
-      file: {
-        owner: 'nobody',
-        perms: '755',
-        warning_on_second_line: true,
         plain: 'plainfile',
       },
       link: {
@@ -368,28 +331,61 @@ EOF
       post_once_per_run: ['postonceperone', 'postoncepertwo'],
       test: ['testone', 'testtwo'],
     }
+    testdoc = Etch.xmlloadstr(testconfig)
+    assert_equal(expected, Etch.config_xml_to_hash(testdoc))
+  end
+  test 'config_hash_to_xml' do
+    testhash = {
+      revert: true,
+      depend: ['depone', 'deptwo'],
+      dependcommand: ['depcmd'],
+      server_setup: ['ssetup'],
+      setup: ['setupone', 'setuptwo'],
+      pre: ['prething'],
+      file: {
+        owner: 'nobody',
+        perms: '755',
+        contents: 'filecontents',
+      },
+      link: {
+        group: 'someone',
+        perms: '600',
+        overwrite_directory: true,
+        dest: 'linkdest',
+      },
+      directory: {
+        owner: 'nouser',
+        perms: '750',
+        create: true,
+      },
+      delete: {
+        overwrite_directory: true,
+        proceed: true,
+      },
+      test_before_post: ['tbp'],
+      post: ['postone', 'posttwo'],
+      post_once: ['postonce'],
+      post_once_per_run: ['postonceperone', 'postoncepertwo'],
+      test: ['testone', 'testtwo'],
+    }
     expected = <<-EOS
-    <config>
+    <config filename="testfile">
       <revert/>
       <depend>depone</depend>
       <depend>deptwo</depend>
       <dependcommand>depcmd</dependcommand>
-      <server_setup><exec>ssetup</exec></server_setup>
       <setup><exec>setupone</exec><exec>setuptwo</exec></setup>
       <pre><exec>prething</exec></pre>
       <file>
         <owner>nobody</owner>
         <perms>755</perms>
-        <warning_on_second_line/>
-        <source>
-          <plain>plainfile</plain>
-        </source>
+        <contents>filecontents</contents>
       </file>
       <link>
         <group>someone</group>
         <perms>600</perms>
         <overwrite_directory/>
-        <script>linkscript</script>
+        <dest>linkdest</dest>
       </link>
       <directory>
         <owner>nouser</owner>
@@ -412,7 +408,7 @@ EOF
     </config>
     EOS
     expectdoc = Etch.xmlloadstr(expected)
-    assert_equal(expectdoc.to_s.gsub(/\s/, ''), @etch.send(:config_hash_to_xml, testhash).to_s.gsub(/\s/, ''))
+    assert_equal(expectdoc.to_s.gsub(/\s/, ''), Etch.config_hash_to_xml(testhash, 'testfile').to_s.gsub(/\s/, ''))
   end
   test 'command_xml_to_hash' do
     testcmd = <<-EOS
@@ -459,7 +455,7 @@ EOF
       ],
     }
     testdoc = Etch.xmlloadstr(testcmd)
-    assert_equal(expected, @etch.send(:command_xml_to_hash, testdoc))
+    assert_equal(expected, Etch.command_xml_to_hash(testdoc))
   end
   test 'command_hash_to_xml' do
     testhash = {
@@ -481,7 +477,7 @@ EOF
       ],
     }
     expected = <<-EOS
-    <commands>
+    <commands commandname="testcommand">
       <depend>depone</depend>
       <depend>deptwo</depend>
       <dependfile>depfile</dependfile>
@@ -506,7 +502,7 @@ EOF
     </commands>
     EOS
     expectdoc = Etch.xmlloadstr(expected)
-    assert_equal(expectdoc.to_s.gsub(/\s/, ''), @etch.send(:command_hash_to_xml, testhash).to_s.gsub(/\s/, ''))
+    assert_equal(expectdoc.to_s.gsub(/\s/, ''), Etch.command_hash_to_xml(testhash, 'testcommand').to_s.gsub(/\s/, ''))
   end
   test 'check_for_inconsistency' do
     refute @etch.send(:check_for_inconsistency, [])

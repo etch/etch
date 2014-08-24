@@ -255,7 +255,7 @@ class Etch
         section = node.name.to_sym
         defaults[section] ||= {}
         Etch.xmleachall(node) do |entry|
-          value = Etch.xmltext(entry).strip
+          value = Etch.xmltext(entry)
           # Convert things that look like numbers to match how YAML is parsed
           if value.to_i.to_s == value
             value = value.to_i
@@ -604,7 +604,9 @@ class Etch
 
           # Remove the source configuration from the config, the
           # client won't need to see it
-          config[:file].delete(:source)
+          config[:file].delete(:plain)
+          config[:file].delete(:template)
+          config[:file].delete(:script)
 
           # Remove all of the warning related elements from the config, the
           # client won't need to see them
@@ -898,7 +900,7 @@ class Etch
       rescue Exception => e
         raise Etch.wrap_exception(e, "Filtered config.xml for #{file} fails validation:\n" + e.message)
       end
-      config = config_xml_to_hash(config_xml)
+      config = Etch.config_xml_to_hash(config_xml)
     else
       raise "config.yml or config.xml for #{file} does not exist"
     end
@@ -1023,9 +1025,6 @@ class Etch
     # If filtering didn't remove all the content then add this to the list of
     # commands to be returned to the client.
     if generation_status && generation_status != :unknown && !cmd.empty?
-      # Include the commands directory name to aid troubleshooting on the
-      # client side.
-      cmd[:commandname] = command
       @commands[command] = cmd
     end
     
@@ -1067,7 +1066,7 @@ class Etch
         raise Etch.wrap_exception(e, "Filtered commands.xml for #{command} fails validation:\n" + e.message)
       end
       # Convert the filtered XML to a hash
-      cmd = command_xml_to_hash(command_xml)
+      cmd = Etch.command_xml_to_hash(command_xml)
     else
       raise "commands.yml or commands.xml for #{command} does not exist"
     end
@@ -1256,7 +1255,7 @@ class Etch
     end
   end
   
-  def config_xml_to_hash(config_xml)
+  def self.config_xml_to_hash(config_xml)
     config = {}
 
     if Etch.xmlfindfirst(config_xml, '/config/revert')
@@ -1303,8 +1302,7 @@ class Etch
     end
     [:plain, :template, :script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/file/source/#{sourcetype}") do |sourceelem|
-        config[:file][sourcetype] ||= []
-        config[:file][sourcetype] << Etch.xmltext(sourceelem)
+        config[:file][sourcetype] = Etch.xmltext(sourceelem)
       end
     end
 
@@ -1323,8 +1321,7 @@ class Etch
     end
     [:dest, :script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/link/#{sourcetype}") do |sourceelem|
-        config[:link][sourcetype] ||= []
-        config[:link][sourcetype] << Etch.xmltext(sourceelem)
+        config[:link][sourcetype] = Etch.xmltext(sourceelem)
       end
     end
 
@@ -1343,8 +1340,7 @@ class Etch
     end
     [:script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/directory/#{sourcetype}") do |sourceelem|
-        config[:directory][sourcetype] ||= []
-        config[:directory][sourcetype] << Etch.xmltext(sourceelem)
+        config[:directory][sourcetype] = Etch.xmltext(sourceelem)
       end
     end
 
@@ -1358,8 +1354,7 @@ class Etch
     end
     [:script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/delete/#{sourcetype}") do |sourceelem|
-        config[:delete][sourcetype] ||= []
-        config[:delete][sourcetype] << Etch.xmltext(sourceelem)
+        config[:delete][sourcetype] = Etch.xmltext(sourceelem)
       end
     end
 
@@ -1386,9 +1381,10 @@ class Etch
 
     config
   end
-  def config_hash_to_xml(config)
+  def self.config_hash_to_xml(config, file)
     doc = Etch.xmlnewdoc
     root = Etch.xmlnewelem('config', doc)
+    Etch.xmlattradd(root, 'filename', file)
     Etch.xmlsetroot(doc, root)
     if config[:revert]
       root << Etch.xmlnewelem('revert', doc)
@@ -1406,15 +1402,6 @@ class Etch
         Etch.xmlsettext(depelem, dependcommand)
         root << depelem
       end
-    end
-    if config[:server_setup]
-      elem = Etch.xmlnewelem('server_setup', doc)
-      config[:server_setup].each do |exec|
-        execelem = Etch.xmlnewelem('exec', doc)
-        Etch.xmlsettext(execelem, exec)
-        elem << execelem
-      end
-      root << elem
     end
     if config[:setup]
       elem = Etch.xmlnewelem('setup', doc)
@@ -1437,43 +1424,33 @@ class Etch
     if config[:file]
       fileelem = Etch.xmlnewelem('file', doc)
       root << fileelem
-      [:owner, :group, :perms, :warning_file, :comment_open,
-       :comment_line, :comment_close].each do |meta|
-        if config[:file][meta]
-          metaelem = Etch.xmlnewelem(meta.to_s, doc)
-          Etch.xmlsettext(metaelem, config[:file][meta])
-          fileelem << metaelem
+      [:owner, :group, :perms].each do |text|
+        if config[:file][text]
+          textelem = Etch.xmlnewelem(text.to_s, doc)
+          Etch.xmlsettext(textelem, config[:file][text])
+          fileelem << textelem
         end
       end
-      [:always_manage_metadata, :warning_on_second_line,
-       :no_space_around_warning, :allow_empty,
-       :overwrite_directory].each do |bool|
+      [:overwrite_directory].each do |bool|
         if config[:file][bool]
           boolelem = Etch.xmlnewelem(bool.to_s, doc)
           fileelem << boolelem
         end
       end
-      [:plain, :template, :script].each do |sourcetype|
-        sourceelem = nil
-        if config[:file][sourcetype]
-          if !sourceelem
-            sourceelem = Etch.xmlnewelem('source', doc)
-            fileelem << sourceelem
-          end
-          sourcetypeelem = Etch.xmlnewelem(sourcetype.to_s, doc)
-          Etch.xmlsettext(sourcetypeelem, config[:file][sourcetype])
-          sourceelem << sourcetypeelem
-        end
+      if config[:file][:contents]
+        elem = Etch.xmlnewelem('contents', doc)
+        Etch.xmlsettext(elem, config[:file][:contents])
+        fileelem << elem
       end
     end
     if config[:link]
       linkelem = Etch.xmlnewelem('link', doc)
       root << linkelem
-      [:owner, :group, :perms].each do |meta|
-        if config[:link][meta]
-          metaelem = Etch.xmlnewelem(meta.to_s, doc)
-          Etch.xmlsettext(metaelem, config[:link][meta])
-          linkelem << metaelem
+      [:owner, :group, :perms].each do |text|
+        if config[:link][text]
+          textelem = Etch.xmlnewelem(text.to_s, doc)
+          Etch.xmlsettext(textelem, config[:link][text])
+          linkelem << textelem
         end
       end
       [:allow_nonexistent_dest, :overwrite_directory].each do |bool|
@@ -1482,35 +1459,26 @@ class Etch
           linkelem << boolelem
         end
       end
-      [:dest, :script].each do |source|
-        if config[:link][source]
-          sourceelem = Etch.xmlnewelem(source.to_s, doc)
-          Etch.xmlsettext(sourceelem, config[:link][source])
-          linkelem << sourceelem
-        end
+      if config[:link][:dest]
+        elem = Etch.xmlnewelem('dest', doc)
+        Etch.xmlsettext(elem, config[:link][:dest])
+        linkelem << elem
       end
     end
     if config[:directory]
       direlem = Etch.xmlnewelem('directory', doc)
       root << direlem
-      [:owner, :group, :perms].each do |meta|
-        if config[:directory][meta]
-          metaelem = Etch.xmlnewelem(meta.to_s, doc)
-          Etch.xmlsettext(metaelem, config[:directory][meta])
-          direlem << metaelem
+      [:owner, :group, :perms].each do |text|
+        if config[:directory][text]
+          textelem = Etch.xmlnewelem(text.to_s, doc)
+          Etch.xmlsettext(textelem, config[:directory][text])
+          direlem << textelem
         end
       end
       [:create].each do |bool|
         if config[:directory][bool]
           boolelem = Etch.xmlnewelem(bool.to_s, doc)
           direlem << boolelem
-        end
-      end
-      [:script].each do |source|
-        if config[:directory][source]
-          sourceelem = Etch.xmlnewelem(source.to_s, doc)
-          Etch.xmlsettext(sourceelem, config[:directory][source])
-          direlem << sourceelem
         end
       end
     end
@@ -1521,13 +1489,6 @@ class Etch
         if config[:delete][bool]
           boolelem = Etch.xmlnewelem(bool.to_s, doc)
           deleteelem << boolelem
-        end
-      end
-      [:script].each do |source|
-        if config[:delete][source]
-          sourceelem = Etch.xmlnewelem(source.to_s, doc)
-          Etch.xmlsettext(sourceelem, config[:delete][source])
-          deleteelem << sourceelem
         end
       end
     end
@@ -1569,7 +1530,7 @@ class Etch
     end
     doc
   end
-  def command_xml_to_hash(command_xml)
+  def self.command_xml_to_hash(command_xml)
     cmd = {}
     Etch.xmleach(command_xml, '/commands/depend') do |depend|
       cmd[:depend] ||= []
@@ -1594,9 +1555,10 @@ class Etch
     end
     cmd
   end
-  def command_hash_to_xml(cmd)
+  def self.command_hash_to_xml(cmd, commandname)
     doc = Etch.xmlnewdoc
     root = Etch.xmlnewelem('commands', doc)
+    Etch.xmlattradd(root, 'commandname', commandname)
     Etch.xmlsetroot(doc, root)
     if cmd[:depend]
       cmd[:depend].each do |depend|
