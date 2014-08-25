@@ -1100,20 +1100,20 @@ class Etch
       end
       remove.each{|k| yaml.delete(k)}
     when Array
-      remove = []
-      yaml.each_with_index do |e, i|
+      keep = []
+      yaml.each do |e|
         if e.kind_of?(Hash) &&
            e.length == 1 &&
            e.keys.first =~ /\Awhere (.*)/
           if eval_yaml_condition($1)
-            yaml[i] = e.values.first
-          else
-            remove << i
+            keep << e.values.first
           end
+        else
+          keep << e
         end
         yamlfilter!(e)
       end
-      remove.each{|i| yaml.delete_at(i)}
+      yaml.replace(keep)
     end
   end
   # Examples:

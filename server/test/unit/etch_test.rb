@@ -137,6 +137,8 @@ EOF
       :array => [
         {'where operatingsystem==RedHat' => 'redhat.script'},
         {'where operatingsystem==SunOS' => 'sunos.script'},
+        'all.script',
+        {'where operatingsystem==FreeBSD' => 'freebsd.script'},
       ],
       :nestedarray => [
         :a,
@@ -145,17 +147,23 @@ EOF
           :script => {'where operatingsystem==RedHat' => 'foo.script'}
         },
         {:plain => {'where operatingsystem==SunOS' => 'foo'}},
-        {:script => {'where operatingsystem==RedHat' => 'foo.script'}},
+        {:script => {'where operatingsystem==RedHat' => 'bar.script'}},
         {'where foo' => false, 'where bar' => true},
       ],
       :other => {'where foo' => false, 'where bar' => true},
     }
-    filterhash = testhash
+    filterhash = Marshal.load(Marshal.dump testhash)
     filterhash.delete(:plain)
+    filterhash[:script] = filterhash[:script].values.first
     filterhash[:nested].delete(:plain)
+    filterhash[:nested][:script] = filterhash[:nested][:script].values.first
+    filterhash[:array][0] = filterhash[:array][0].values.first
     filterhash[:array].delete_at(1)
+    filterhash[:array].delete_at(2) # FreeBSD entry will be at 2 after previous delete
     filterhash[:nestedarray][1].delete(:plain)
-    filterhash[:nestedarray].delete_at(2)
+    filterhash[:nestedarray][1][:script] = filterhash[:nestedarray][1][:script].values.first
+    filterhash[:nestedarray][2].clear
+    filterhash[:nestedarray][3][:script] = filterhash[:nestedarray][3][:script].values.first
     @etch.send(:yamlfilter!, testhash)
     assert_equal(filterhash, testhash)
   end
