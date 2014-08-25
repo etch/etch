@@ -135,6 +135,10 @@ EOF
         :script => {'where operatingsystem==RedHat' => 'foo.script'},
       },
       :array => [
+        {'where operatingsystem==RedHat' => 'redhat.script'},
+        {'where operatingsystem==SunOS' => 'sunos.script'},
+      ],
+      :nestedarray => [
         :a,
         {
           :plain => {'where operatingsystem==SunOS' => 'foo'},
@@ -149,8 +153,9 @@ EOF
     filterhash = testhash
     filterhash.delete(:plain)
     filterhash[:nested].delete(:plain)
-    filterhash[:array][1].delete(:plain)
-    filterhash[:array].delete_at(2)
+    filterhash[:array].delete_at(1)
+    filterhash[:nestedarray][1].delete(:plain)
+    filterhash[:nestedarray].delete_at(2)
     @etch.send(:yamlfilter!, testhash)
     assert_equal(filterhash, testhash)
   end

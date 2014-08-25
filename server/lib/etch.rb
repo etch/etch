@@ -1106,7 +1106,7 @@ class Etch
            e.length == 1 &&
            e.keys.first =~ /\Awhere (.*)/
           if eval_yaml_condition($1)
-            yaml[i] = v.values.first
+            yaml[i] = e.values.first
           else
             remove << i
           end
@@ -1118,8 +1118,8 @@ class Etch
   end
   # Examples:
   # operatingsystem==Solaris
-  # operatingsystem=~/RedHat|CentOS/ and group==bar
-  # operatingsystem=~/RedHat|CentOS/ or kernel == SunOS and group==bar
+  # operatingsystem=~RedHat|CentOS and group==bar
+  # operatingsystem=~RedHat|CentOS or kernel == SunOS and group==bar
   def eval_yaml_condition(condition)
     exprs = condition.split(/\s+(and|or)\s+/)
     prevcond = nil
