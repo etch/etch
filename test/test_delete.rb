@@ -27,8 +27,7 @@ class EtchDeleteTests < Test::Unit::TestCase
     #puts "Using #{@destfile} as link destination file"
   end
   
-  def test_delete
-
+  def test_delete_file
     #
     # Delete a file
     #
@@ -49,13 +48,16 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Verify that the file was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
+  end
 
+  def test_delete_link
     #
     # Delete a link
     #
     testname = 'delete link'
 
     # Create the link
+    FileUtils.rm_f(@targetfile)
     File.symlink(@destfile, @targetfile)
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
@@ -73,7 +75,9 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Verify that the link was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
-
+  end
+  
+  def test_delete_directory
     #
     # Delete a directory
     #
@@ -81,7 +85,8 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Create the directory with a file inside just to make sure the
     # delete handles that properly
-    Dir.mkdir(@targetfile) if (!File.directory?(@targetfile))
+    FileUtils.rm_f(@targetfile)
+    Dir.mkdir(@targetfile)
     File.open("#{@targetfile}/testfile", 'w') { |file| }
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
@@ -99,7 +104,9 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Verify that the directory was not deleted
     assert(File.directory?(@targetfile), testname)
-
+  end
+  
+  def test_delete_overwrite_directory
     #
     # Delete a directory w/ overwrite_directory
     #
@@ -107,7 +114,8 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Create the directory with a file inside just to make sure the
     # delete handles that properly
-    Dir.mkdir(@targetfile) if (!File.directory?(@targetfile))
+    FileUtils.rm_f(@targetfile)
+    Dir.mkdir(@targetfile)
     File.open("#{@targetfile}/testfile", 'w') { |file| }
 
     FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
@@ -126,7 +134,9 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     # Verify that the directory was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
-
+  end
+  
+  def test_delete_nonexistent
     #
     # Delete a non-existent file
     #
@@ -150,7 +160,9 @@ class EtchDeleteTests < Test::Unit::TestCase
     # told to delete something that doesn't exist, which is captured by
     # the assert within run_etch.
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
-
+  end
+  
+  def test_delete_duplicate_script
     #
     # Test duplicate script instructions
     #
@@ -178,8 +190,10 @@ class EtchDeleteTests < Test::Unit::TestCase
 
     run_etch(@server, @testroot, :testname => testname)
 
-    assert(!File.exist?(@targetfile), 'duplicate script instructions')
-
+    assert(!File.exist?(@targetfile), testname)
+  end
+  
+  def test_delete_contradictory_script
     #
     # Test contradictory script instructions
     #
@@ -211,8 +225,7 @@ class EtchDeleteTests < Test::Unit::TestCase
     run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file wasn't removed
-    assert(File.exist?(@targetfile), 'contradictory script instructions')
-
+    assert(File.exist?(@targetfile), testname)
   end
 
   def teardown
