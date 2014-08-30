@@ -246,7 +246,7 @@ class Etch
     xmldefaults = "#{@configdir}/defaults.xml"
     if File.exist?(yamldefaults)
       @dlogger.debug "Loading defaults from #{yamldefaults}"
-      defaults = symbolize_keys(YAML.load(File.read(yamldefaults)))
+      defaults = symbolize_etch_keys(YAML.load(File.read(yamldefaults)))
     elsif File.exist?(xmldefaults)
       @dlogger.debug "Loading defaults from #{xmldefaults}"
       defaults = {}
@@ -270,9 +270,15 @@ class Etch
     [:file, :link, :directory].each{|top| defaults[top] ||= {}}
     defaults
   end
-  def symbolize_keys(hash)
-    if hash.kind_of? Hash
-      Hash[hash.collect{|k,v| [k.to_sym, symbolize_keys(v)]}]
+  def symbolize_etch_key(key)
+    key =~ /\Awhere (.*)/ ? key : key.to_sym
+  end
+  def symbolize_etch_keys(hash)
+    case hash
+    when Hash
+      Hash[hash.collect{|k,v| [symbolize_etch_key(k), symbolize_etch_keys(v)]}]
+    when Array
+      hash.collect{|e| symbolize_etch_keys(e)}
     else
       hash
     end
@@ -469,7 +475,7 @@ class Etch
         # Assemble the contents for the file
         #
         newcontents = ''
-        if config[:file][:plain]
+        if config[:file][:plain] && !config[:file][:plain].empty?
           if config[:file][:plain].kind_of?(Array)
             if check_for_inconsistency(config[:file][:plain])
               raise "Inconsistent 'plain' entries for #{file}"
@@ -480,7 +486,7 @@ class Etch
           end
           # Just slurp the file in
           newcontents = IO.read(plain)
-        elsif config[:file][:template]
+        elsif config[:file][:template] && !config[:file][:template].empty?
           if config[:file][:template].kind_of?(Array)
             if check_for_inconsistency(config[:file][:template])
               raise "Inconsistent 'template' entries for #{file}"
@@ -492,7 +498,7 @@ class Etch
           # Run the template through ERB to generate the file contents
           external = EtchExternalSource.new(file, original_file, @facts, @groups, local_requests, @sourcebase, @commandsbase, @sitelibbase, @dlogger)
           newcontents = external.process_template(template)
-        elsif config[:file][:script]
+        elsif config[:file][:script] && !config[:file][:script].empty?
           if config[:file][:script].kind_of?(Array)
             if check_for_inconsistency(config[:file][:script])
               raise "Inconsistent 'script' entries for #{file}"
@@ -655,7 +661,7 @@ class Etch
   
       if config[:link]
         dest = nil
-        if config[:link][:dest]
+        if config[:link][:dest] && !config[:link][:dest].empty?
           if config[:link][:dest].kind_of?(Array)
             if check_for_inconsistency(config[:link][:dest])
               raise "Inconsistent 'dest' entries for #{file}"
@@ -664,7 +670,7 @@ class Etch
           else
             dest = config[:link][:dest]
           end
-        elsif config[:link][:script]
+        elsif config[:link][:script] && !config[:link][:script].empty?
           # The user can specify a script to perform more complex
           # testing to decide whether to create the link or not and
           # what its destination should be.
@@ -730,7 +736,8 @@ class Etch
   
       if config[:directory]
         create = false
-        if config[:directory][:create]
+        if config[:directory][:create] &&
+           (!config[:directory][:create].kind_of?(Array) || !config[:directory][:create].empty?)
           if config[:directory][:create].kind_of?(Array)
             if check_for_inconsistency(config[:directory][:create])
               raise "Inconsistent 'create' entries for #{file}"
@@ -739,7 +746,7 @@ class Etch
           else
             create = config[:directory][:create]
           end
-        elsif config[:directory][:script]
+        elsif config[:directory][:script] && !config[:directory][:script].empty?
           # The user can specify a script to perform more complex testing
           # to decide whether to create the directory or not.
           if config[:directory][:script].kind_of?(Array)
@@ -805,7 +812,8 @@ class Etch
 
       if config[:delete]
         proceed = false
-        if config[:delete][:proceed]
+        if config[:delete][:proceed] &&
+           (!config[:delete][:proceed].kind_of?(Array) || !config[:delete][:proceed].empty?)
           if config[:delete][:proceed].kind_of?(Array)
             if check_for_inconsistency(config[:delete][:proceed])
               raise "Inconsistent 'proceed' entries for #{file}"
@@ -814,7 +822,7 @@ class Etch
           else
             proceed = config[:delete][:proceed]
           end
-        elsif config[:delete][:script]
+        elsif config[:delete][:script] && !config[:delete][:script].empty?
           # The user can specify a script to perform more complex testing
           # to decide whether to delete the file or not.
           if config[:delete][:script].kind_of?(Array)
@@ -873,7 +881,7 @@ class Etch
     yamlconfig = "#{@sourcebase}/#{file}/config.yml"
     xmlconfig = "#{@sourcebase}/#{file}/config.xml"
     if File.exist?(yamlconfig)
-      config = symbolize_keys(YAML.load(File.read(yamlconfig)))
+      config = symbolize_etch_keys(YAML.load(File.read(yamlconfig)))
       config ||= {}
       begin
         yamlfilter!(config)
@@ -914,7 +922,8 @@ class Etch
     # statements.
     if @already_generated[command]
       @dlogger.debug "Skipping already generated command #{command}"
-      return
+      # Return the status of that previous generation
+      return @generation_status[command]
     end
     
     # Check for circular dependencies, otherwise we're vulnerable
@@ -945,21 +954,15 @@ class Etch
       # Generate any other commands that this command depends on
       dependfiles = []
       proceed = true
-      if cmd[:depends]
-        cmd[:depends].each do |depend|
-          @dlogger.debug "Generating command dependency #{depend}"
-          r = generate_commands(depend, request)
-          proceed = proceed && r
-        end
+      cmd[:depend] && cmd[:depend].each do |depend|
+        @dlogger.debug "Generating command dependency #{depend}"
+        proceed &= generate_commands(depend, request)
       end
       # Also generate any files that this command depends on
-      if cmd[:dependfile]
-        cmd[:dependfile].each do |dependfile|
-          @dlogger.debug "Generating file dependency #{dependfile}"
-          dependfiles << dependfile
-          r = generate_file(dependfile, request)
-          proceed = proceed && r
-        end
+      cmd[:dependfile] && cmd[:dependfile].each do |dependfile|
+        @dlogger.debug "Generating file dependency #{dependfile}"
+        dependfiles << dependfile
+        proceed &= generate_file(dependfile, request)
       end
       if !proceed
         @dlogger.debug "One or more dependencies of #{command} need data from client"
@@ -974,53 +977,35 @@ class Etch
         throw :generate_done
       end
       
-      # Change into the corresponding directory so that the user can
-      # refer to source files and scripts by their relative pathnames.
-      Dir.chdir "#{@commandsbase}/#{command}"
-      
-      # Check that the resulting document is consistent after filtering
-      if cmd[:step]
+      if cmd[:steps]
         remove = []
-        cmd[:step].each do |step|
-          if step[:guard]
-            if step[:guard].kind_of?(Array)
-              if check_for_inconsistency(step[:guard])
-                raise "Inconsistent guard entries for #{command}"
-              end
-              step[:guard] = step[:guard].first
+        cmd[:steps].each do |outerstep|
+          if step = outerstep[:step]
+            if step[:guard] && !step[:guard].kind_of?(Array)
+              step[:guard] = [step[:guard]]
             end
-          end
-          if step[:command]
-            if step[:command].kind_of?(Array)
-              if check_for_inconsistency(step[:command])
-                raise "Inconsistent command entries for #{command}"
-              end
-              step[:command] = step[:command].first
+            if step[:command] && !step[:command].kind_of?(Array)
+              step[:command] = [step[:command]]
             end
-          end
-          # If filtering has removed both the guard and command elements
-          # we can remove this step.
-          if !step[:guard] && !step[:command]
-            remove << step
-          # If filtering has removed the guard but not the command or vice
-          # versa that's an error.
-          elsif !step[:guard]
-            raise "Filtering removed guard, but left command: #{step[:command].first}"
-          elsif !step[:command]
-            raise "Filtering removed command, but left guard: #{step[:guard].first}"
+            # If filtering has removed both the guard and command elements
+            # then we can remove this step.
+            if (!step[:guard] || step[:guard].empty?) &&
+               (!step[:command] || step[:command].empty?)
+              remove << outerstep
+            # If filtering has removed the guard but not the command or vice
+            # versa that's an error.
+            elsif !step[:guard] || step[:guard].empty?
+              raise "Filtering removed guard, but left command: #{step[:command].join(';')}"
+            elsif !step[:command] || step[:command].empty?
+              raise "Filtering removed command, but left guard: #{step[:guard].join(';')}"
+            else
+              generation_status = :success
+            end
           end
         end
-        remove.each{|step| cmd[:step].delete(step)}
+        remove.each{|outerstep| cmd[:steps].delete(outerstep)}
       end
-      
-      # I'm not sure if we'd benefit from further checking the config for
-      # validity.  For now we declare success if we got this far.
-      generation_status = :success
     end
-    
-    # Earlier we chdir'd into the command's directory in the repository.  It
-    # seems best not to leave this process with that as the cwd.
-    Dir.chdir('/')
     
     # If filtering didn't remove all the content then add this to the list of
     # commands to be returned to the client.
@@ -1039,7 +1024,7 @@ class Etch
     yamlcommand = "#{@commandsbase}/#{command}/commands.yml"
     xmlcommand = "#{@commandsbase}/#{command}/commands.xml"
     if File.exist?(yamlcommand)
-      cmd = symbolize_keys(YAML.load(File.read(yamlcommand)))
+      cmd = symbolize_etch_keys(YAML.load(File.read(yamlcommand)))
       cmd ||= {}
       begin
         yamlfilter!(cmd)
@@ -1302,7 +1287,8 @@ class Etch
     end
     [:plain, :template, :script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/file/source/#{sourcetype}") do |sourceelem|
-        config[:file][sourcetype] = Etch.xmltext(sourceelem)
+        config[:file][sourcetype] ||= []
+        config[:file][sourcetype] << Etch.xmltext(sourceelem)
       end
     end
 
@@ -1321,7 +1307,8 @@ class Etch
     end
     [:dest, :script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/link/#{sourcetype}") do |sourceelem|
-        config[:link][sourcetype] = Etch.xmltext(sourceelem)
+        config[:link][sourcetype] ||= []
+        config[:link][sourcetype] << Etch.xmltext(sourceelem)
       end
     end
 
@@ -1340,7 +1327,8 @@ class Etch
     end
     [:script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/directory/#{sourcetype}") do |sourceelem|
-        config[:directory][sourcetype] = Etch.xmltext(sourceelem)
+        config[:directory][sourcetype] ||= []
+        config[:directory][sourcetype] << Etch.xmltext(sourceelem)
       end
     end
 
@@ -1354,7 +1342,8 @@ class Etch
     end
     [:script].each do |sourcetype|
       Etch.xmleach(config_xml, "/config/delete/#{sourcetype}") do |sourceelem|
-        config[:delete][sourcetype] = Etch.xmltext(sourceelem)
+        config[:delete][sourcetype] ||= []
+        config[:delete][sourcetype] << Etch.xmltext(sourceelem)
       end
     end
 

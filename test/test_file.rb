@@ -519,6 +519,71 @@ class EtchFileTests < Test::Unit::TestCase
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory plain instructions')
   end
   
+  def test_empty_plain
+    testname = 'empty plain instructions'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({file: {plain: [], script: 'source', warning_file: false}}.to_yaml)
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << '#{sourcecontents}'")
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+  end
+
+  def test_empty_template
+    testname = 'empty template instructions'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({file: {template: [], script: 'source', warning_file: false}}.to_yaml)
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+    sourcecontents = "This is the source contents\n"
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << '#{sourcecontents}'")
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
+  end
+
+  def test_empty_script
+    testname = 'empty script instructions'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({file: {script: []}}.to_yaml)
+    end
+
+    origcontents = "This is the original contents\n"
+    File.chmod(0644, @targetfile)  # Need to give ourselves write perms
+    File.open(@targetfile, 'w') do |file|
+      file.write(origcontents)
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert_equal(origcontents, get_file_contents(@targetfile), testname)
+  end
+
   def test_duplicate_template
     #
     # Test duplicate template instructions

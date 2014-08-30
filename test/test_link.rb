@@ -263,6 +263,23 @@ class EtchLinkTests < Test::Unit::TestCase
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory dest instructions')
   end
   
+  def test_link_empty_dest
+    testname = 'empty dest instructions'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({link: {dest: [], script: 'source'}}.to_yaml)
+    end
+
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << '#{@destfile}'")
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert_equal(@destfile, File.readlink(@targetfile), testname)
+  end
+
   def test_link_duplicate_script
     #
     # Test duplicate script instructions
@@ -319,6 +336,19 @@ class EtchLinkTests < Test::Unit::TestCase
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory script instructions')
+  end
+
+  def test_link_empty_script
+    testname = 'empty script instructions'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({link: {script: []}}.to_yaml)
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), testname)
   end
 
   def teardown

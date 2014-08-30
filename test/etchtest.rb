@@ -16,8 +16,9 @@ module EtchTests
   SERVERDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/server"
   CLIENTDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/client"
   
-  # :quiet, :normal, :debug
   VERBOSE = :quiet
+  # VERBOSE = :normal
+  # VERBOSE = :debug
   
   # Creates a temporary file via Tempfile, capture the filename, tell Tempfile
   # to clean up, then return the path.  This gives the caller a filename that

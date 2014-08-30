@@ -162,6 +162,47 @@ class EtchDeleteTests < Test::Unit::TestCase
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
   end
   
+  def test_delete_duplicate_proceed
+    testname = 'delete duplicate proceed'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({delete: {proceed: [true, true]}}.to_yaml)
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
+  end
+  def test_delete_contradictory_proceed
+    testname = 'delete duplicate proceed'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({delete: {proceed: [true, false]}}.to_yaml)
+    end
+
+    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+
+    assert(File.exist?(@targetfile), testname)
+  end
+  def test_delete_empty_proceed
+    testname = 'delete empty proceed'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({delete: {proceed: [], script: 'source'}}.to_yaml)
+    end
+
+    File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
+      file.puts("@contents << 'true'")
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
+    assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
+  end
+
   def test_delete_duplicate_script
     #
     # Test duplicate script instructions
@@ -225,6 +266,18 @@ class EtchDeleteTests < Test::Unit::TestCase
     run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file wasn't removed
+    assert(File.exist?(@targetfile), testname)
+  end
+  def test_delete_empty_script
+    testname = 'empty proceed instructions'
+
+    FileUtils.mkdir_p("#{@repodir}/source/#{@targetfile}")
+    File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
+      file.write({delete: {script: []}}.to_yaml)
+    end
+
+    run_etch(@server, @testroot, :testname => testname)
+
     assert(File.exist?(@targetfile), testname)
   end
 

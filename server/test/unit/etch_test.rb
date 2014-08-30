@@ -58,16 +58,147 @@ EOF
     assert_equal('# ', defaults[:file][:comment_line])
     assert_equal({}, defaults[:link])
   end
-  test 'symbolize keys' do
-    assert_equal({a: {b: 1}}, @etch.send(:symbolize_keys, {'a' => {'b' => 1}}))
-    assert_equal({a: {b: 1}}, @etch.send(:symbolize_keys, {'a' => {:b => 1}}))
-    assert_equal({a: {b: 1}}, @etch.send(:symbolize_keys, {:a => {'b' => 1}}))
-    assert_equal({a: {b: 1}}, @etch.send(:symbolize_keys, {:a => {:b => 1}}))
+  test 'symbolize_etch_key' do
+    key = 'plain'
+    assert_equal(key.to_sym, @etch.send(:symbolize_etch_key, key))
+    key = 'whereplain'
+    assert_equal(key.to_sym, @etch.send(:symbolize_etch_key, key))
+    key = 'where plain'
+    assert_equal(key, @etch.send(:symbolize_etch_key, key))
+  end
+  test 'symbolize_etch_keys' do
+    assert_equal({a: {b: 1}}, @etch.send(:symbolize_etch_keys, {'a' => {'b' => 1}}))
+    assert_equal({a: {b: 1}}, @etch.send(:symbolize_etch_keys, {'a' => {:b => 1}}))
+    assert_equal({a: {b: 1}}, @etch.send(:symbolize_etch_keys, {:a => {'b' => 1}}))
+    assert_equal({a: {b: 1}}, @etch.send(:symbolize_etch_keys, {:a => {:b => 1}}))
+    assert_equal({a: [{b: 1}]}, @etch.send(:symbolize_etch_keys, {'a' => [{'b' => 1}]}))
+  end
+  test 'load_nodes none' do
+    assert_raise(RuntimeError) {@etch.send(:load_nodes)}
+  end
+  test 'load_nodes yaml empty' do
+    File.open("#{@configdir}/nodes.yml", 'w') do |file|
+    end
+    assert_equal([{}, 'nodes.yml'], @etch.send(:load_nodes))
+  end
+  test 'load_nodes yaml' do
+    data = {'server1.example.com' => ['group1', 'group2'], 'server2.example.com' => ['group3']}
+    File.open("#{@configdir}/nodes.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    assert_equal([data, 'nodes.yml'], @etch.send(:load_nodes))
+  end
+  test 'load_nodes xml empty' do
+    File.open("#{@configdir}/nodes.xml", 'w') do |file|
+    end
+    assert_equal([{}, 'nodes.xml'], @etch.send(:load_nodes))
+  end
+  test 'load_nodes xml' do
+    data = {'server1.example.com' => ['group1', 'group2'], 'server2.example.com' => ['group3']}
+    File.open("#{@configdir}/nodes.xml", 'w') do |file|
+      file.write <<-EOS
+      <nodes>
+        <node name="server1.example.com">
+          <group>group1</group>
+          <group>group2</group>
+        </node>
+        <node name="server2.example.com">
+          <group>group3</group>
+        </node>
+      </nodes>
+      EOS
+    end
+    assert_equal([data, 'nodes.xml'], @etch.send(:load_nodes))
+  end
+  test 'load_nodes both' do
+    data = {'server1.example.com' => ['group1', 'group2'], 'server2.example.com' => ['group3']}
+    File.open("#{@configdir}/nodes.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    File.open("#{@configdir}/nodes.xml", 'w') do |file|
+      file.write <<-EOS
+      <nodes>
+        <node name="server3.example.com">
+          <group>group4</group>
+        </node>
+      </nodes>
+      EOS
+    end
+    assert_equal([data, 'nodes.yml'], @etch.send(:load_nodes))
+  end
+  test 'load_nodegroups none' do
+    assert_equal({}, @etch.send(:load_nodegroups))
+  end
+  test 'load_nodegroups yaml empty' do
+    File.open("#{@configdir}/nodegroups.yml", 'w') do |file|
+    end
+    assert_equal({}, @etch.send(:load_nodegroups))
+  end
+  test 'load_nodegroups yaml' do
+    data = {'pgroup1' => ['cgroup1', 'cgroup2'], 'pgroup2' => ['cgroup3']}
+    File.open("#{@configdir}/nodegroups.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    assert_equal(data, @etch.send(:load_nodegroups))
+  end
+  test 'load_nodegroups xml empty' do
+    File.open("#{@configdir}/nodegroups.xml", 'w') do |file|
+    end
+    assert_equal({}, @etch.send(:load_nodegroups))
+  end
+  test 'load_nodegroups xml' do
+    data = {'pgroup1' => ['cgroup1', 'cgroup2'], 'pgroup2' => ['cgroup3']}
+    File.open("#{@configdir}/nodegroups.xml", 'w') do |file|
+      file.write <<-EOS
+      <nodegroups>
+        <nodegroup name="pgroup1">
+          <child>cgroup1</child>
+          <child>cgroup2</child>
+        </nodegroup>
+        <nodegroup name="pgroup2">
+          <child>cgroup3</child>
+        </nodegroup>
+      </nodegroups>
+      EOS
+    end
+    assert_equal(data, @etch.send(:load_nodegroups))
+  end
+  test 'load_nodegroups both' do
+    data = {'server1.example.com' => ['group1', 'group2'], 'server2.example.com' => ['group3']}
+    File.open("#{@configdir}/nodegroups.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    File.open("#{@configdir}/nodegroups.xml", 'w') do |file|
+      file.write <<-EOS
+      <nodegroups>
+        <nodegroup name="pgroup3">
+          <child>cgroup4</child>
+        </nodegroup>
+      </nodegroups>
+      EOS
+    end
+    assert_equal(data, @etch.send(:load_nodegroups))
+  end
+  test 'get_parent_nodegroups' do
+    nodegroups = {
+      'grandparent' => ['parent', 'other'],
+      'parent' => ['child', 'other'],
+      'child' => ['other'],
+    }
+    @etch.instance_variable_set(:@group_hierarchy, nodegroups)
+    assert_equal(Set.new(['grandparent', 'parent']), @etch.send(:get_parent_nodegroups, 'child'))
+    assert_equal(Set.new(['grandparent']), @etch.send(:get_parent_nodegroups, 'parent'))
+    assert_equal(Set.new, @etch.send(:get_parent_nodegroups, 'grandparent'))
+    assert_equal(Set.new, @etch.send(:get_parent_nodegroups, 'random'))
+  end
+
+  test 'generate_file' do
+    # FIXME: need to test
   end
 
   test 'load_config yaml' do
     FileUtils.mkdir_p("#{@configdir}/source/test")
-    data = {a: [{'b' => 'c'}]}
+    data = {a: [{:b => 'c'}, 'd']}
     File.open("#{@configdir}/source/test/config.yml", 'w') do |file|
       file.write data.to_yaml
     end
@@ -78,7 +209,7 @@ EOF
     File.open("#{@configdir}/source/test/config.xml", 'w') do |file|
       file.write '<config><file><source><plain>plainfile</plain></source></file></config>'
     end
-    assert_equal({file: {plain: 'plainfile'}}, @etch.send(:load_config, 'test'))
+    assert_equal({file: {plain: ['plainfile']}}, @etch.send(:load_config, 'test'))
   end
   test 'load_config empty' do
     FileUtils.mkdir_p("#{@configdir}/source/test")
@@ -86,18 +217,252 @@ EOF
   end
   test 'load_command yaml' do
     FileUtils.mkdir_p("#{@configdir}/commands/test")
-    data = {a: [{'b' => 'c'}]}
+    data = {steps: [{step: {guard: 'true', command: ['ls', 'grep']}}]}
     File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
       file.write data.to_yaml
     end
     assert_equal(data, @etch.send(:load_command, 'test'))
   end
+
+  test 'generate_commands already generated' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: ['true', 'false'], command: ['ls', 'grep']}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {'test' => true})
+    # Note that I've set these two intentionally wrong to ensure that the commands
+    # are not in fact generated again
+    @etch.instance_variable_set(:@generation_status, {'test' => :unknown})
+    @etch.instance_variable_set(:@commands, {'test' => nil})
+
+    assert_equal(:unknown, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :unknown}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({'test' => nil}, @etch.instance_variable_get(:@commands))
+  end
+  test 'generate_commands circular dependency' do
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {'test' => true})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_raise(RuntimeError) {@etch.send(:generate_commands, 'test', nil)}
+  end
+  test 'generate_commands depend' do
+    data = {depend: ['test2'], steps: [{step: {guard: ['true'], command: ['ls']}}]}
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    data2 = {steps: [{step: {guard: ['false'], command: ['grep']}}]}
+    FileUtils.mkdir_p("#{@configdir}/commands/test2")
+    File.open("#{@configdir}/commands/test2/commands.yml", 'w') do |file|
+      file.write data2.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_equal(:success, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true, 'test2' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :success, 'test2' => :success}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({'test' => data, 'test2' => data2}, @etch.instance_variable_get(:@commands))
+  end
+  test 'generate_commands dependfile' do
+    testname = 'generate_commands dependfile'
+    data = {dependfile: ['/testfile'], steps: [{step: {guard: ['true'], command: ['ls']}}]}
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    filedata = {file: {plain: 'source'}}
+    FileUtils.mkdir_p("#{@configdir}/source/testfile")
+    File.open("#{@configdir}/source/testfile/config.yml", 'w') do |file|
+      file.write filedata.to_yaml
+    end
+    sourcecontents = "Test #{testname}\n"
+    File.open("#{@configdir}/source/testfile/source", 'w') do |file|
+      file.write sourcecontents
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+    @etch.instance_variable_set(:@configs, {})
+    FileUtils.cp("#{File.dirname(__FILE__)}/../../../test/testrepo/defaults.yml", @configdir)
+    @etch.instance_variable_set(:@defaults, @etch.send(:load_defaults))
+
+    request = {files: {'/testfile' => {orig: ''}}}
+    assert_equal(:success, @etch.send(:generate_commands, 'test', request))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true, '/testfile' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :success, '/testfile' => :success}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({'test' => data}, @etch.instance_variable_get(:@commands))
+    expectfiledata = {'/testfile' => {file: {contents: Base64.encode64(sourcecontents), owner: 0, group: 0, perms: 444}}}
+    assert_equal(expectfiledata, @etch.instance_variable_get(:@configs))
+  end
+  test 'generate_commands empty commands' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_equal(:unknown, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :unknown}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({}, @etch.instance_variable_get(:@commands))
+  end
+  test 'generate_commands empty step' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_equal(:unknown, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :unknown}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({}, @etch.instance_variable_get(:@commands))
+  end
+  test 'generate_commands empty array step' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: [], command: []}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_equal(:unknown, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :unknown}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({}, @etch.instance_variable_get(:@commands))
+  end
+  test 'generate_commands no guard' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {command: ['ls']}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_raise(RuntimeError) {@etch.send(:generate_commands, 'test', nil)}
+  end
+  test 'generate_commands no guard array' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: [], command: ['ls']}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_raise(RuntimeError) {@etch.send(:generate_commands, 'test', nil)}
+  end
+  test 'generate_commands no command' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: ['true']}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_raise(RuntimeError) {@etch.send(:generate_commands, 'test', nil)}
+  end
+  test 'generate_commands no command array' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: ['true'], command: []}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_raise(RuntimeError) {@etch.send(:generate_commands, 'test', nil)}
+  end
+  test 'generate_commands scalar data' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: 'true', command: 'ls'}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_equal(:success, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :success}, @etch.instance_variable_get(:@generation_status))
+    data[:steps].first[:step][:guard] = [data[:steps].first[:step][:guard]]
+    data[:steps].first[:step][:command] = [data[:steps].first[:step][:command]]
+    assert_equal({'test' => data}, @etch.instance_variable_get(:@commands))
+  end
+  test 'generate_commands array data' do
+    FileUtils.mkdir_p("#{@configdir}/commands/test")
+    data = {steps: [{step: {guard: ['true', 'false'], command: ['ls', 'grep']}}]}
+    File.open("#{@configdir}/commands/test/commands.yml", 'w') do |file|
+      file.write data.to_yaml
+    end
+    # These are normally initialized by the generate method
+    @etch.instance_variable_set(:@filestack, {})
+    @etch.instance_variable_set(:@already_generated, {})
+    @etch.instance_variable_set(:@generation_status, {})
+    @etch.instance_variable_set(:@commands, {})
+
+    assert_equal(:success, @etch.send(:generate_commands, 'test', nil))
+    assert_equal({}, @etch.instance_variable_get(:@filestack))
+    assert_equal({'test' => true}, @etch.instance_variable_get(:@already_generated))
+    assert_equal({'test' => :success}, @etch.instance_variable_get(:@generation_status))
+    assert_equal({'test' => data}, @etch.instance_variable_get(:@commands))
+  end
+
   test 'load_command xml' do
     FileUtils.mkdir_p("#{@configdir}/commands/test")
     File.open("#{@configdir}/commands/test/commands.xml", 'w') do |file|
-      file.write '<commands><step><guard><exec>true</exec></guard><command><exec>false</exec></command></step></commands>'
+      file.write '<commands><step><guard><exec>true</exec><exec>false</exec></guard><command><exec>ls</exec><exec>grep</exec></command></step></commands>'
     end
-    assert_equal({steps: [{step: {guard: ['true'], command: ['false']}}]}, @etch.send(:load_command, 'test'))
+    assert_equal({steps: [{step: {guard: ['true', 'false'], command: ['ls', 'grep']}}]}, @etch.send(:load_command, 'test'))
   end
   test 'load_command empty' do
     FileUtils.mkdir_p("#{@configdir}/commands/test")
@@ -282,6 +647,7 @@ EOF
         <source>
           <plain>plainfile</plain>
           <plain>plainfile</plain>
+          <plain>plainfile2</plain>
         </source>
       </file>
       <link>
@@ -321,13 +687,13 @@ EOF
         owner: 'nobody',
         perms: '755',
         warning_on_second_line: true,
-        plain: 'plainfile',
+        plain: ['plainfile', 'plainfile', 'plainfile2'],
       },
       link: {
         group: 'someone',
         perms: '600',
         overwrite_directory: true,
-        script: 'linkscript',
+        script: ['linkscript'],
       },
       directory: {
         owner: 'nouser',
