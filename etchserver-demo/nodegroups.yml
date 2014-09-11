@@ -1,0 +1,6 @@
+dns_server:
+- dns_primary
+- dns_secondary
+http_server:
+- intranet_server
+- yum_server

@@ -1,0 +1,5 @@
+server1.example.com:
+- nfs_server
+- dhcp_server
+server2.example.com:
+- mail_server

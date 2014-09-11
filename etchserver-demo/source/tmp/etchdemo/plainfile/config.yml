@@ -1,0 +1,9 @@
+file:
+  # By default files will be owned by root, but you can change that.
+  # If this user or group doesn't exist UID 0 and GID 0 will be used as
+  # a fallback.
+  owner: demouser
+  group: demogroup
+  plain:
+    - where operatingsystem != FreeBSD: plainfile
+    - where operatingsystem == FreeBSD: plainfile2

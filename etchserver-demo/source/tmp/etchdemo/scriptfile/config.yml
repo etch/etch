@@ -1,0 +1,6 @@
+file:
+  script: scriptfile.script
+post:
+  where operatingsystem =~ RedHat|CentOS: service sshd status
+test:
+  - id root

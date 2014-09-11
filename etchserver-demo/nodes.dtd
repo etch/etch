@@ -1,8 +1,0 @@
-<!ELEMENT nodes (node*)>
-
-<!ELEMENT node (group*, hardware*)>
-<!ATTLIST node name CDATA #REQUIRED>
-
-<!ELEMENT group (#PCDATA)>
-<!ELEMENT hardware (#PCDATA)>
-

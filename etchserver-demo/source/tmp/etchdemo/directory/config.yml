@@ -1,0 +1,7 @@
+# This directory will be created on any variant of Linux, and
+# FreeBSD and Solaris.
+directory:
+  create:
+    - where kernel == Linux: true
+    - where operatingsystem == FreeBSD: true
+    - where operatingsystem == Solaris: true
