@@ -74,7 +74,7 @@ EOF
     assert_equal({a: [{b: 1}]}, @etch.send(:symbolize_etch_keys, {'a' => [{'b' => 1}]}))
   end
   test 'load_nodes none' do
-    assert_raise(RuntimeError) {@etch.send(:load_nodes)}
+    assert_equal([{}, '<none>'], @etch.send(:load_nodes))
   end
   test 'load_nodes yaml empty' do
     File.open("#{@configdir}/nodes.yml", 'w') do |file|

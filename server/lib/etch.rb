@@ -101,11 +101,11 @@ class Etch
     @commands_dtd_file = "#{@configdir}/commands.dtd"
     
     #
-    # Load the DTD which is used to validate config.xml files
+    # These will be loaded on demand so that all-YAML configurations don't require them
     #
     
-    @config_dtd = Etch.xmlloaddtd(@config_dtd_file)
-    @commands_dtd = Etch.xmlloaddtd(@commands_dtd_file)
+    @config_dtd = nil
+    @commands_dtd = nil
     
     #
     # Load the defaults file which sets defaults for parameters that the
@@ -303,9 +303,9 @@ class Etch
           nodes[name] << Etch.xmltext(group)
         end
       end
-    else
-      raise "Neither nodes.yml nor nodes.xml exists"
     end
+    nodes ||= {}
+    nodesfile ||= '<none>'
     [nodes, nodesfile]
   end
   def load_nodegroups
@@ -903,6 +903,7 @@ class Etch
         raise Etch.wrap_exception(e, "Error filtering config.xml for #{file}:\n" + e.message)
       end
       # Validate the filtered file against config.dtd
+      @config_dtd ||= Etch.xmlloaddtd(@config_dtd_file)
       begin
         Etch.xmlvalidate(config_xml, @config_dtd)
       rescue Exception => e
@@ -1045,6 +1046,7 @@ class Etch
         raise Etch.wrap_exception(e, "Error filtering commands.xml for #{command}:\n" + e.message)
       end
       # Validate the filtered file against commands.dtd
+      @commands_dtd ||= Etch.xmlloaddtd(@commands_dtd_file)
       begin
         Etch.xmlvalidate(command_xml, @commands_dtd)
       rescue Exception => e
