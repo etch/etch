@@ -3,11 +3,12 @@ require 'intmax'
 class FactsController < ApplicationController
   # GET /facts
   def index
-    # Clients requesting XML get no pagination (all entries)
+    # Clients requesting XML/JSON get no pagination (all entries)
     per_page = Fact.per_page # will_paginate's default value
     respond_to do |format|
       format.html {}
-      format.xml { per_page = Integer::MAX }
+      format.xml  { per_page = Integer::MAX }
+      format.json { per_page = Integer::MAX }
     end
     
     @q = Fact.search(params[:q])
@@ -16,6 +17,7 @@ class FactsController < ApplicationController
     respond_to do |format|
       format.html # index.html.erb
       format.xml  { render :xml => @facts }
+      format.json { render :json => @facts }
     end
   end
 
@@ -26,6 +28,7 @@ class FactsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.xml  { render :xml => @fact }
+      format.json { render :json => @fact }
     end
   end
 
@@ -36,6 +39,7 @@ class FactsController < ApplicationController
     respond_to do |format|
       format.html # new.html.erb
       format.xml  { render :xml => @fact }
+      format.json { render :json => @fact }
     end
   end
 
@@ -53,9 +57,11 @@ class FactsController < ApplicationController
         flash[:notice] = 'Fact was successfully created.'
         format.html { redirect_to(@fact) }
         format.xml  { render :xml => @fact, :status => :created, :location => @fact }
+        format.json { render :json => @fact, :status => :created, :location => @fact }
       else
         format.html { render :action => "new" }
         format.xml  { render :xml => @fact.errors, :status => :unprocessable_entity }
+        format.json { render :json => @fact.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -69,9 +75,11 @@ class FactsController < ApplicationController
         flash[:notice] = 'Fact was successfully updated.'
         format.html { redirect_to(@fact) }
         format.xml  { head :ok }
+        format.json { head :ok }
       else
         format.html { render :action => "edit" }
         format.xml  { render :xml => @fact.errors, :status => :unprocessable_entity }
+        format.json { render :json => @fact.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -84,6 +92,7 @@ class FactsController < ApplicationController
     respond_to do |format|
       format.html { redirect_to(admin_facts_url) }
       format.xml  { head :ok }
+      format.json { head :ok }
     end
   end
 end

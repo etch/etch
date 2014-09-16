@@ -3,11 +3,12 @@ require 'intmax'
 class EtchConfigsController < ApplicationController
   # GET /etch_configs
   def index
-    # Clients requesting XML get no pagination (all entries)
+    # Clients requesting XML/JSON get no pagination (all entries)
     per_page = EtchConfig.per_page # will_paginate's default value
     respond_to do |format|
       format.html {}
-      format.xml { per_page = Integer::MAX }
+      format.xml  { per_page = Integer::MAX }
+      format.json { per_page = Integer::MAX }
     end
     
     @q = EtchConfig.search(params[:q])
@@ -16,6 +17,7 @@ class EtchConfigsController < ApplicationController
     respond_to do |format|
       format.html # index.html.erb
       format.xml  { render :xml => @etch_configs }
+      format.json { render :json => @etch_configs }
     end
   end
 
@@ -26,6 +28,7 @@ class EtchConfigsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.xml  { render :xml => @etch_config }
+      format.json { render :json => @etch_config }
     end
   end
 
@@ -36,6 +39,7 @@ class EtchConfigsController < ApplicationController
     respond_to do |format|
       format.html # new.html.erb
       format.xml  { render :xml => @etch_config }
+      format.json { render :json => @etch_config }
     end
   end
 
@@ -53,9 +57,11 @@ class EtchConfigsController < ApplicationController
         flash[:notice] = 'EtchConfig was successfully created.'
         format.html { redirect_to(@etch_config) }
         format.xml  { render :xml => @etch_config, :status => :created, :location => @etch_config }
+        format.json { render :json => @etch_config, :status => :created, :location => @etch_config }
       else
         format.html { render :action => "new" }
         format.xml  { render :xml => @etch_config.errors, :status => :unprocessable_entity }
+        format.json { render :json => @etch_config.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -69,9 +75,11 @@ class EtchConfigsController < ApplicationController
         flash[:notice] = 'EtchConfig was successfully updated.'
         format.html { redirect_to(@etch_config) }
         format.xml  { head :ok }
+        format.json { head :ok }
       else
         format.html { render :action => "edit" }
         format.xml  { render :xml => @etch_config.errors, :status => :unprocessable_entity }
+        format.json { render :json => @etch_config.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -84,6 +92,7 @@ class EtchConfigsController < ApplicationController
     respond_to do |format|
       format.html { redirect_to(admin_etch_configs_url) }
       format.xml  { head :ok }
+      format.json { head :ok }
     end
   end
 end
