@@ -24,7 +24,7 @@ class ResultsController < ApplicationController
     respond_to do |format|
       format.html # index.html.erb
       format.xml  { render :xml => @results.to_xml(:dasherize => false) }
-      format.json { render :json => @results.to_json(:dasherize => false) }
+      format.json { render :json => @results.to_json }
     end
   end
   
@@ -34,7 +34,7 @@ class ResultsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.xml  { render :xml => @result.to_xml(:dasherize => false) }
-      format.json { render :json => @result.to_json(:dasherize => false) }
+      format.json { render :json => @result.to_json }
     end
   end
   

@@ -34,7 +34,7 @@ class ClientsController < ApplicationController
     respond_to do |format|
       format.html # index.html.erb
       format.xml  { render :xml => @clients.to_xml(:dasherize => false) }
-      format.json { render :json => @clients.to_json(:dasherize => false) }
+      format.json { render :json => @clients.to_json }
     end
   end
   
@@ -49,7 +49,7 @@ class ClientsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.xml  { render :xml => @client.to_xml(:dasherize => false) }
-      format.json { render :json => @client.to_json(:dasherize => false) }
+      format.json { render :json => @client.to_json }
     end
   end
   
