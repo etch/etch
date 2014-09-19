@@ -22,9 +22,9 @@ class FilesController < ApplicationController
         commands = params[:commands].inject({}) { |h, (command, value)| h[CGI.unescape(command)] = value; h }
       end
       respond_to do |format|
-        format.json { render :json => etchserver.generate(files, commands, :json) }
         format.xml  { render :xml => etchserver.generate(files, commands, :xml) }
         format.yaml { render body: etchserver.generate(files, commands, :yaml), content_type: "application/x-yaml" }
+        format.json { render :json => etchserver.generate(files, commands, :json) }
       end
     rescue Exception => e
       logger.error e.message
