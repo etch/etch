@@ -5,6 +5,7 @@ require 'time'        # Time.parse
 require 'fileutils'   # mkdir_p
 require 'logger'
 require 'yaml'
+require 'json'
 require 'set'
 require 'etch'
 
@@ -412,33 +413,42 @@ class Etch::Server
     case format
     when :yaml
       yamlresponse(response, need_sum, need_orig)
+    when :json
+      jsonresponse(response, need_sum, need_orig)
     when :xml
       xmlresponse(response, need_sum, need_orig)
     else
       raise "Unsupported format #{format}"
     end
   end
-  def yamlresponse(response, need_sum, need_orig)
-    # Generate the YAML to return to the client
-    response_yaml = {}
+  def hashresponse(response, need_sum, need_orig)
+    response_hash = {}
     if response[:configs]
-      response_yaml[:configs] = response[:configs]
+      response_hash[:configs] = response[:configs]
     end
     if !need_sum.empty?
-      response_yaml[:need_sum] = need_sum
+      response_hash[:need_sum] = need_sum
     end
     if !need_orig.empty?
-      response_yaml[:need_orig] = need_orig
+      response_hash[:need_orig] = need_orig
     end
     if response[:commands]
-      response_yaml[:commands] = response[:commands]
+      response_hash[:commands] = response[:commands]
     end
     if response[:retrycommands]
-      response_yaml[:retrycommands] = response[:retrycommands]
+      response_hash[:retrycommands] = response[:retrycommands]
     end
-    yaml = response_yaml.to_yaml
+    response_hash
+  end
+  def yamlresponse(response, need_sum, need_orig)
+    yaml = hashresponse(response, need_sum, need_orig).to_yaml
     @dlogger.debug "Returning #{yaml}"
     yaml
+  end
+  def jsonresponse(response, need_sum, need_orig)
+    json = hashresponse(response, need_sum, need_orig).to_json
+    @dlogger.debug "Returning #{json}"
+    json
   end
   def xmlresponse(response, need_sum, need_orig)
     # Generate the XML document to return to the client
