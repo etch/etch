@@ -1,9 +1,6 @@
 require 'test_helper'
 
 class ClientTest < ActiveSupport::TestCase
-  # FIXME: need to test
-  # attr_accessible :name, :status, :message
-  
   test 'has many facts' do
     assert_kind_of Fact, clients(:one).facts.first
   end

@@ -1,9 +1,6 @@
 require 'test_helper'
 
 class FactTest < ActiveSupport::TestCase
-  # FIXME: need to test
-  # attr_accessible :client, :client_id, :key, :value
-
   test 'belongs to client' do
     f = Fact.new(client_id: clients(:one).id)
     f.client = clients(:one)

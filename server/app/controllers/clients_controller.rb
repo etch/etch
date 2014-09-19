@@ -58,7 +58,7 @@ class ClientsController < ApplicationController
     
     respond_to do |format|
       format.html # new.html.erb
-      format.xml  { render :xml => @client }
+      format.xml  { render :xml => @client.to_xml(:dasherize => false) }
     end
   end
   
@@ -69,13 +69,13 @@ class ClientsController < ApplicationController
   
   # POST /clients
   def create
-    @client = Client.new(params[:client])
+    @client = Client.new(client_params)
     
     respond_to do |format|
       if @client.save
         flash[:notice] = 'Client was successfully created.'
         format.html { redirect_to(@client) }
-        format.xml  { render :xml => @client, :status => :created, :location => @client }
+        format.xml  { render :xml => @client.to_xml(:dasherize => false), :status => :created, :location => @client }
       else
         format.html { render :action => "new" }
         format.xml  { render :xml => @client.errors, :status => :unprocessable_entity }
@@ -88,7 +88,7 @@ class ClientsController < ApplicationController
     @client = Client.find(params[:id])
     
     respond_to do |format|
-      if @client.update_attributes(params[:client])
+      if @client.update_attributes(client_params)
         flash[:notice] = 'Client was successfully updated.'
         format.html { redirect_to(@client) }
         format.xml  { head :ok }
@@ -109,5 +109,10 @@ class ClientsController < ApplicationController
       format.xml  { head :ok }
     end
   end
+
+  private
+    def client_params
+      params.require(:client).permit(:name, :status, :message)
+    end
 end
 

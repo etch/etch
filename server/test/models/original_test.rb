@@ -1,9 +1,6 @@
 require 'test_helper'
 
 class OriginalTest < ActiveSupport::TestCase
-  # FIXME: need to test
-  # attr_accessible :client, :client_id, :file, :sum
-
   test 'belongs to client' do
     o = Original.new(client_id: clients(:one).id)
     o.client = clients(:one)

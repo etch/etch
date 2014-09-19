@@ -1,6 +1,4 @@
 class Client < ActiveRecord::Base
-  attr_accessible :name, :status, :message
-
   has_many :facts, :dependent => :destroy
   has_many :originals, :dependent => :destroy
   has_many :etch_configs, :dependent => :destroy

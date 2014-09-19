@@ -1,9 +1,6 @@
 require 'test_helper'
 
 class EtchConfigTest < ActiveSupport::TestCase
-  # FIXME: need to test
-  # attr_accessible :client, :client_id, :file, :config
-  
   test 'belongs to client' do
     c = EtchConfig.new(client_id: clients(:one).id)
     c.client = clients(:one)

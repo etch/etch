@@ -15,7 +15,7 @@ class FactsController < ApplicationController
     
     respond_to do |format|
       format.html # index.html.erb
-      format.xml  { render :xml => @facts }
+      format.xml  { render :xml => @facts.to_xml(:dasherize => false) }
     end
   end
 
@@ -25,7 +25,7 @@ class FactsController < ApplicationController
 
     respond_to do |format|
       format.html # show.html.erb
-      format.xml  { render :xml => @fact }
+      format.xml  { render :xml => @fact.to_xml(:dasherize => false) }
     end
   end
 
@@ -35,7 +35,7 @@ class FactsController < ApplicationController
 
     respond_to do |format|
       format.html # new.html.erb
-      format.xml  { render :xml => @fact }
+      format.xml  { render :xml => @fact.to_xml(:dasherize => false) }
     end
   end
 
@@ -46,13 +46,13 @@ class FactsController < ApplicationController
 
   # POST /facts
   def create
-    @fact = Fact.new(params[:fact])
+    @fact = Fact.new(fact_params)
 
     respond_to do |format|
       if @fact.save
         flash[:notice] = 'Fact was successfully created.'
         format.html { redirect_to(@fact) }
-        format.xml  { render :xml => @fact, :status => :created, :location => @fact }
+        format.xml  { render :xml => @fact.to_xml(:dasherize => false), :status => :created, :location => @fact }
       else
         format.html { render :action => "new" }
         format.xml  { render :xml => @fact.errors, :status => :unprocessable_entity }
@@ -65,7 +65,7 @@ class FactsController < ApplicationController
     @fact = Fact.find(params[:id])
 
     respond_to do |format|
-      if @fact.update_attributes(params[:fact])
+      if @fact.update_attributes(fact_params)
         flash[:notice] = 'Fact was successfully updated.'
         format.html { redirect_to(@fact) }
         format.xml  { head :ok }
@@ -82,8 +82,13 @@ class FactsController < ApplicationController
     @fact.destroy
 
     respond_to do |format|
-      format.html { redirect_to(admin_facts_url) }
+      format.html { redirect_to(facts_url) }
       format.xml  { head :ok }
     end
   end
+
+  private
+    def fact_params
+      params.require(:fact).permit(:client_id, :key, :value)
+    end
 end

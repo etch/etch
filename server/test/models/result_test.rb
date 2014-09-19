@@ -1,9 +1,6 @@
 require 'test_helper'
 
 class ResultTest < ActiveSupport::TestCase
-  # FIXME: need to test
-  # attr_accessible :client, :client_id, :file, :success, :message
-
   test 'belongs to client' do
     r = Result.new(client_id: clients(:one).id)
     r.client = clients(:one)
