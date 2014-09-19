@@ -20,11 +20,12 @@ class ClientsController < ApplicationController
       scope = Client
     end
     
-    # Clients requesting XML get no pagination (all entries)
+    # Clients requesting XML/JSON get no pagination (all entries)
     per_page = Client.per_page # will_paginate's default value
     respond_to do |format|
       format.html {}
-      format.xml { per_page = Integer::MAX }
+      format.xml  { per_page = Integer::MAX }
+      format.json { per_page = Integer::MAX }
     end
     
     @q = scope.search(params[:q])
@@ -32,9 +33,8 @@ class ClientsController < ApplicationController
     
     respond_to do |format|
       format.html # index.html.erb
-      format.xml do
-        render :xml => @clients.to_xml(:dasherize => false)
-      end
+      format.xml  { render :xml => @clients.to_xml(:dasherize => false) }
+      format.json { render :json => @clients.to_json }
     end
   end
   
@@ -49,6 +49,7 @@ class ClientsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.xml  { render :xml => @client.to_xml(:dasherize => false) }
+      format.json { render :json => @client.to_json }
     end
   end
   
@@ -59,6 +60,7 @@ class ClientsController < ApplicationController
     respond_to do |format|
       format.html # new.html.erb
       format.xml  { render :xml => @client.to_xml(:dasherize => false) }
+      format.json { render :json => @client }
     end
   end
   
@@ -76,9 +78,11 @@ class ClientsController < ApplicationController
         flash[:notice] = 'Client was successfully created.'
         format.html { redirect_to(@client) }
         format.xml  { render :xml => @client.to_xml(:dasherize => false), :status => :created, :location => @client }
+        format.json { render :json => @client, :status => :created, :location => @client }
       else
         format.html { render :action => "new" }
         format.xml  { render :xml => @client.errors, :status => :unprocessable_entity }
+        format.json { render :json => @client.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -92,9 +96,11 @@ class ClientsController < ApplicationController
         flash[:notice] = 'Client was successfully updated.'
         format.html { redirect_to(@client) }
         format.xml  { head :ok }
+        format.json { head :ok }
       else
         format.html { render :action => "edit" }
         format.xml  { render :xml => @client.errors, :status => :unprocessable_entity }
+        format.json { render :json => @client.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -107,6 +113,7 @@ class ClientsController < ApplicationController
     respond_to do |format|
       format.html { redirect_to(clients_url) }
       format.xml  { head :ok }
+      format.json { head :ok }
     end
   end
 

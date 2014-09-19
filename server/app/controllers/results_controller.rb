@@ -6,11 +6,12 @@ class ResultsController < ApplicationController
     @combined = params[:combined]
     @query_string = request.query_string
     
-    # Clients requesting XML get no pagination (all entries)
+    # Clients requesting XML/JSON get no pagination (all entries)
     per_page = Client.per_page # will_paginate's default value
     respond_to do |format|
       format.html {}
-      format.xml { per_page = Integer::MAX }
+      format.xml  { per_page = Integer::MAX }
+      format.json { per_page = Integer::MAX }
     end
     # As do clients who specifically request everything
     if @combined
@@ -22,9 +23,8 @@ class ResultsController < ApplicationController
     
     respond_to do |format|
       format.html # index.html.erb
-      format.xml do
-        render :xml => @results.to_xml(:dasherize => false)
-      end
+      format.xml  { render :xml => @results.to_xml(:dasherize => false) }
+      format.json { render :json => @results.to_json }
     end
   end
   
@@ -34,6 +34,7 @@ class ResultsController < ApplicationController
     respond_to do |format|
       format.html # show.html.erb
       format.xml  { render :xml => @result.to_xml(:dasherize => false) }
+      format.json { render :json => @result.to_json }
     end
   end
   
@@ -44,6 +45,7 @@ class ResultsController < ApplicationController
     respond_to do |format|
       format.html # new.html.erb
       format.xml  { render :xml => @result.to_xml(:dasherize => false) }
+      format.json { render :json => @result }
     end
   end
 
@@ -130,9 +132,11 @@ class ResultsController < ApplicationController
         flash[:notice] = 'Result was successfully updated.'
         format.html { redirect_to(@result) }
         format.xml  { head :ok }
+        format.json { head :ok }
       else
         format.html { render :action => "edit" }
         format.xml  { render :xml => @result.errors, :status => :unprocessable_entity }
+        format.json { render :json => @result.errors, :status => :unprocessable_entity }
       end
     end
   end
@@ -145,6 +149,7 @@ class ResultsController < ApplicationController
     respond_to do |format|
       format.html { redirect_to(results_url) }
       format.xml  { head :ok }
+      format.json { head :ok }
     end
   end
 
