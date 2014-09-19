@@ -53,9 +53,12 @@ GEM
     libv8 (3.16.14.3)
     mail (2.6.1)
       mime-types (>= 1.16, < 3)
+    metaclass (0.0.4)
     mime-types (2.3)
     mini_portile (0.5.2)
     minitest (5.4.1)
+    mocha (1.1.0)
+      metaclass (~> 0.0.1)
     multi_json (1.10.1)
     nokogiri (1.6.1)
       mini_portile (~> 0.5.0)
@@ -130,6 +133,7 @@ DEPENDENCIES
   exception_notification (~> 4.0.1)
   jbuilder (~> 1.2)
   jquery-rails
+  mocha
   nokogiri (~> 1.6.1)
   rails (= 4.1.6)
   ransack (~> 1.2.2)
