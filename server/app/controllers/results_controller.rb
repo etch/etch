@@ -44,7 +44,7 @@ class ResultsController < ApplicationController
 
     respond_to do |format|
       format.html # new.html.erb
-      format.xml  { render :xml => @result }
+      format.xml  { render :xml => @result.to_xml(:dasherize => false) }
       format.json { render :json => @result }
     end
   end
@@ -84,7 +84,10 @@ class ResultsController < ApplicationController
     # changed.  Otherwise clients will appear to go stale if their state
     # remains unchanged.
     client.updated_at = Time.now
-    client.save
+    if !client.save
+      render :text => "Client save failed: #{client.errors.full_messages}", :status => :unprocessable_entity
+      return
+    end
     
     success_count = 0
     params[:results].each do |result|
@@ -109,9 +112,11 @@ class ResultsController < ApplicationController
       # detect and replace invalid bytes.
       result[:message].encode!('UTF-16', :invalid => :replace).encode!('UTF-8')
       
-      result = Result.new(result.merge({:client => client}))
+      result = Result.new(result.merge({:client_id => client.id}).permit(:client_id, :file, :success, :message))
       if result.save
         success_count += 1
+      else
+        logger.debug "Result save failed: #{result.errors.full_messages}"
       end
     end
     
@@ -123,7 +128,7 @@ class ResultsController < ApplicationController
     @result = Result.find(params[:id])
 
     respond_to do |format|
-      if @result.update_attributes(params[:result])
+      if @result.update_attributes(result_params)
         flash[:notice] = 'Result was successfully updated.'
         format.html { redirect_to(@result) }
         format.xml  { head :ok }
@@ -142,10 +147,15 @@ class ResultsController < ApplicationController
     @result.destroy
 
     respond_to do |format|
-      format.html { redirect_to(admin_results_url) }
+      format.html { redirect_to(results_url) }
       format.xml  { head :ok }
       format.json { head :ok }
     end
   end
+
+  private
+    def result_params
+      params.require(:result).permit(:client_id, :file, :success, :message)
+    end
 end
 

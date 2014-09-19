@@ -16,7 +16,7 @@ class EtchConfigsController < ApplicationController
     
     respond_to do |format|
       format.html # index.html.erb
-      format.xml  { render :xml => @etch_configs }
+      format.xml  { render :xml => @etch_configs.to_xml(:dasherize => false) }
       format.json { render :json => @etch_configs }
     end
   end
@@ -27,7 +27,7 @@ class EtchConfigsController < ApplicationController
 
     respond_to do |format|
       format.html # show.html.erb
-      format.xml  { render :xml => @etch_config }
+      format.xml  { render :xml => @etch_config.to_xml(:dasherize => false) }
       format.json { render :json => @etch_config }
     end
   end
@@ -38,7 +38,7 @@ class EtchConfigsController < ApplicationController
 
     respond_to do |format|
       format.html # new.html.erb
-      format.xml  { render :xml => @etch_config }
+      format.xml  { render :xml => @etch_config.to_xml(:dasherize => false) }
       format.json { render :json => @etch_config }
     end
   end
@@ -50,13 +50,13 @@ class EtchConfigsController < ApplicationController
 
   # POST /etch_configs
   def create
-    @etch_config = EtchConfig.new(params[:etch_config])
+    @etch_config = EtchConfig.new(etch_config_params)
 
     respond_to do |format|
       if @etch_config.save
         flash[:notice] = 'EtchConfig was successfully created.'
         format.html { redirect_to(@etch_config) }
-        format.xml  { render :xml => @etch_config, :status => :created, :location => @etch_config }
+        format.xml  { render :xml => @etch_config.to_xml(:dasherize => false), :status => :created, :location => @etch_config }
         format.json { render :json => @etch_config, :status => :created, :location => @etch_config }
       else
         format.html { render :action => "new" }
@@ -71,7 +71,7 @@ class EtchConfigsController < ApplicationController
     @etch_config = EtchConfig.find(params[:id])
 
     respond_to do |format|
-      if @etch_config.update_attributes(params[:etch_config])
+      if @etch_config.update_attributes(etch_config_params)
         flash[:notice] = 'EtchConfig was successfully updated.'
         format.html { redirect_to(@etch_config) }
         format.xml  { head :ok }
@@ -90,9 +90,14 @@ class EtchConfigsController < ApplicationController
     @etch_config.destroy
 
     respond_to do |format|
-      format.html { redirect_to(admin_etch_configs_url) }
+      format.html { redirect_to(etch_configs_url) }
       format.xml  { head :ok }
       format.json { head :ok }
     end
   end
+
+  private
+    def etch_config_params
+      params.require(:etch_config).permit(:client_id, :file, :config)
+    end
 end

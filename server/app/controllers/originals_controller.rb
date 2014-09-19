@@ -16,7 +16,7 @@ class OriginalsController < ApplicationController
     
     respond_to do |format|
       format.html # index.html.erb
-      format.xml  { render :xml => @originals }
+      format.xml  { render :xml => @originals.to_xml(:dasherize => false) }
       format.json { render :json => @originals }
     end
   end
@@ -27,7 +27,7 @@ class OriginalsController < ApplicationController
 
     respond_to do |format|
       format.html # show.html.erb
-      format.xml  { render :xml => @original }
+      format.xml  { render :xml => @original.to_xml(:dasherize => false) }
       format.json { render :json => @original }
     end
   end
@@ -38,7 +38,7 @@ class OriginalsController < ApplicationController
 
     respond_to do |format|
       format.html # new.html.erb
-      format.xml  { render :xml => @original }
+      format.xml  { render :xml => @original.to_xml(:dasherize => false) }
       format.json { render :json => @original }
     end
   end
@@ -50,13 +50,13 @@ class OriginalsController < ApplicationController
 
   # POST /originals
   def create
-    @original = Original.new(params[:original])
+    @original = Original.new(original_params)
 
     respond_to do |format|
       if @original.save
         flash[:notice] = 'Original was successfully created.'
         format.html { redirect_to(@original) }
-        format.xml  { render :xml => @original, :status => :created, :location => @original }
+        format.xml  { render :xml => @original.to_xml(:dasherize => false), :status => :created, :location => @original }
         format.json { render :json => @original, :status => :created, :location => @original }
       else
         format.html { render :action => "new" }
@@ -71,7 +71,7 @@ class OriginalsController < ApplicationController
     @original = Original.find(params[:id])
 
     respond_to do |format|
-      if @original.update_attributes(params[:original])
+      if @original.update_attributes(original_params)
         flash[:notice] = 'Original was successfully updated.'
         format.html { redirect_to(@original) }
         format.xml  { head :ok }
@@ -90,9 +90,14 @@ class OriginalsController < ApplicationController
     @original.destroy
 
     respond_to do |format|
-      format.html { redirect_to(admin_originals_url) }
+      format.html { redirect_to(originals_url) }
       format.xml  { head :ok }
       format.json { head :ok }
     end
   end
+
+  private
+    def original_params
+      params.require(:original).permit(:client_id, :file, :sum)
+    end
 end
