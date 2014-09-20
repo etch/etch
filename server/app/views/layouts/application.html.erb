@@ -18,7 +18,7 @@ Welcome back, <%= link_to logged_in_account.name, account_path(logged_in_account
 <%- else -%>
 <%#= link_to "Login", :controller => 'login', :action => 'login' %>
 <%- end -%>
-<%= link_to "Help", "http://etch.sourceforge.net/" %>
+<%= link_to "Help", "http://etch.github.io/" %>
 </p>
 
 <h1 id="branding"><%= link_to "Etch", { :controller => 'dashboard' } %></h1>
@@ -47,8 +47,8 @@ Welcome back, <%= link_to logged_in_account.name, account_path(logged_in_account
 <p><%= link_to "Dashboard", { :controller => 'dashboard' } %></p>
 
 <ul>
-  <li><%= link_to "Clients", clients_url %></li>
-  <li><%= link_to "Results", results_url %></li>
+  <li><%= link_to "Clients", clients_path %></li>
+  <li><%= link_to "Results", results_path %></li>
 </ul>
 <hr />
 </div> <!-- end sidepanel -->
