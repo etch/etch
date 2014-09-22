@@ -1,32 +1,54 @@
 #!/usr/bin/ruby -w
-
 require 'fileutils'
 require 'tempfile'
 
-if !File.directory?('/etc/etchserver/trunk')
+use_git = true if ARGV[0] == "git"
+
+if !File.directory?("/etc/etchserver/trunk")
   abort "Please check out an etch config repo in /etc/etchserver/trunk"
 end
 
-FileUtils.mkdir_p('/etc/etchserver/orig')
-FileUtils.chown('nobody', nil, '/etc/etchserver/orig')
-Dir.chdir('/etc/etchserver')
-system('svn update --quiet')
+if use_git
+  # clean and reset the repo
+  Dir.chdir('/etc/etchserver/trunk')
+  system('git reset --hard --quiet')
+  system('git clean -fdx --quiet')
+  system('git pull --quiet origin master')
+  Dir.chdir('/etc/etchserver')
+else
+  FileUtils.mkdir_p('/etc/etchserver/orig')
+  FileUtils.chown('nobody', nil, '/etc/etchserver/orig')
+  Dir.chdir('/etc/etchserver')
+  system('svn update --quiet')
+end
 
 # Create hourly tag
 FileUtils.mkdir_p('/etc/etchserver/tags')
 currenttag = Time.now.strftime('etchautotag-%Y%m%d-%H00')
 tagdir = File.join('tags', currenttag)
+
 if !File.directory?(tagdir)
   # Use Tempfile to make a unique filename
   tmpdirfile = Tempfile.new('newtag', 'tags')
+
   # Turn it into a directory
   File.delete(tmpdirfile.path)
   Dir.mkdir(tmpdirfile.path)
+
   # Use it to create the new tag atomically
-  system("cp -a trunk #{tmpdirfile.path}")
-  File.rename(File.join(tmpdirfile.path, 'trunk'), tagdir)
-  # Cleanup
-  Dir.delete(tmpdirfile.path)
+  if use_git
+    # use git archive to create the new tag
+    Dir.chdir('/etc/etchserver/trunk')
+    system("git archive master | tar -x -C #{tmpdirfile.path}")
+    Dir.chdir('/etc/etchserver')
+    File.rename(tmpdirfile.path, tagdir)
+  else
+    system("cp -a trunk #{tmpdirfile.path}")
+    File.rename(File.join(tmpdirfile.path, 'trunk'), tagdir)
+
+    # Cleanup
+    Dir.delete(tmpdirfile.path)
+  end
 end
 
 def convert_tagtime_to_unixtime(tagdate, tagtime)
