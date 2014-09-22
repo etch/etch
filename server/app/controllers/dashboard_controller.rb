@@ -15,8 +15,8 @@ class DashboardController < ApplicationController
   
   def index
     set_counts
-    @status_data_url = url_for(:action => 'chart', :chart => 'status', :format => :json)
-    @client_data_url = url_for(:action => 'chart', :chart => 'client', :format => :json)
+    @status_data_url = url_for(:action => 'chart', :chart => 'status', :format => :json, :only_path => true)
+    @client_data_url = url_for(:action => 'chart', :chart => 'client', :format => :json, :only_path => true)
     # set_charts
   end
   
