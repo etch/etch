@@ -1,0 +1,38 @@
+#!/usr/bin/ruby
+
+require 'rexml/document'
+require 'yaml'
+
+def main
+  if !ARGV[0] || !File.exist?(ARGV[0])
+    abort "Usage: nodes_xml_to_yaml /path/to/nodes.xml"
+  end
+
+  nodes = nodes_xml_to_hash(ARGV[0])
+  yamlname = ARGV[0].sub(/\.xml\z/, '.yml')
+  write_nodes_yml(yamlname, nodes)
+end
+
+def nodes_xml_to_hash(file)
+  nodes = {}
+  doc = REXML::Document.new(File.open(file))
+  doc.elements.each('/nodes/node') do |node|
+    name = node.attributes['name']
+    nodes[name] ||= []
+    node.elements.each('group') do |group|
+      nodes[name] << group.text
+    end
+  end
+  nodes
+end
+
+def write_nodes_yml(yamlname, nodes)
+  if File.exist?(yamlname)
+    abort "#{yamlname} already exists"
+  end
+  File.open(yamlname, 'w') do |yamlfile|
+    yamlfile.write nodes.to_yaml
+  end
+end
+
+main
