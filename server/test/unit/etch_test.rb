@@ -542,6 +542,9 @@ EOF
     refute @etch.send(:eval_yaml_condition, 'group ==three')
     refute @etch.send(:eval_yaml_condition, 'group==three')
 
+    refute @etch.send(:eval_yaml_condition, 'group != one')
+    assert @etch.send(:eval_yaml_condition, 'group != three')
+
     assert @etch.send(:eval_yaml_condition, 'operatingsystem =~ Red')
     assert @etch.send(:eval_yaml_condition, 'operatingsystem =~ \ARed')
     refute @etch.send(:eval_yaml_condition, 'operatingsystem =~ \AHat')
@@ -550,6 +553,7 @@ EOF
     refute @etch.send(:eval_yaml_condition, 'operatingsystem !~ Hat')
 
     assert @etch.send(:eval_yaml_condition, 'operatingsystemrelease == 6.5')
+    assert @etch.send(:eval_yaml_condition, 'operatingsystemrelease != 6.4')
     assert @etch.send(:eval_yaml_condition, 'operatingsystemrelease >= 6.5')
     assert @etch.send(:eval_yaml_condition, 'operatingsystemrelease > 6.1')
     assert @etch.send(:eval_yaml_condition, 'operatingsystemrelease > 6.1.1')

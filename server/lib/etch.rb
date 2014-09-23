@@ -1136,6 +1136,9 @@ class Etch
         when expr =~ /(.+?)\s*==\s*(.+)/
           comps = comparables($1)
           value = comps.include?($2)
+        when expr =~ /(.+?)\s*!=\s*(.+)/
+          comps = comparables($1)
+          value = !comps.include?($2)
         else
           raise "Unable to parse '#{condition}'"
         end
