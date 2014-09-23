@@ -38,8 +38,9 @@ if !File.directory?(tagdir)
   # Use it to create the new tag atomically
   if use_git
     # use git archive to create the new tag
+    tmpdirfile_fullpath = File.expand_path(tmpdirfile.path)
     Dir.chdir('/etc/etchserver/trunk')
-    system("git archive master | tar -x -C #{tmpdirfile.path}")
+    system("git archive master | tar -x -C #{tmpdirfile_fullpath}")
     Dir.chdir('/etc/etchserver')
     File.rename(tmpdirfile.path, tagdir)
   else
