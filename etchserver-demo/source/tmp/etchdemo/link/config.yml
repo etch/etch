@@ -1,3 +1,4 @@
 # This will create a symlink to /tmp/otherfile on all systems.
 link:
   dest: /tmp/otherfile
+  allow_nonexistent_dest: true
