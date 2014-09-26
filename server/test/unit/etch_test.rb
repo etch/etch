@@ -562,6 +562,15 @@ EOF
     assert @etch.send(:eval_yaml_condition, 'operatingsystemrelease < 6.9')
     refute @etch.send(:eval_yaml_condition, 'operatingsystemrelease < 6.2')
 
+    assert @etch.send(:eval_yaml_condition, 'operatingsystem in RedHat, CentOS')
+    refute @etch.send(:eval_yaml_condition, 'operatingsystem in Debian, Ubuntu')
+    refute @etch.send(:eval_yaml_condition, 'operatingsystem !in RedHat, CentOS')
+    assert @etch.send(:eval_yaml_condition, 'operatingsystem !in Debian, Ubuntu')
+    assert @etch.send(:eval_yaml_condition, 'group in one, three')
+    refute @etch.send(:eval_yaml_condition, 'group in zero, three')
+    refute @etch.send(:eval_yaml_condition, 'group !in one, three')
+    assert @etch.send(:eval_yaml_condition, 'group !in zero, three')
+
     assert @etch.send(:eval_yaml_condition, 'operatingsystem =~ Red and group == one')
     assert @etch.send(:eval_yaml_condition, 'operatingsystem =~ Red or group == three')
     refute @etch.send(:eval_yaml_condition, 'operatingsystem =~ Red and group == three')

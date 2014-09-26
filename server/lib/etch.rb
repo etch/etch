@@ -1139,6 +1139,14 @@ class Etch
         when expr =~ /(.+?)\s*!=\s*(.+)/
           comps = comparables($1)
           value = !comps.include?($2)
+        when expr =~ /(.+?)\s+in\s+(.+)/
+          comps = comparables($1)
+          list = $2.split(/\s*,\s*/)
+          value = list.any?{|item| comps.include?(item)}
+        when expr =~ /(.+?)\s+!in\s+(.+)/
+          comps = comparables($1)
+          list = $2.split(/\s*,\s*/)
+          value = list.none?{|item| comps.include?(item)}
         else
           raise "Unable to parse '#{condition}'"
         end
