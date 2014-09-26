@@ -19,15 +19,18 @@ Rails.application.configure do
   # For large-scale production use, consider using a caching reverse proxy like nginx, varnish or squid.
   # config.action_dispatch.rack_cache = true
 
-  # Disable Rails's static asset server (Apache or nginx will already do this).
-  config.serve_static_assets = false
+  # have ruby/unicorn server static assets. normally you would want this
+  # set to false and let nginx/apache server these out. etch is such low
+  # volume traffic that this isn't really necessary.
+  config.serve_static_assets = true
 
   # Compress JavaScripts and CSS.
   config.assets.js_compressor = :uglifier
   # config.assets.css_compressor = :sass
 
-  # Do not fallback to assets pipeline if a precompiled asset is missed.
-  config.assets.compile = false
+  # fall back to letting ruby compile the assets if you aren't going to
+  # precompile the assets using the asset pipeline.
+  config.assets.compile = true
 
   # Generate digests for assets URLs.
   config.assets.digest = true
