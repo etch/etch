@@ -211,7 +211,9 @@ class Etch
       @dlogger.debug "Building complete configuration commands for request from #{@fqdn}"
       if File.exist?(@commandsbase)
         Find.find(@commandsbase) do |path|
-          if File.directory?(path) && File.exist?(File.join(path, 'commands.xml'))
+          if File.directory?(path) &&
+             (File.exist?(File.join(path, 'commands.yml')) ||
+              File.exist?(File.join(path, 'commands.xml')))
             commandnames << File.basename(path)
           end
         end
@@ -944,7 +946,7 @@ class Etch
     #          generally the original file for a file this command depends on
     # success: we successfully processed a valid configuration
     # unknown: no valid configuration nor errors encountered, probably because
-    #          filtering removed everything from the commands.xml file.  This
+    #          filtering removed everything from the commands file.  This
     #          should be considered a successful outcome, it indicates the
     #          caller/client provided us with all required data and our result
     #          is that no action needs to be taken.
