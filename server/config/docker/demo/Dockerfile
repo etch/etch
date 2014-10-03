@@ -33,7 +33,7 @@ RUN sed -i 's/^std/#std/' /opt/etchserver/config/unicorn.rb
 # Productionize the Gemfile
 RUN sed -i '/gem.*sqlite3/s/^/#/' /opt/etchserver/Gemfile
 RUN sed -i '/gem.*unicorn/s/^# //' /opt/etchserver/Gemfile
-RUN printf "gem 'mysql'\n" >> /opt/etchserver/Gemfile
+RUN printf "gem 'mysql2'\n" >> /opt/etchserver/Gemfile
 
 # Install ruby and gems
 RUN cd /opt/etchserver && bundle install
@@ -42,7 +42,7 @@ RUN cd /opt/etchserver && bundle install --deployment --binstubs
 # Database
 RUN service mysql start && mysql -u root -e "CREATE DATABASE etch"
 RUN service mysql start && mysql -u root -e "GRANT ALL on etch.* to etch"
-RUN printf "production:\n  adapter: mysql\n  database: etch\n  username: etch\n  host: localhost\n  socket: /var/run/mysqld/mysqld.sock\n" > /opt/etchserver/config/database.yml
+RUN printf "production:\n  adapter: mysql2\n  database: etch\n  username: etch\n  host: localhost\n  socket: /var/run/mysqld/mysqld.sock\n" > /opt/etchserver/config/database.yml
 RUN service mysql start && cd /opt/etchserver && RAILS_ENV=production bundle exec ./bin/rake db:migrate
 
 # Assets
@@ -59,4 +59,4 @@ EXPOSE 8080
 
 # Start unicorn
 WORKDIR /opt/etchserver
-ENTRYPOINT service mysql start && cat config/unicorn.rb && bundle exec ./bin/unicorn -E production -c ./config/unicorn.rb
+ENTRYPOINT service mysql start && bundle exec ./bin/unicorn -E production -c ./config/unicorn.rb
