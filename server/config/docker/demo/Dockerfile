@@ -1,6 +1,8 @@
 FROM debian:7
 MAINTAINER Jason Heiss <jheiss@aput.net>
 
+# Build with:  docker build -t etch/serverdemo .
+
 # A production etch server docker config should probably run the
 # database in a separate container.
 # Per https://downloads.mariadb.org/mariadb/repositories/
