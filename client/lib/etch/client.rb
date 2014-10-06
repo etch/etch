@@ -227,12 +227,6 @@ class Etch::Client
       puts "Connecting to #{@filesuri}" if (@debug)
       http = Net::HTTP.new(@filesuri.host, @filesuri.port)
       if @filesuri.scheme == "https"
-        # Eliminate the OpenSSL "using default DH parameters" warning
-        if File.exist?(File.join(@configdir, 'etch', 'dhparams'))
-          dh = OpenSSL::PKey::DH.new(IO.read(File.join(@configdir, 'etch', 'dhparams')))
-          Net::HTTP.ssl_context_accessor(:tmp_dh_callback)
-          http.tmp_dh_callback = proc { dh }
-        end
         http.use_ssl = true
         if File.exist?(File.join(@configdir, 'etch', 'ca.pem'))
           http.ca_file = File.join(@configdir, 'etch', 'ca.pem')

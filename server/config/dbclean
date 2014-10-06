@@ -64,12 +64,6 @@ clientsuri = URI.join(options[:server], "clients.xml?q[updated_at_lt]=#{hours.ho
 
 http = Net::HTTP.new(clientsuri.host, clientsuri.port)
 if clientsuri.scheme == "https"
-  # Eliminate the OpenSSL "using default DH parameters" warning
-  if File.exist?(File.join('etc', 'etch', 'dhparams'))
-    dh = OpenSSL::PKey::DH.new(IO.read(File.join('etc', 'etch', 'dhparams')))
-    Net::HTTP.ssl_context_accessor(:tmp_dh_callback)
-    http.tmp_dh_callback = proc { dh }
-  end
   http.use_ssl = true
   if File.exist?(File.join('etc', 'etch', 'ca.pem'))
     http.ca_file = File.join('etc', 'etch', 'ca.pem')
