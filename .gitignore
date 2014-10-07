@@ -1,3 +1,4 @@
+client/etch-release-*.tar.gz
 server/db/*.sqlite3
 server/log
 server/tmp

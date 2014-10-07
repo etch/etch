@@ -3,9 +3,10 @@ require 'tempfile'
 require 'tmpdir'
 require 'open-uri'
 
-ETCHVER = IO.read('../VERSION').chomp
-TARBALLFILE = "etch-#{ETCHVER}.tar.gz"
-TARBALL = File.expand_path(TARBALLFILE)
+require_relative 'lib/etch/client'
+ETCHVER = Etch::Client::VERSION
+TARBALL_URL = "https://github.com/etch/etch/archive/release-#{ETCHVER}.tar.gz"
+TARBALL = File.expand_path("etch-release-#{ETCHVER}.tar.gz")
 
 BUILDROOT = '/var/tmp/etch-client-buildroot'
 
@@ -50,13 +51,9 @@ def copy_etch_files(destdir, options={})
     mkdir_p(libdir)
     mkdir_p(File.join(libdir, 'etch'))
     
-    # Substitute ETCHVER into etch/client.rb
     # Substitute proper path into CONFIGDIR in etch/client.rb if appropriate
     File.open(File.join(libdir, 'etch', 'client.rb'), 'w') do |newfile|
       IO.foreach(File.join('lib', 'etch', 'client.rb')) do |line|
-        if line =~ /^\s*VERSION/
-          line.sub!(/=.*/, "= '#{ETCHVER}'")
-        end
         if options[:etcdir] && line =~ /^\s*CONFIGDIR/
           line.sub!(/=.*/, "= '#{options[:etcdir]}'")
         end
@@ -88,7 +85,7 @@ def copy_etch_files(destdir, options={})
     # All of the supporting config files go into a subdirectory
     etcetchdir = File.join(etcdir, 'etch')
     mkdir_p(etcetchdir)
-    etcetchfiles = ['ca.pem', 'dhparams']
+    etcetchfiles = ['ca.pem']
     etcetchfiles.each do |etcetchfile|
       cp(File.join('etc', 'etch', etcetchfile), etcetchdir, :preserve => true)
       chmod(0644, File.join(etcetchdir, etcetchfile))
@@ -372,12 +369,11 @@ task :install, :destdir do |t, args|
                   :ruby => File.join(Config::CONFIG['bindir'], Config::CONFIG['ruby_install_name']))
 end
 
-desc 'Fetch tarball from sourceforge'
+desc 'Fetch tarball from github'
 task :fetch do
   if !File.exist?(TARBALL)
-    url = "http://downloads.sourceforge.net/project/etch/etch/#{ETCHVER}/#{TARBALLFILE}"
-    puts "Fetching tarball from #{url}"
-    open(url) do |df|
+    puts "Fetching tarball from #{TARBALL_URL}"
+    open(TARBALL_URL) do |df|
       open(TARBALL, 'w') do |lf|
         lf.write(df.read)
       end
@@ -387,18 +383,14 @@ end
 
 desc 'Prepare portfile for submission to MacPorts'
 task :macport => :fetch do
-  md5 = `openssl md5 #{TARBALL}`.chomp.split.last
-  sha1 = `openssl sha1 #{TARBALL}`.chomp.split.last
   rmd160 = `openssl rmd160 #{TARBALL}`.chomp.split.last
-  sha256 = `openssl sha256 #{TARBALL}`.chomp.split.last
+  sha256 = `openssl sha -sha256 #{TARBALL}`.chomp.split.last
   
   portfile = File.join(Dir.tmpdir, 'Portfile')
   rm_f(portfile)
   File.open(portfile, 'w') do |newfile|
     IO.foreach(File.join('packages', 'macports', 'Portfile.template')) do |line|
       line.sub!('%VER%', ETCHVER)
-      line.sub!('%MD5%', md5)
-      line.sub!('%SHA1%', sha1)
       line.sub!('%RMD160%', rmd160)
       line.sub!('%SHA256%', sha256)
       newfile.puts(line)

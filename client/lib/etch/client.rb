@@ -41,7 +41,7 @@ end
 require 'etch'
 
 class Etch::Client
-  VERSION = 'unset'
+  VERSION = '5.0.0'
   
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
