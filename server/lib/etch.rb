@@ -14,6 +14,7 @@ Silently.silently do
   require 'set'
 end
 require 'versiontype' # Version
+require 'colorize' # add some colors to the output
 
 class Etch
   def self.xmllib

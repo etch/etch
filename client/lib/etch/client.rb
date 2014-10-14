@@ -332,7 +332,7 @@ class Etch::Client
             end
             puts "Response from server:\n'#{httpresponse.body}'" if (@debug)
             if httpresponse['Content-Type'].split(';').first != 'application/x-yaml'
-              raise "MIME type #{httpresponse['Content-Type']} is not yaml"
+              raise "MIME type #{httpresponse['Content-Type']} is not yaml".red
             end
             if httpresponse.body.nil? || httpresponse.body.empty?
               puts "  Response is empty" if (@debug)
@@ -384,7 +384,7 @@ class Etch::Client
             if @local
               # If this happens we screwed something up, the local mode
               # code never requests sums.
-              raise "No support for sums in local mode"
+              raise "No support for sums in local mode".red
             else
               request["files[#{CGI.escape(need_sum)}][sha1sum]"] =
                 get_orig_sum(need_sum)
@@ -594,9 +594,9 @@ class Etch::Client
         # debug the problem, but I don't think it's worth maintaining a
         # seperate array just for that purpose.
         if @locked_files.has_key?(file)
-          raise "Circular dependancy detected.  " +
+          raise ("Circular dependancy detected.  " +
             "Dependancy list (unsorted) contains:\n  " +
-            @locked_files.keys.join(', ')
+            @locked_files.keys.join(', ')).red
         end
 
         # This needs to be after the circular dependency check
@@ -764,14 +764,16 @@ class Etch::Client
                 tempfile.close
                 puts "============================================="
                 if File.file?(file) && !File.symlink?(file)
-                  system("diff -c #{file} #{tempfile.path}")
+                  diff_output = IO.popen("/usr/bin/diff -y #{file} #{tempfile.path}")
+                  puts diff_output.readlines.join.blue
                 else
                   # Either the file doesn't currently exist,
                   # or is something other than a normal file
                   # that we'll be replacing with a file.  In
                   # either case diffing against /dev/null will
                   # produce the most logical output.
-                  system("diff -c /dev/null #{tempfile.path}")
+                  diff_output = IO.popen("/usr/bin/diff -y /dev/null #{tempfile.path}")
+                  puts diff_output.readlines.join.blue
                 end
                 puts "============================================="
                 tempfile.delete
@@ -798,7 +800,7 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               else
-                raise "Unexpected result from get_user_confirmation()"
+                raise "Unexpected result from get_user_confirmation()".red
               end
             end
 
@@ -814,8 +816,8 @@ class Etch::Client
             # after any pre commands are run.
             if File.directory?(file) && !File.symlink?(file) &&
                !config[:file][:overwrite_directory]
-              raise "Can't proceed, original of #{file} is a directory,\n" +
-                    "  consider the overwrite_directory flag if appropriate."
+              raise ("Can't proceed, original of #{file} is a directory,\n" +
+                    "  consider the overwrite_directory flag if appropriate.").red
             end
 
             # Give save_orig a definitive answer on whether or not to save the
@@ -903,7 +905,7 @@ class Etch::Client
             # Perform any test_before_post commands that the user has requested
             if !process_test_before_post(file, config)
               restore_backup(file, backup)
-              raise "test_before_post failed"
+              raise "test_before_post failed".red
             end
 
             # Perform any post-action commands that the user has requested
@@ -1057,7 +1059,7 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               else
-                raise "Unexpected result from get_user_confirmation()"
+                raise "Unexpected result from get_user_confirmation()".red
               end
             end
 
@@ -1073,8 +1075,8 @@ class Etch::Client
             # after any pre commands are run.
             if File.directory?(file) && !File.symlink?(file) &&
                !config[:link][:overwrite_directory]
-              raise "Can't proceed, original of #{file} is a directory,\n" +
-                    "  consider the overwrite_directory flag if appropriate."
+              raise ("Can't proceed, original of #{file} is a directory,\n" +
+                    "  consider the overwrite_directory flag if appropriate.").red
             end
 
             # Give save_orig a definitive answer on whether or not to save the
@@ -1134,7 +1136,7 @@ class Etch::Client
             # Perform any test_before_post commands that the user has requested
             if !process_test_before_post(file, config)
               restore_backup(file, backup)
-              raise "test_before_post failed"
+              raise "test_before_post failed".red
             end
 
             # Perform any post-action commands that the user has requested
@@ -1167,7 +1169,7 @@ class Etch::Client
   
           # A little safety check
           if !config[:directory][:create]
-            raise "No create element found in directory section"
+            raise "No create element found in directory section".red
           end
   
           permstring = config[:directory][:perms].to_s
@@ -1227,7 +1229,7 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               else
-                raise "Unexpected result from get_user_confirmation()"
+                raise "Unexpected result from get_user_confirmation()".red
               end
             end
 
@@ -1285,7 +1287,7 @@ class Etch::Client
             # Perform any test_before_post commands that the user has requested
             if !process_test_before_post(file, config)
               restore_backup(file, backup)
-              raise "test_before_post failed"
+              raise "test_before_post failed".red
             end
 
             # Perform any post-action commands that the user has requested
@@ -1318,7 +1320,7 @@ class Etch::Client
 
           # A little safety check
           if !config[:delete][:proceed]
-            raise "No proceed element found in delete section"
+            raise "No proceed element found in delete section".red
           end
 
           # Proceed only if the file currently exists
@@ -1342,7 +1344,7 @@ class Etch::Client
                 save_results = false
                 throw :process_done
               else
-                raise "Unexpected result from get_user_confirmation()"
+                raise "Unexpected result from get_user_confirmation()".red
               end
             end
 
@@ -1358,8 +1360,8 @@ class Etch::Client
             # after any pre commands are run.
             if File.directory?(file) && !File.symlink?(file) &&
                !config[:delete][:overwrite_directory]
-              raise "Can't proceed, original of #{file} is a directory,\n" +
-                    "  consider the overwrite_directory flag if appropriate."
+              raise ("Can't proceed, original of #{file} is a directory,\n" +
+                    "  consider the overwrite_directory flag if appropriate.").red
             end
 
             # Give save_orig a definitive answer on whether or not to save the
@@ -1384,7 +1386,7 @@ class Etch::Client
             # Perform any test_before_post commands that the user has requested
             if !process_test_before_post(file, config)
               restore_backup(file, backup)
-              raise "test_before_post failed"
+              raise "test_before_post failed".red
             end
 
             # Perform any post-action commands that the user has requested
@@ -1486,9 +1488,9 @@ class Etch::Client
         # debug the problem, but I don't think it's worth maintaining a
         # seperate array just for that purpose.
         if @locked_files.has_key?(commandname)
-          raise "Circular command dependancy detected.  " +
+          raise ("Circular command dependancy detected.  " +
             "Dependancy list (unsorted) contains:\n  " +
-            @locked_files.keys.join(', ')
+            @locked_files.keys.join(', ')).red
         end
         
         # This needs to be after the circular dependency check
@@ -1523,7 +1525,7 @@ class Etch::Client
           
             if !guard_result
               # Tell the user what we're going to do
-              puts "Will run command '#{step[:command].join('; ')}'"
+              puts "Will run command '#{step[:command].join('; ')}'".green
             
               # If the user requested interactive mode ask them for
               # confirmation to proceed.
@@ -1539,7 +1541,7 @@ class Etch::Client
                   save_results = false
                   throw :process_done
                 else
-                  raise "Unexpected result from get_user_confirmation()"
+                  raise "Unexpected result from get_user_confirmation()".red
                 end
               end
             
@@ -1554,7 +1556,7 @@ class Etch::Client
                 guard_recheck_result &= process_guard(guard, commandname)
               end
               if !guard_recheck_result
-                raise "Guard #{step[:guard].join('; ')} still fails for #{commandname} after running command #{step[:command].join('; ')}"
+                raise "Guard #{step[:guard].join('; ')} still fails for #{commandname} after running command #{step[:command].join('; ')}".red
               end
             end
           end
@@ -1578,7 +1580,7 @@ class Etch::Client
     end
     
     if exception
-      raise exception
+      raise exception.red
     end
     
     @already_processed[commandname] = true
@@ -1800,7 +1802,7 @@ class Etch::Client
           end
         end
         if !rcsmax
-          raise "Failed to parse RCS history rlog output"
+          raise "Failed to parse RCS history rlog output".red
         end
         tmphistdir = tempdir(histdir)
         1.upto(rcsmax) do |rcsrev|
@@ -1983,7 +1985,7 @@ class Etch::Client
         # anything except remove our NOORIG marker file
         remove_file(backup)
       else
-        raise "No backup found in #{backup} to restore to #{file}"
+        raise "No backup found in #{backup} to restore to #{file}".red
       end
     end
   end
@@ -2096,7 +2098,7 @@ class Etch::Client
     # Because the setup and guard commands are processed every time (rather
     # than just when the file has changed as with pre/post) we don't want to
     # print a message for them.
-    puts "  Executing '#{exec}'" if (![:setup, :guard].include?(exectype) || @debug)
+    puts "  Executing '#{exec}'".green if (![:setup, :guard].include?(exectype) || @debug)
 
     # Actually run the command unless we're in a dry run, or if we're in
     # a damp run and the command is a setup command.
@@ -2153,27 +2155,27 @@ class Etch::Client
       # those software installs fail.  So consider it a fatal error if
       # that occurs.
       if [:setup, :pre].include?(exectype)
-        raise "    Setup/Pre command " + execmsg + filemsg +
-          "exited with non-zero value"
+        raise ("    Setup/Pre command " + execmsg + filemsg +
+          "exited with non-zero value").red
       # Post commands are generally used to restart services.  While
       # it is unfortunate if they fail, there is little to be gained
       # by having etch exit if they do so.  So simply warn if a post
       # command fails.
       elsif exectype == :post
-        puts "    Post command " + execmsg + filemsg +
-          "exited with non-zero value"
+        puts ("    Post command " + execmsg + filemsg +
+          "exited with non-zero value").red
       # process_commands takes the appropriate action when guards and commands
       # fail, so we just warn of any failures here.
       elsif exectype == :guard
-        puts "    Guard " + execmsg + filemsg + "exited with non-zero value"
+        puts ("    Guard " + execmsg + filemsg + "exited with non-zero value").red
       elsif exectype == :command
-        puts "    Command " + execmsg + filemsg + "exited with non-zero value"
+        puts ("    Command " + execmsg + filemsg + "exited with non-zero value").red
       # For test commands we need to warn the user and then return a
       # value indicating the failure so that a rollback can be
       # performed.
       elsif exectype =~ /^test/
-        puts "    Test command " + execmsg + filemsg +
-          "exited with non-zero value"
+        puts ("    Test command " + execmsg + filemsg +
+          "exited with non-zero value").red
       end
     end
 
@@ -2290,7 +2292,7 @@ class Etch::Client
     # GNU find and cpio also have -print0/--null to handle filenames with
     # spaces or special characters, but that's not standard either.
     system("cd #{sourcedir} && find #{sourcefile} | cpio -pdum #{destdir}") or
-      raise "Recursive copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
+      raise "Recursive copy #{sourcedir}/#{sourcefile} to #{destdir} failed".red
   end
   def recursive_copy_and_rename(sourcedir, sourcefile, destname)
     tmpdir = tempdir(destname)
@@ -2300,7 +2302,7 @@ class Etch::Client
   end
   def nonrecursive_copy(sourcedir, sourcefile, destdir)
     system("cd #{sourcedir} && echo #{sourcefile} | cpio -pdum #{destdir}") or
-      raise "Non-recursive copy #{sourcedir}/#{sourcefile} to #{destdir} failed"
+      raise "Non-recursive copy #{sourcedir}/#{sourcefile} to #{destdir} failed".red
   end
   def nonrecursive_copy_and_rename(sourcedir, sourcefile, destname)
     tmpdir = tempdir(destname)
@@ -2331,12 +2333,12 @@ class Etch::Client
         @locked_files[file] = true
         return
       rescue Errno::EEXIST
-        puts "Attempt to acquire lock for #{file} failed, sleeping 1s"
+        puts "Attempt to acquire lock for #{file} failed, sleeping 1s".yellow
         sleep 1
       end
     end
 
-    raise "Unable to acquire lock for #{file} after repeated attempts"
+    raise "Unable to acquire lock for #{file} after repeated attempts".red
   end
 
   def unlock_file(file)
@@ -2355,7 +2357,7 @@ class Etch::Client
         @locked_files.delete(file)
       else
         # This shouldn't happen, if it does it's a bug
-        raise "Process #{Process.pid} asked to unlock #{file} which is locked by another process (pid #{pid})"
+        raise "Process #{Process.pid} asked to unlock #{file} which is locked by another process (pid #{pid})".red
       end
     else
       # This shouldn't happen either
@@ -2465,13 +2467,13 @@ class Etch::Client
             end
           end
         rescue Timeout::Error
-          $stderr.puts "Timeout in output capture, some app restarted via post probably didn't daemonize properly"
+          $stderr.puts "Timeout in output capture, some app restarted via post probably didn't daemonize properly".red
         end
         pread.close
         owrite.write(output)
         owrite.close
       rescue Exception => e
-        $stderr.puts "Exception in output capture child: " + e.message
+        $stderr.puts ("Exception in output capture child: " + e.message).red
         $stderr.puts e.backtrace.join("\n") if @debug
       end
       # Exit in such a way that we don't trigger any signal handlers that
