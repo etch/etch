@@ -1219,7 +1219,8 @@ class Etch
       value.sub!(/^\!/, '')  # Strip off the bang
     end
     
-    comparables(name).each do |comp|
+    comps = comparables(name)
+    comps && comps.each do |comp|
       # Numerical comparisons
       # i.e. <plain os="SunOS" osversion=">=5.8"></plain>
       # Note that the standard for XML requires that the < character be
