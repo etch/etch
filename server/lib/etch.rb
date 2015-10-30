@@ -1194,6 +1194,8 @@ class Etch
       @groups
     elsif @facts[name]
       [@facts[name]]
+    else
+      []
     end
   end
   # Used when parsing each config.xml to filter out any elements which
@@ -1219,8 +1221,7 @@ class Etch
       value.sub!(/^\!/, '')  # Strip off the bang
     end
     
-    comps = comparables(name)
-    comps && comps.each do |comp|
+    comparables(name).each do |comp|
       # Numerical comparisons
       # i.e. <plain os="SunOS" osversion=">=5.8"></plain>
       # Note that the standard for XML requires that the < character be
