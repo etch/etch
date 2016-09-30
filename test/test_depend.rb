@@ -75,7 +75,7 @@ class EtchDependTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'dependency file 1')
@@ -135,7 +135,7 @@ class EtchDependTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :extra_args => @targetfile, :testname => testname)
+    assert_etch(@server, @testroot, :extra_args => @targetfile, :testname => testname)
 
     # Verify that the files were created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'single request dependency file 1')
@@ -197,7 +197,7 @@ class EtchDependTests < Test::Unit::TestCase
       end
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :extra_args => @targetfile, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :extra_args => @targetfile, :testname => testname)
 
     # Verify that the files weren't modified
     assert_equal(origcontents, get_file_contents(@targetfile), 'circular dependency file 1')
@@ -249,7 +249,7 @@ class EtchDependTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the regular file and the command-generated file were created
     # properly

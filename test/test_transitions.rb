@@ -57,7 +57,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'file to link')
 
@@ -81,7 +81,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), 'file to directory')
   end
@@ -115,7 +115,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link to file')
@@ -153,7 +153,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'link w/ same contents to file')
@@ -178,7 +178,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), 'link to directory')
   end
@@ -213,7 +213,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'directory to file')
@@ -239,7 +239,7 @@ class EtchTransitionTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'directory to link')
   end

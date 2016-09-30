@@ -59,7 +59,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with syntax error size comparison')
@@ -91,8 +91,8 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
     
-    #run_etch(@server, @testroot, :errors_expected => false, :testname => testname)
-    run_etch(@server, @testroot, :testname => testname)
+    #assert_etch(@server, @testroot, :errors_expected => false, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, testname + ' size comparison')
@@ -124,7 +124,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, testname + ' size comparison')
@@ -156,7 +156,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'script with no output size comparison')
@@ -185,7 +185,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << '#{sourcecontents}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -225,7 +225,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << IO.read('source')")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -264,7 +264,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << IO.read('source')")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -299,7 +299,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << '#{@destfile}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link was created properly
     assert_equal(@destfile, File.readlink(@targetfile), 'link script')
@@ -329,7 +329,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_readlink = File.readlink(@targetfile)
     before_ctime = File.stat(@targetfile).ctime
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_readlink, File.readlink(@targetfile), 'link script with no output readlink comparison')
@@ -355,7 +355,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the directory was created
     assert(File.directory?(@targetfile), 'directory script')
@@ -389,7 +389,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'directory script with no output size comparison')
@@ -416,7 +416,7 @@ class EtchScriptTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was removed
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), 'delete script')
@@ -452,7 +452,7 @@ class EtchScriptTests < Test::Unit::TestCase
     before_size = File.stat(@targetfile).size
     before_ctime = File.stat(@targetfile).ctime
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that etch didn't do anything to the file
     assert_equal(before_size, File.stat(@targetfile).size, 'delete script with no output size comparison')

@@ -45,7 +45,7 @@ class EtchCommandTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(testname, get_file_contents(@targetfile), testname)
@@ -73,7 +73,7 @@ class EtchCommandTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
   end
   
   def test_commands_guard_succeeds
@@ -100,7 +100,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     File.open(@targetfile, 'w') { |file| file.print(testname) }
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was not touched
     assert_equal(testname, get_file_contents(@targetfile), testname)
@@ -136,7 +136,7 @@ class EtchCommandTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that both steps ran and in the proper order
     assert_equal("firststep\nsecondstep\n", get_file_contents(@targetfile), testname)
@@ -181,7 +181,7 @@ class EtchCommandTests < Test::Unit::TestCase
     
     # Run etch
     #puts "Running '#{testname}' test"
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that both commands ran, ordering doesn't matter
     assert_equal(['firstcmd', 'secondcmd'], get_file_contents(@targetfile).split("\n").sort, testname)
@@ -225,7 +225,7 @@ class EtchCommandTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that both commands ran and in the proper order
     assert_equal("firstcmd\nsecondcmd\n", get_file_contents(@targetfile), testname)
@@ -277,7 +277,7 @@ class EtchCommandTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the command-generated file and the regular file were created
     # properly
@@ -320,7 +320,7 @@ class EtchCommandTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that only the desired step executed
     assert_equal("notingroup\n", get_file_contents(@targetfile), testname)
@@ -343,7 +343,7 @@ class EtchCommandTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
   end
   
   def teardown

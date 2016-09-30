@@ -28,7 +28,7 @@ class EtchMiscTests < Test::Unit::TestCase
     # Does etch behave properly if the repository is empty?  I.e. no source or
     # commands directories.
     testname = 'empty repository'
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
   end
   
   def teardown

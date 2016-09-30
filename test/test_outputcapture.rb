@@ -62,7 +62,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     assert_match(postoutput, latest_result_message, testname)
   end
@@ -124,7 +124,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
       oldlang = ENV['LANG']
       ENV['LANG'] = "en_US.#{lang}"
-      run_etch(@server, @testroot, :testname => testname)
+      assert_etch(@server, @testroot, :testname => testname)
       ENV['LANG'] = oldlang
     
       assert_match(postoutput, latest_result_message, testname)
@@ -164,7 +164,7 @@ class EtchOutputCaptureTests < Test::Unit::TestCase
     
     begin
       Timeout.timeout(Etch::Client::OUTPUT_CAPTURE_TIMEOUT + 15) do
-        run_etch(@server, @testroot, :testname => testname)
+        assert_etch(@server, @testroot, :testname => testname)
       end
     rescue Timeout::Error
       flunk('output capturing did not time out as expected')

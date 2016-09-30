@@ -170,7 +170,7 @@ module EtchTests
     end
   end
   
-  def run_etch(server, testroot, options={})
+  def assert_etch(server, testroot, options={})
     extra_args = ''
     if options[:extra_args]
       extra_args += options[:extra_args]
