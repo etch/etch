@@ -15,11 +15,12 @@ module EtchTests
   # Roughly ../server and ../client
   SERVERDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/server"
   CLIENTDIR = "#{File.dirname(File.dirname(File.expand_path(__FILE__)))}/client"
-  
-  VERBOSE = :quiet
+
+  # VERBOSE = :quiet
   # VERBOSE = :normal
   # VERBOSE = :debug
-  
+  VERBOSE = (ENV['VERBOSE'] || :quiet).intern
+
   # Creates a temporary file via Tempfile, capture the filename, tell Tempfile
   # to clean up, then return the path.  This gives the caller a filename that
   # they should be able to write to, that was recently unused and unique, and
