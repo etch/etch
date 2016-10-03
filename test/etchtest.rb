@@ -121,28 +121,20 @@ module EtchTests
     serverbase = serverbasefile.path
     serverbasefile.close!
     File.symlink(repo, serverbase)
-    ENV['etchserverbase'] = serverbase
     # Pick a random port in the 3001-6000 range (range somewhat randomly chosen)
     port = 3001 + rand(3000)
     if pid = fork
       # Give the server up to 30s to start, checking every second
-      serverstarted = false
-      catch :serverstarted do
+      catch :server_started do
         30.times do
           begin
-            Net::HTTP.start('localhost', port) do |http|
-              response = http.head("/")
-              if response.kind_of?(Net::HTTPSuccess)
-                serverstarted = true
-                throw :serverstarted
-              end
-            end
-          rescue
+            Net::HTTP.get 'localhost', '/', port
+            throw :server_started
+          rescue SystemCallError
+            # retry
+            sleep 1
           end
-          sleep(1)
         end
-      end
-      if !serverstarted
         raise "Etch server failed to start"
       end
     else
@@ -151,10 +143,9 @@ module EtchTests
       when :quiet
         serverargs += ' > /dev/null 2>&1'
       end
-      if `cd #{SERVERDIR} && #{RUBY} \`which bundle\` list`.include?('unicorn')
-        exec("cd #{SERVERDIR} && RAILS_ENV=test #{RUBY} `which bundle` exec unicorn #{serverargs}")
-      else
-        exec("cd #{SERVERDIR} && RAILS_ENV=test #{RUBY} `which bundle` exec rails server #{serverargs}")
+      with_clean_env do
+        ENV['etchserverbase'] = serverbase
+        exec "cd #{SERVERDIR} && #{RUBY} -S bundle exec rails server -e test #{serverargs}"
       end
     end
     {:port => port, :pid => pid, :repo => serverbase}
@@ -245,6 +236,11 @@ module EtchTests
       end
     end
     lrm
+  end
+
+  def with_clean_env(&block)
+    return yield unless defined? Bundler
+    Bundler.with_clean_env(&block)
   end
 end
 
