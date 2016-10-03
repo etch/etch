@@ -8,6 +8,7 @@ require 'fileutils'
 require 'net/http'
 require 'rbconfig'
 require 'yaml'
+require 'open3'
 
 RUBY = File.join(*RbConfig::CONFIG.values_at("bindir", "ruby_install_name")) + RbConfig::CONFIG["EXEEXT"]
 
@@ -50,15 +51,15 @@ module EtchTests
     Dir.mkdir(tmpdir)
     tmpdir
   end
-  
+
   def initialize_repository(nodegroups=[], format=:yml)
     # Generate a temp directory to put our test repository into
     repo = tempdir
-    
+
     # Put the basic files into that directory needed for a basic etch tree
     # :preserve to maintain executable permissions on the scripts
     FileUtils.cp_r(Dir.glob("#{File.dirname(__FILE__)}/testrepo/*"), repo, :preserve => true)
-    
+
     hostname = `facter fqdn`.chomp
     case format
     when :yml
@@ -82,16 +83,16 @@ module EtchTests
         EOF
       end
     end
-    
+
     puts "Created repository #{repo}" if (VERBOSE != :quiet)
-    
+
     repo
   end
-  
+
   def remove_repository(repo)
     FileUtils.rm_rf(repo)
   end
-  
+
   @@server = nil
   def get_server(newrepo=nil)
     if !@@server
@@ -107,13 +108,13 @@ module EtchTests
     end
     @@server
   end
-  
+
   def swap_repository(server, newrepo)
     # Point server[:repo] symlink to newrepo
     FileUtils.rm_f(server[:repo])
     File.symlink(newrepo, server[:repo])
   end
-  
+
   def start_server(repo='no_repo_yet')
     # We want the running server's notion of the server base to be a symlink
     # that we can easily change later in swap_repository.
@@ -150,7 +151,7 @@ module EtchTests
     end
     {:port => port, :pid => pid, :repo => serverbase}
   end
-  
+
   def stop_server(server)
     Process.kill('TERM', server[:pid])
     sleep 1
@@ -161,7 +162,7 @@ module EtchTests
       Process.waitpid(server[:pid])
     end
   end
-  
+
   def assert_etch(server, testroot, options={})
     extra_args = ''
     if options[:extra_args]
@@ -170,25 +171,23 @@ module EtchTests
     case VERBOSE
     when :debug
       extra_args += ' --debug'
-    when :quiet
-      extra_args += ' > /dev/null 2>&1'
     end
-    
+
     port = server[:port]
     if options[:port]
       port = options[:port]
     end
-    
+
     server = "--server=http://localhost:#{port}"
     if options[:server]
       server = options[:server]
     end
-    
+
     key = "--key=#{File.dirname(__FILE__)}/keys/testkey"
     if options[:key]
       key = options[:key]
     end
-    
+
     if options[:errors_expected] && VERBOSE != :quiet
       # Warn the user that errors are expected.  Otherwise it can be
       # disconcerting if you're watching the tests run and see errors.
@@ -198,14 +197,17 @@ module EtchTests
       puts "#"
       #sleep 3
     end
-    result = system("#{RUBY} -I #{CLIENTDIR}/lib #{CLIENTDIR}/bin/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}")
-    if options[:errors_expected]
-      assert(!result, options[:testname])
-    else
-      assert(result, options[:testname])
+    cmd = "#{RUBY} -I #{CLIENTDIR}/lib #{CLIENTDIR}/bin/etch --generate-all --test-root=#{testroot} #{server} #{key} #{extra_args}"
+    Open3.popen3 cmd do |stdin, stdout, stderr, wait_thr|
+      result = wait_thr.value.success?
+      result = !result if options[:errors_expected]
+
+      assert result, proc{
+        "%s\nstdout: %s\nstderr: %s" % [options[:testname], stdout.readlines.join("\t"), stderr.readlines.join("\t")]
+      }
     end
   end
-  
+
   # Wrap File.read and return nil if an exception occurs
   def get_file_contents(file)
     # Don't follow symlinks
@@ -219,7 +221,7 @@ module EtchTests
       end
     end
   end
-  
+
   # Fetch the latest result for this client from the server.  Useful for
   # verifying that results were logged to the server as expected.
   def latest_result_message
