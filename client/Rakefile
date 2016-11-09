@@ -1,12 +1,15 @@
+# don't use these as they override too many other tasks.
+# require 'bundler/gem_tasks'
 require 'rbconfig'
 require 'tempfile'
 require 'tmpdir'
 require 'open-uri'
 
-require_relative 'lib/etch/client'
+$:.unshift "lib"
+
+require 'etch/version'
 ETCHVER = Etch::Client::VERSION
-TARBALL_URL = "https://github.com/etch/etch/archive/release-#{ETCHVER}.tar.gz"
-TARBALL = File.expand_path("etch-release-#{ETCHVER}.tar.gz")
+TARBALL = File.expand_path("pkg/etch-release-#{ETCHVER}.tar.gz")
 
 BUILDROOT = '/var/tmp/etch-client-buildroot'
 
@@ -45,12 +48,12 @@ def copy_etch_files(destdir, options={})
       chmod(0555, File.join(bindir, binapp))
     end
   end
-  
+
   if options[:libdir]
     libdir = File.join(destdir, options[:libdir])
     mkdir_p(libdir)
     mkdir_p(File.join(libdir, 'etch'))
-    
+
     # Substitute proper path into CONFIGDIR in etch/client.rb if appropriate
     File.open(File.join(libdir, 'etch', 'client.rb'), 'w') do |newfile|
       IO.foreach(File.join('lib', 'etch', 'client.rb')) do |line|
@@ -61,14 +64,14 @@ def copy_etch_files(destdir, options={})
       end
     end
     chmod(0444, File.join(libdir, 'etch', 'client.rb'))
-    
+
     serverlibs = ['etch.rb', 'silently.rb', 'versiontype.rb']
     serverlibs.each do |serverlib|
       cp(File.join('..', 'server', 'lib', serverlib), libdir, :preserve => true)
       chmod(0444, File.join(libdir, serverlib))
     end
   end
-  
+
   if options[:mandir]
     mandir = File.join(destdir, options[:mandir])
     man8dir = File.join(mandir, 'man8')
@@ -76,7 +79,7 @@ def copy_etch_files(destdir, options={})
     cp(File.join('man', 'man8', 'etch.8'), man8dir, :preserve => true)
     chmod(0444, File.join(man8dir, 'etch.8'))
   end
-  
+
   if options[:etcdir]
     etcdir = File.join(destdir, options[:etcdir])
     mkdir_p(etcdir)
@@ -91,7 +94,7 @@ def copy_etch_files(destdir, options={})
       chmod(0644, File.join(etcetchdir, etcetchfile))
     end
   end
-  
+
   if options[:crondir]
     crondir = File.join(destdir, options[:crondir])
     mkdir_p(crondir)
@@ -107,44 +110,35 @@ task :redhatprep do
   # Install the package which contains the rpmbuild command
   system('rpm --quiet -q rpm-build || sudo yum install rpm-build')
 end
+
 desc 'Build an etch client RPM'
 task :rpm do
-  #
-  # Create package file structure in build root
-  #
-  
-  rm_rf(BUILDROOT)
-  
-  sbindir = File.join('usr', 'sbin')
-  libdir = File.join('usr', 'lib', 'ruby', 'site_ruby', '1.8')
-  mandir = File.join('usr', 'share', 'man')
-  etcdir = '/etc'
-  crondir = File.join('etc', 'cron.d')
-  copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
-                  :mandir => mandir, :etcdir => etcdir, :crondir => crondir)
-  
-  #
-  # Prep spec file
-  #
-  
-  spec = Tempfile.new('etchrpm')
-  IO.foreach(File.join('packages', 'rpm', 'etch-client.spec')) do |line|
-    line.sub!('%VER%', ETCHVER)
-    spec.puts(line)
+  Dir.mktmpdir do |buildroot|
+    sbindir = File.join('usr', 'sbin')
+    libdir = File.join('usr', 'lib', 'ruby', 'site_ruby', '1.8')
+    mandir = File.join('usr', 'share', 'man')
+    etcdir = '/etc'
+    crondir = File.join('etc', 'cron.d')
+    copy_etch_files(buildroot, :bindir => sbindir, :libdir => libdir,
+                    :mandir => mandir, :etcdir => etcdir, :crondir => crondir)
+
+    #
+    # Prep spec file
+    #
+
+    spec = Tempfile.new('etchrpm')
+    IO.foreach(File.join('packages', 'rpm', 'etch-client.spec')) do |line|
+      line.sub!('%VER%', ETCHVER)
+      spec.puts(line)
+    end
+    spec.close
+
+    #
+    # Build the package
+    #
+
+    system("rpmbuild -bb --buildroot #{buildroot} #{spec.path}")
   end
-  spec.close
-  
-  #
-  # Build the package
-  #
-  
-  system("rpmbuild -bb --buildroot #{BUILDROOT} #{spec.path}")
-  
-  #
-  # Cleanup
-  #
-  
-  rm_rf(BUILDROOT)
 end
 
 desc 'Build an etch client deb'
@@ -152,9 +146,9 @@ task :deb do
   #
   # Create package file structure in build root
   #
-  
+
   rm_rf(BUILDROOT)
-  
+
   mkdir_p(File.join(BUILDROOT, 'DEBIAN'))
   File.open(File.join(BUILDROOT, 'DEBIAN', 'control'), 'w') do |control|
     IO.foreach(File.join('packages', 'deb', 'control')) do |line|
@@ -163,7 +157,7 @@ task :deb do
       control.puts(line)
     end
   end
-  
+
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('usr', 'local', 'lib', 'site_ruby')
   mandir = File.join('usr', 'share', 'man')
@@ -171,23 +165,23 @@ task :deb do
   crondir = File.join('etc', 'cron.d')
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
                   :mandir => mandir, :etcdir => etcdir, :crondir => crondir)
-  
+
   #
   # Set permissions
   #
-  
+
   system("sudo chown -R 0:0 #{BUILDROOT}")
-  
+
   #
   # Build the package
   #
-  
+
   system("dpkg --build #{BUILDROOT} etch-client-#{ETCHVER}.deb")
-  
+
   #
   # Cleanup
   #
-  
+
   rm_rf(BUILDROOT)
 end
 
@@ -198,9 +192,9 @@ task :sysvpkg do
   #
   # Create package file structure in build root
   #
-  
+
   rm_rf(BUILDROOT)
-  
+
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('opt', 'csw', 'lib', 'ruby', 'site_ruby', '1.8')
   mandir = File.join('usr', 'share', 'man')
@@ -208,11 +202,11 @@ task :sysvpkg do
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
                   :mandir => mandir, :etcdir => etcdir,
                   :ruby => '/opt/csw/bin/ruby')
-  
+
   #
   # Prep packaging files
   #
-  
+
   rm_rf('solbuild')
   mkdir('solbuild')
   File.open(File.join('solbuild', 'pkginfo'), 'w') do |pkginfo|
@@ -245,18 +239,18 @@ task :sysvpkg do
       end
     end
   end
-  
+
   #
   # Build the package
   #
-  
+
   system("cd solbuild && pkgmk -r #{BUILDROOT} -d $PWD/solbuild")
   system("pkgtrans solbuild ../OSSetch-#{ETCHVER}.pkg OSSetch")
-  
+
   #
   # Cleanup
   #
-  
+
   rm_rf('solbuild')
   rm_rf(BUILDROOT)
 end
@@ -274,9 +268,9 @@ task :sysvpkgsparc do
   #
   # Create package file structure in build root
   #
-  
+
   rm_rf(BUILDROOT)
-  
+
   sbindir = File.join('usr', 'sbin')
   libdir = File.join('opt', 'csw', 'lib', 'ruby', 'site_ruby', '1.8')
   mandir = File.join('usr', 'share', 'man')
@@ -284,7 +278,7 @@ task :sysvpkgsparc do
   copy_etch_files(BUILDROOT, :bindir => sbindir, :libdir => libdir,
                   :mandir => mandir, :etcdir => etcdir,
                   :ruby => '/usr/local/bin/ruby')
-  
+
   # Since we're using the Sunfreeware ruby but CSW libraries we need to add
   # the CSW ruby library directory to the search path
   newetch = File.join(BUILDROOT, 'usr', 'sbin', 'etch.new')
@@ -299,11 +293,11 @@ task :sysvpkgsparc do
   end
   mv(newetch, etch)
   chmod(0555, etch)
-  
+
   #
   # Prep packaging files
   #
-  
+
   rm_rf('solbuild')
   mkdir('solbuild')
   File.open(File.join('solbuild', 'pkginfo'), 'w') do |pkginfo|
@@ -336,57 +330,32 @@ task :sysvpkgsparc do
       end
     end
   end
-  
+
   #
   # Build the package
   #
-  
+
   system("cd solbuild && pkgmk -r #{BUILDROOT} -d $PWD/solbuild")
   system("pkgtrans solbuild ../OSSetch-#{ETCHVER}-sparc.pkg OSSetch")
-  
+
   #
   # Cleanup
   #
-  
+
   rm_rf('solbuild')
   rm_rf(BUILDROOT)
 end
 
-# Install based on Config::CONFIG paths
-task :install, :destdir do |t, args|
-  destdir = nil
-  if args.destdir
-    destdir = args.destdir
-  else
-    destdir = '/'
-  end
-  copy_etch_files(destdir,
-                  :bindir => Config::CONFIG['sbindir'],
-                  :libdir => Config::CONFIG['sitelibdir'],
-                  :mandir => Config::CONFIG['mandir'],
-                  :etcdir => Config::CONFIG['sysconfdir'],
-                  # Can't find a better way to get the path to the current ruby
-                  :ruby => File.join(Config::CONFIG['bindir'], Config::CONFIG['ruby_install_name']))
-end
-
-desc 'Fetch tarball from github'
-task :fetch do
-  if !File.exist?(TARBALL)
-    puts "Fetching tarball from #{TARBALL_URL}"
-    open(TARBALL_URL) do |df|
-      open(TARBALL, 'w') do |lf|
-        lf.write(df.read)
-      end
-    end
-  end
+task :archive do
+  `git archive -o #{TARBALL} HEAD`
 end
 
 desc 'Prepare portfile for submission to MacPorts'
-task :macport => :fetch do
+task :macport => :archive do
   rmd160 = `openssl rmd160 #{TARBALL}`.chomp.split.last
   sha256 = `openssl sha -sha256 #{TARBALL}`.chomp.split.last
-  
-  portfile = File.join(Dir.tmpdir, 'Portfile')
+
+  portfile = File.join('pkg', 'Portfile')
   rm_f(portfile)
   File.open(portfile, 'w') do |newfile|
     IO.foreach(File.join('packages', 'macports', 'Portfile.template')) do |line|
@@ -399,45 +368,5 @@ task :macport => :fetch do
   puts "Portfile is #{portfile}"
 end
 
-desc 'Build rubygem package'
-task :gem do
-  #
-  # Create package file structure in build root
-  #
-  
-  rm_rf(BUILDROOT)
-  copy_etch_files(BUILDROOT,
-                  :bindir => 'bin',
-                  :libdir => 'lib')
-  
-  #
-  # Prep gemspec (renaming to Rakefile in the process)
-  #
-  File.open(File.join(BUILDROOT, 'Rakefile'), 'w') do |gemspec|
-    IO.foreach(File.join('packages', 'gem', 'gemspec')) do |line|
-      line.sub!('%VER%', ETCHVER)
-      gemspec.puts(line)
-    end
-  end
-  
-  #
-  # Build the package
-  #
-  
-  system("cd #{BUILDROOT} && rake gem")
-  gemglob = File.join(BUILDROOT, 'pkg', '*.gem')
-  gemfile = Dir.glob(gemglob).first
-  if gemfile
-    mv(gemfile, Dir.tmpdir)
-    puts "Gem is #{File.join(Dir.tmpdir, File.basename(gemfile))}"
-  else
-    warn "Gem file #{gemglob} not found!"
-  end
-  
-  #
-  # Cleanup
-  #
-  
-  rm_rf(BUILDROOT)
-end
-
+# pull in rake tasks
+load 'etch.gemspec'

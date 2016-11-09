@@ -39,10 +39,9 @@ Silently.silently do
   require 'logger'
 end
 require 'etch'
+require 'etch/version'
 
 class Etch::Client
-  VERSION = '5.0.0'
-  
   CONFIRM_PROCEED = 1
   CONFIRM_SKIP = 2
   CONFIRM_QUIT = 3

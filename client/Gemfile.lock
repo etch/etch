@@ -1,10 +1,24 @@
+PATH
+  remote: .
+  specs:
+    etch (5.0.0)
+      facter (~> 1.6, >= 1.6.5)
+
 GEM
   remote: https://rubygems.org/
   specs:
-    facter (1.6.5)
+    facter (1.7.6)
+    minitest (5.9.1)
+    rake (10.5.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  facter
+  bundler (~> 1.12)
+  etch!
+  minitest (~> 5.0)
+  rake (~> 10.0)
+
+BUNDLED WITH
+   1.12.5
