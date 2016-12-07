@@ -30,7 +30,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
     File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
       file.write({directory: {create: true}}.to_yaml)
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), testname)
   end
@@ -41,7 +41,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
     File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
       file.write({directory: {create: [true, true]}}.to_yaml)
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), testname)
   end
@@ -52,7 +52,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
     File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
       file.write({directory: {create: [true, false]}}.to_yaml)
     end
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     assert(File.file?(@targetfile), testname)
   end
@@ -68,7 +68,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), testname)
   end
@@ -85,7 +85,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), testname)
   end
@@ -101,7 +101,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), testname)
   end
@@ -120,7 +120,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     assert(File.file?(@targetfile), testname)
   end
@@ -132,7 +132,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
       file.write({directory: {script: []}}.to_yaml)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.file?(@targetfile), testname)
   end
@@ -144,7 +144,7 @@ class EtchDirectoryTests < Test::Unit::TestCase
     File.open("#{@repodir}/source/#{@targetfile}/config.yml", 'w') do |file|
       file.write({directory: {owner: 5000, group: 6000, perms: 750, create: true}}.to_yaml)
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.directory?(@targetfile), testname)
     # Most systems don't support give-away chown, so this test won't work

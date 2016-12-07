@@ -44,7 +44,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
@@ -71,7 +71,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
@@ -100,7 +100,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the directory was not deleted
     assert(File.directory?(@targetfile), testname)
@@ -130,7 +130,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the directory was deleted
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
@@ -153,12 +153,12 @@ class EtchDeleteTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that we still don't have a file.  That's rather unlikely,
     # this is really more a test that etch doesn't throw an error if
     # told to delete something that doesn't exist, which is captured by
-    # the assert within run_etch.
+    # the assert within assert_etch.
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
   end
   
@@ -170,7 +170,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       file.write({delete: {proceed: [true, true]}}.to_yaml)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
   end
@@ -182,7 +182,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       file.write({delete: {proceed: [true, false]}}.to_yaml)
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     assert(File.exist?(@targetfile), testname)
   end
@@ -198,7 +198,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(!File.exist?(@targetfile) && !File.symlink?(@targetfile), testname)
   end
@@ -229,7 +229,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(!File.exist?(@targetfile), testname)
   end
@@ -263,7 +263,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       file.puts("@contents << 'true'")
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file wasn't removed
     assert(File.exist?(@targetfile), testname)
@@ -276,7 +276,7 @@ class EtchDeleteTests < Test::Unit::TestCase
       file.write({delete: {script: []}}.to_yaml)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(File.exist?(@targetfile), testname)
   end

@@ -50,7 +50,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'link create')
 
@@ -70,7 +70,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile2, File.readlink(@targetfile), 'link update')
 
@@ -98,7 +98,7 @@ class EtchLinkTests < Test::Unit::TestCase
     # previous test)
     File.delete(@destfile2)
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'link update from non-existent file')
   end
@@ -123,7 +123,7 @@ class EtchLinkTests < Test::Unit::TestCase
 
     File.delete(@destfile)
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link was not created
     assert(!File.symlink?(@targetfile), 'link to non-existent destination')
@@ -146,7 +146,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link was updated properly
     assert_equal(@destfile, File.readlink(@targetfile), 'link to non-existent destination with override')
@@ -174,7 +174,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link was updated properly
     assert_equal(reldestfile, File.readlink(@targetfile), 'relative link')
@@ -200,7 +200,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the link ownership got set correctly
     #  Most systems don't support give-away chown, so this test won't work
@@ -234,7 +234,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'duplicate dest instructions')
   end
@@ -257,7 +257,7 @@ class EtchLinkTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory dest instructions')
@@ -275,7 +275,7 @@ class EtchLinkTests < Test::Unit::TestCase
       file.puts("@contents << '#{@destfile}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), testname)
   end
@@ -302,7 +302,7 @@ class EtchLinkTests < Test::Unit::TestCase
       file.puts("@contents << '#{@destfile}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(@destfile, File.readlink(@targetfile), 'duplicate script instructions')
   end
@@ -332,7 +332,7 @@ class EtchLinkTests < Test::Unit::TestCase
       file.puts("@contents << '#{@destfile2}'")
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the link wasn't created
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), 'contradictory script instructions')
@@ -346,7 +346,7 @@ class EtchLinkTests < Test::Unit::TestCase
       file.write({link: {script: []}}.to_yaml)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert(!File.symlink?(@targetfile) && !File.exist?(@targetfile), testname)
   end

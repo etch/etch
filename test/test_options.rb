@@ -61,7 +61,7 @@ class EtchOptionTests < Test::Unit::TestCase
       file.write('killswitch test')
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@targetfile), 'killswitch')
   end
@@ -98,7 +98,7 @@ class EtchOptionTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :extra_args => '--dry-run', :testname => testname)
+    assert_etch(@server, @testroot, :extra_args => '--dry-run', :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@targetfile), '--dry-run')
   end
@@ -229,7 +229,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2} etchtest1 etchtest2", :testname => testname)
+    assert_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2} etchtest1 etchtest2", :testname => testname)
     
     # Verify that only the requested files were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' file 1')
@@ -314,7 +314,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    run_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2}", :testname => testname)
+    assert_etch(@server, @testroot, :extra_args => "#{@targetfile} #{targetfile2}", :testname => testname)
     
     # Verify that all were created
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname + ' filesonly file 1')
@@ -406,7 +406,7 @@ class EtchOptionTests < Test::Unit::TestCase
       end
     end
     
-    run_etch(@server, @testroot, :extra_args => "etchtest1 #{targetfile2}", :testname => testname)
+    assert_etch(@server, @testroot, :extra_args => "etchtest1 #{targetfile2}", :testname => testname)
     
     # Verify that all were created
     assert_equal(origcontents + testname, get_file_contents(cmdtargetfile1), testname + ' cmdandfile cmd 1')
@@ -466,14 +466,14 @@ class EtchOptionTests < Test::Unit::TestCase
     sleep(5)
     
     # Test that we don't follow redirects by default
-    run_etch(@server, @testroot, :errors_expected => true, :extra_args => '', :port => redirect_port, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :extra_args => '', :port => redirect_port, :testname => testname)
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
     
     # Check that we do follow redirects with the appropriate option
     # NOTE:  Due to lack of need/demand we have not yet implemented an option
     #        to follow redirects
     # testname = 'follow redirects with --follow-redirects'
-    # run_etch(@server, @testroot, :extra_args => '--follow-redirects', :port => redirect_port)
+    # assert_etch(@server, @testroot, :extra_args => '--follow-redirects', :port => redirect_port)
     # assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
     
     # Test redirect with valid SSL
@@ -490,7 +490,7 @@ class EtchOptionTests < Test::Unit::TestCase
       response.set_redirect(
         WEBrick::HTTPStatus::Found, "http://localhost:#{redirect_port}/")
     end
-    run_etch(@server, @testroot, :errors_expected => true, :port => redirect_port, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :port => redirect_port, :testname => testname)
     
     server.shutdown
     t.kill
@@ -529,7 +529,7 @@ class EtchOptionTests < Test::Unit::TestCase
     end
     
     # Test that output from etch is appropriate
-    #run_etch(@server, @testroot, :extra_args => '--list-files', :testname => testname)
+    #assert_etch(@server, @testroot, :extra_args => '--list-files', :testname => testname)
     output = `#{RUBY} #{CLIENTDIR}/bin/etch --generate-all --test-root=#{@testroot} --key=#{File.dirname(__FILE__)}/keys/testkey --server=http://localhost:#{@server[:port]} --list-files`
     assert(output.include?("Files under management:\n#{@targetfile}\n"))
     

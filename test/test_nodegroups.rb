@@ -55,7 +55,7 @@ EOF
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -95,7 +95,7 @@ EOF
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -135,7 +135,7 @@ echo "grouper_group2"
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -185,7 +185,7 @@ echo "grouper_group2"
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file wasn't modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)

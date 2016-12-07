@@ -67,9 +67,9 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "server = http://bogushost:0"
     end
     
-    # The --server option normally used by run_etch will override the config
-    # file, signal run_etch to leave out the --server option
-    run_etch(@server, @testroot, :server => '', :errors_expected => true, :testname => testname)
+    # The --server option normally used by assert_etch will override the config
+    # file, signal assert_etch to leave out the --server option
+    assert_etch(@server, @testroot, :server => '', :errors_expected => true, :testname => testname)
     
     # And confirm that it now succeeds with a correct etch.conf server setting
     testname = 'etch.conf server setting, correct'
@@ -77,9 +77,9 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "server = http://localhost:#{@server[:port]}"
     end
     
-    # The --server option normally used by run_etch will override the config
-    # file, signal run_etch to leave out the --server option
-    run_etch(@server, @testroot, :server => '', :testname => testname)
+    # The --server option normally used by assert_etch will override the config
+    # file, signal assert_etch to leave out the --server option
+    assert_etch(@server, @testroot, :server => '', :testname => testname)
     assert_equal(sourcecontents, get_file_contents(@targetfile))
   end
   
@@ -116,9 +116,9 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "local = /not/a/valid/path"
     end
     
-    # Although the config file local setting will override it, tell run_etch
+    # Although the config file local setting will override it, tell assert_etch
     # to leave out the --server option to avoid confusion
-    run_etch(@server, @testroot, :server => '', :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :server => '', :errors_expected => true, :testname => testname)
     
     # And confirm that it now succeeds with a correct etch.conf local setting
     testname = 'etch.conf local setting, correct'
@@ -126,9 +126,9 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "local = #{@repodir}"
     end
     
-    # Although the config file local setting will override it, tell run_etch
+    # Although the config file local setting will override it, tell assert_etch
     # to leave out the --server option to avoid confusion
-    run_etch(@server, @testroot, :server => '', :testname => testname)
+    assert_etch(@server, @testroot, :server => '', :testname => testname)
     assert_equal(sourcecontents, get_file_contents(@targetfile))
   end
   
@@ -235,9 +235,9 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "key = /not/a/valid/path"
     end
     
-    # The --key option normally used by run_etch will override the config
-    # file, signal run_etch to leave out the --key option
-    run_etch(authserver, @testroot, :key => '',
+    # The --key option normally used by assert_etch will override the config
+    # file, signal assert_etch to leave out the --key option
+    assert_etch(authserver, @testroot, :key => '',
              :errors_expected => true, :testname => testname)
     
     # And confirm that it now succeeds with a correct etch.conf key setting
@@ -246,9 +246,9 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "key = #{keyfile.path}"
     end
     
-    # The --key option normally used by run_etch will override the config
-    # file, signal run_etch to leave out the --key option
-    run_etch(authserver, @testroot, :key => '', :testname => testname)
+    # The --key option normally used by assert_etch will override the config
+    # file, signal assert_etch to leave out the --key option
+    assert_etch(authserver, @testroot, :key => '', :testname => testname)
     assert_equal(sourcecontents, get_file_contents(@targetfile))
     
     # Tempfile will clean up the private key file, but not the associated
@@ -294,7 +294,7 @@ class EtchConfTests < Test::Unit::TestCase
     
     # Test that it fails without an etch.conf path setting
     testname = 'etch.conf path setting, not set'
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     assert(!File.exist?("#{@repodir}/pathtest/testpost.output"))
     
     testname = 'etch.conf path setting, set'
@@ -304,7 +304,7 @@ class EtchConfTests < Test::Unit::TestCase
     end
     
     # And confirm that it now succeeds with an etch.conf path setting
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     assert(File.exist?("#{@repodir}/pathtest/testpost.output"))
   end
   
@@ -335,7 +335,7 @@ class EtchConfTests < Test::Unit::TestCase
     File.open("#{@repodir}/source/#{@targetfile}/source", 'w') do |file|
       file.write(sourcecontents)
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     assert_match(sourcecontents, latest_result_message, testname)
     
     # Configure logging to server
@@ -350,7 +350,7 @@ class EtchConfTests < Test::Unit::TestCase
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "detailed_results = SERVER"
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     assert_match(sourcecontents, latest_result_message, testname)
     
     # Configure logging to file
@@ -364,7 +364,7 @@ class EtchConfTests < Test::Unit::TestCase
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "detailed_results = #{logfile.path}"
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     assert_match(sourcecontents, File.read(logfile.path), testname)
     # Check that details weren't sent to server
     # Odd that assert_no_match requires a Regexp when assert_match accepts a String
@@ -384,7 +384,7 @@ class EtchConfTests < Test::Unit::TestCase
       file.puts "detailed_results = SERVER"
       file.puts "detailed_results = #{logfile.path}"
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     assert_match(sourcecontents, latest_result_message, testname)
     assert_match(sourcecontents, File.read(logfile.path), testname)
     
@@ -398,7 +398,7 @@ class EtchConfTests < Test::Unit::TestCase
     File.open("#{@testroot}/etc/etch.conf", 'w') do |file|
       file.puts "detailed_results ="
     end
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     # Check that details weren't sent to server
     # Odd that assert_no_match requires a Regexp when assert_match accepts a String
     assert_no_match(Regexp.new(Regexp.escape(sourcecontents)), latest_result_message, testname)

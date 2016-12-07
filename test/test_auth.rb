@@ -89,7 +89,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -118,7 +118,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -155,7 +155,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(origcontents)
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :key => "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}", :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :key => "--key=#{File.join(File.dirname(__FILE__), 'keys', 'testkey2')}", :testname => testname)
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -198,7 +198,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(origcontents)
     end
     
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
     
     # Verify that the file was not touched
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -211,7 +211,7 @@ class EtchAuthTests < Test::Unit::TestCase
     sleep 3
     repodir2 = initialize_repository
     server2 = start_server(repodir2)
-    run_etch(server2, @testroot, :testname => 'adding client to database')
+    assert_etch(server2, @testroot, :testname => 'adding client to database')
     stop_server(server2)
     remove_repository(repodir2)
     
@@ -239,7 +239,7 @@ class EtchAuthTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)

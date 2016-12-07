@@ -1,0 +1,25 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    facter (2.3.0)
+    mini_portile2 (2.1.0)
+    minitest (4.7.5)
+    nokogiri (1.6.8)
+      mini_portile2 (~> 2.1.0)
+      pkg-config (~> 1.1.7)
+    pkg-config (1.1.7)
+    rack (1.6.4)
+    rake (10.1.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  facter
+  minitest (~> 4)
+  nokogiri
+  rack (~> 1)
+  rake
+
+BUNDLED WITH
+   1.11.2

@@ -61,7 +61,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -102,7 +102,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -131,7 +131,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -168,7 +168,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -205,7 +205,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -234,7 +234,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -273,7 +273,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -310,7 +310,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -339,7 +339,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -378,7 +378,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -415,7 +415,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -444,7 +444,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -481,7 +481,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -520,7 +520,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -557,7 +557,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was not modified
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
@@ -591,7 +591,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -620,7 +620,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -652,7 +652,7 @@ class EtchAttributeTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(server, @testroot, :testname => testname)
+    assert_etch(server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)

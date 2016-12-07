@@ -66,7 +66,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
@@ -109,7 +109,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     assert_equal(requestdata.join(';'), get_file_contents(@targetfile), testname)
@@ -159,7 +159,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     # Our whitespace in the heredoc above gets added to the generated file, so
@@ -205,7 +205,7 @@ class EtchLocalRequestsTests < Test::Unit::TestCase
       EOF
     end
     
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
     
     # Verify that the file was created properly
     # Our whitespace in the heredoc above gets added to the generated file, so

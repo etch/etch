@@ -47,7 +47,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -85,7 +85,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(templatecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -127,7 +127,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(warningcontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -165,7 +165,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'no warning file')
@@ -196,7 +196,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -236,7 +236,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = "/*\n"
@@ -277,7 +277,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = sourcecontents_firstline
@@ -316,7 +316,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     correctcontents = ''
@@ -355,7 +355,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file ownership got set correctly
     #  Most systems don't support give-away chown, so this test won't work
@@ -395,7 +395,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the ownership defaulted to UID/GID 0
     #  Most systems don't support give-away chown, so this test won't work
@@ -432,7 +432,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(testcontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file permissions got set correctly
     perms = File.stat(@targetfile).mode & 07777
@@ -473,7 +473,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate plain instructions')
@@ -513,7 +513,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(source2contents)
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory plain instructions')
@@ -537,7 +537,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.puts("@contents << '#{sourcecontents}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
   end
@@ -560,7 +560,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.puts("@contents << '#{sourcecontents}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(sourcecontents, get_file_contents(@targetfile), testname)
   end
@@ -579,7 +579,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(origcontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     assert_equal(origcontents, get_file_contents(@targetfile), testname)
   end
@@ -615,7 +615,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate template instructions')
@@ -655,7 +655,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(source2contents)
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory template instructions')
@@ -692,7 +692,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.puts("@contents << '#{sourcecontents}'")
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file contents were updated
     assert_equal(sourcecontents, get_file_contents(@targetfile), 'duplicate script instructions')
@@ -732,7 +732,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(source2contents)
     end
 
-    run_etch(@server, @testroot, :errors_expected => true, :testname => testname)
+    assert_etch(@server, @testroot, :errors_expected => true, :testname => testname)
 
     # Verify that the file contents didn't change
     assert_equal(origcontents, get_file_contents(@targetfile), 'contradictory script instructions')
@@ -769,7 +769,7 @@ class EtchFileTests < Test::Unit::TestCase
       file.write(sourcecontents)
     end
 
-    run_etch(@server, @testroot, :testname => testname)
+    assert_etch(@server, @testroot, :testname => testname)
 
     # Verify that the file was created properly
     assert_equal(sourcecontents, get_file_contents(specialtargetfile), testname)
