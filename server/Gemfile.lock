@@ -62,7 +62,7 @@ GEM
     mocha (1.1.0)
       metaclass (~> 0.0.1)
     multi_json (1.14.1)
-    nokogiri (1.10.7)
+    nokogiri (1.10.8)
       mini_portile2 (~> 2.4.0)
     polyamorous (1.0.0)
       activerecord (>= 3.0)
@@ -136,7 +136,7 @@ DEPENDENCIES
   jbuilder (~> 1.2)
   jquery-rails
   mocha
-  nokogiri (~> 1.10.4)
+  nokogiri (~> 1.10.8)
   rails (= 4.1.6)
   ransack (~> 1.2.2)
   sass-rails (~> 4.0.1)

@@ -47,5 +47,5 @@ end
 gem 'will_paginate', '~> 3.0.5'
 gem 'ransack', '~> 1.2.2'
 gem 'exception_notification', '~> 4.0.1'
-gem 'nokogiri', '~> 1.10.4'
+gem 'nokogiri', '~> 1.10.8'
 gem 'mocha', group: [:test]
