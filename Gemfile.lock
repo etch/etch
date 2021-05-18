@@ -8,7 +8,7 @@ GEM
       mini_portile2 (~> 2.5.0)
       racc (~> 1.4)
     racc (1.5.2)
-    rack (1.6.12)
+    rack (2.1.4)
     rake (10.1.0)
 
 PLATFORMS
@@ -18,7 +18,7 @@ DEPENDENCIES
   facter
   minitest (~> 4)
   nokogiri
-  rack (~> 1)
+  rack (~> 2)
   rake
 
 BUNDLED WITH
