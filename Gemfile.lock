@@ -9,7 +9,7 @@ GEM
       racc (~> 1.4)
     racc (1.5.2)
     rack (2.1.4)
-    rake (10.1.0)
+    rake (12.3.3)
 
 PLATFORMS
   ruby
