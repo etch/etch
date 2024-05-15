@@ -2,9 +2,9 @@ GEM
   remote: https://rubygems.org/
   specs:
     facter (2.4.1)
-    mini_portile2 (2.8.5)
+    mini_portile2 (2.8.6)
     minitest (4.7.5)
-    nokogiri (1.16.2)
+    nokogiri (1.16.5)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
     racc (1.7.3)
