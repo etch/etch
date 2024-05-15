@@ -57,12 +57,12 @@ GEM
       mime-types (>= 1.16, < 3)
     metaclass (0.0.4)
     mime-types (2.3)
-    mini_portile2 (2.8.5)
+    mini_portile2 (2.8.6)
     minitest (5.14.0)
     mocha (1.1.0)
       metaclass (~> 0.0.1)
     multi_json (1.14.1)
-    nokogiri (1.16.2)
+    nokogiri (1.16.5)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
     polyamorous (1.0.0)
@@ -138,7 +138,7 @@ DEPENDENCIES
   jbuilder (~> 1.2)
   jquery-rails
   mocha
-  nokogiri (~> 1.16.2)
+  nokogiri (~> 1.16.5)
   rails (= 4.1.6)
   ransack (~> 1.2.2)
   sass-rails (~> 4.0.1)
